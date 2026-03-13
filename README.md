@@ -11,7 +11,7 @@ Everything here has been used with real-world codebases - not generated with pro
 This repo exists to:
 - filter proven engineering value from untested content and marketing in the agentic ecosystem
 - fill agentic ecosystem gaps, both technology-independent and for specific technologies
-- extend the agentic ecosystem with specialized technology/pattern skills that capture best practices for distributed and/or cross-platform .NET applications
+- extend the agentic ecosystem with specialized technology/pattern skills for distributed and/or cross-platform applications
 
 ## What's included
 Currently this repo includes technology-independent content and content specific for [.NET](https://dotnet.microsoft.com) and [Uno Platform](https://platform.uno).
