@@ -22,13 +22,13 @@ In the coming months I will be adding content as I progress applying agentic eng
 👁️/⭐ this repo if this includes what you are looking for!
 
 ## How to use
-Install only the directives and skills that are relevant for your use case.
+Install only the directives and skills relevant for your use case.
 
 Install a directive:
 Paste the content of a `directives/<name>.md` file in your `AGENTS.MD` / `CLAUDE.md`
 
 Install a skill in Codex:
-`$skill-installer install https://github.com/VincentH-Net/dotnet-agentic-engineering/tree/main/skills/a-skill`
+`$skill-installer install https://github.com/VincentH-Net/dotnet-agentic-engineering/tree/main/skills/skillname`
 
 Install a skill / all skills in any agent with `npx skills` (requires `Node.js`) :
 ```bash
@@ -36,20 +36,20 @@ Install a skill / all skills in any agent with `npx skills` (requires `Node.js`)
 npx skills add VincentH-Net/dotnet-agentic-engineering --list
 
 # Install a specific skill to Claude Code
-npx skills add VincentH-Net/dotnet-agentic-engineering --skill a-skill -a claude-code
+npx skills add VincentH-Net/dotnet-agentic-engineering --skill skillname -a claude-code
 
 # Install a specific skill to Codex
-npx skills add VincentH-Net/dotnet-agentic-engineering --skill a-skill -a codex
+npx skills add VincentH-Net/dotnet-agentic-engineering --skill skillname -a codex
 
 # Install a specific skill to all detected agents
-npx skills add VincentH-Net/dotnet-agentic-engineering --skill a-skill
+npx skills add VincentH-Net/dotnet-agentic-engineering --skill skillname
 
 # Install all skills from this repo
 npx skills add VincentH-Net/dotnet-agentic-engineering --all
 ```
 
 ## Articles
-Posts with relevant results, experience and learnings:
+Posts with relevant results, experience, learnings:
 - TODO Article link
 
 ## Structure
@@ -57,8 +57,8 @@ Posts with relevant results, experience and learnings:
 ```
 dotnet-agentic-engineering/
 ├── setups/             # Optimized combinations of harness, model, configuration, plugins, MCPs and skill libraries - for specific use cases
-├── directives/         # Proven agent instruction snippets for agents.md or claude.md
-├── skills/             # Technology-specific knowledge
+├── directives/         # Proven agent instruction snippets for AGENTS.MD / CLAUDE.MD
+├── skills/             # Technology/pattern-specific knowledge
 └── examples/           # Sample projects demonstrating usage
 ```
 
