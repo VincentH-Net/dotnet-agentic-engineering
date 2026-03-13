@@ -19,7 +19,7 @@ Currently this repo includes technology-independent content and content specific
 ### Coming
 In the coming months I will be adding content as I progress applying agentic engineering to a real-world distributed, cross-platform application built with the latest [.NET](https://dotnet.microsoft.com), [Aspire](https://aspire.dev), [Azure](https://azure.microsoft.com), [Fabric](https://www.microsoft.com/en-us/microsoft-fabric), [Orleans](https://learn.microsoft.com/en-us/dotnet/orleans) and [Uno Platform](https://platform.uno).
 
-Watch and star this repo if this includes what you are looking for!
+👁️/⭐ this repo if this includes what you are looking for!
 
 ## How to use
 Install only the directives and skills that are relevant for your use case.
