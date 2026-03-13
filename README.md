@@ -64,18 +64,13 @@ dotnet-agentic-engineering/
 
 ## Contributing
 
+Contribute directives and skills for distributed/cross-platform applications built with Aspire, .NET (including ASP.NET minimal API's, SignalR), Azure (Container Apps, EventHub incl MQTT Broker), Entra ID, Fabric (RTI, Event House, Kusto).
+
 A core value of this repo is that it only includes things that I have verified in real-world work,
 so the best way to contribute is to register an issue `Consider including X` with a (link to) a directive or skill (library) 
 that you have created or found. It's also useful to summarize your experience using it (if any) - e.g. what was good / bad.
 
 Greatly appreciated!
-
-Things that are in scope of this repo are:
-- technology-independent agent directives
-- distributed .NET Orleans applications
-- cross-platform Uno Platform apps
-- Aspire, .NET SignalR, 
-- Azure (Container Apps, EventHub incl MQTT Broker), Entra ID, Fabric (RTI, Event House, Kusto)
 
 ## License
 
