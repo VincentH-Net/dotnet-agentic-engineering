@@ -1,0 +1,10 @@
+{
+  "name": "dotnet",
+  "version": "1.0.0",
+  "description": "Skills for .NET development including charting with LiveCharts2",
+  "author": {
+    "name": "Vincent Hoogendoorn",
+    "url": "https://github.com/VincentH-Net"
+  },
+  "skills": ["./skills/"]
+}

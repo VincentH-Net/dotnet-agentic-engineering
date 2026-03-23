@@ -1,0 +1,10 @@
+{
+  "name": "uno-platform",
+  "version": "1.0.0",
+  "description": "Skills for Uno Platform cross-platform development including Fluent design, navigation, responsive layouts, and testing",
+  "author": {
+    "name": "Vincent Hoogendoorn",
+    "url": "https://github.com/VincentH-Net"
+  },
+  "skills": ["./skills/"]
+}

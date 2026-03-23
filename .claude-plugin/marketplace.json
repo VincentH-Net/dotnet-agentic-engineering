@@ -1,0 +1,23 @@
+{
+  "name": "dotnet-agentic-engineering",
+  "owner": {
+    "name": "Vincent Hoogendoorn",
+    "url": "https://github.com/VincentH-Net"
+  },
+  "metadata": {
+    "description": "Battle-tested agentic engineering plugins for .NET and Uno Platform",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "dotnet",
+      "source": "./plugins/dotnet",
+      "description": "Skills for .NET development including charting with LiveCharts2"
+    },
+    {
+      "name": "uno-platform",
+      "source": "./plugins/uno-platform",
+      "description": "Skills for Uno Platform cross-platform development including Fluent design, navigation, responsive layouts, and testing"
+    }
+  ]
+}
