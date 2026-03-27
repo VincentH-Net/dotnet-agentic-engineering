@@ -53,8 +53,9 @@ Paste the content of a `directives/<name>.md` file in your `AGENTS.MD` / `CLAUDE
 Install a skills plugin in Claude Code:
 
 ```bash
-claude plugin add VincentH-Net/dotnet-agentic-engineering --plugin dotnet
-claude plugin add VincentH-Net/dotnet-agentic-engineering --plugin uno-platform
+claude plugin marketplace add VincentH-Net/dotnet-agentic-engineering
+claude plugin install dotnet@dotnet-agentic-engineering
+claude plugin install uno-platform@dotnet-agentic-engineering
 ```
 
 Install a skill in Codex:
@@ -72,6 +73,8 @@ npx skills add VincentH-Net/dotnet-agentic-engineering --list
 # Install a specific skill
 npx skills add VincentH-Net/dotnet-agentic-engineering --skill uno-fluent2
 ```
+
+Note that to install the same skills in both Claude Code and Codex you can install plugins for Claude Code and use `npx skills` for Codex. There is no need to specify Codex as target agent in the `npx skills` command: Codex supports skills under the `.agents` folder, which `npx skills` always installs to, while Claude Code does not support `.agents`.
 
 ## Structure
 
