@@ -3,7 +3,7 @@ name: uno-hamburgermenu-databinding
 description: This skill demonstrates how to use the Uno Navigation Extensions `NavigationView` and MVVM to create a data-bound, hierarchical hamburger menu with dynamic navigation. Use when implementing a data-bound hamburger menu.
 metadata:
   author: https://github.com/VincentH-Net
-  version: "1.0"
+  version: "1.1"
   framework: uno-platform
   category: navigation
 ---
@@ -115,12 +115,63 @@ Key points:
 2. **`NavigationView` also needs `uen:Region.Attached="true"`** so it participates in routing.
 3. **`MenuItemTemplate`** must use a `NavigationViewItem` (not just content) with:
    - `uen:Region.Name="{x:Bind Route}"` for navigation routing
-   - `uen:Navigation.Data="{x:Bind Data}"` to pass data to the destination viewmodel
+   - `uen:Navigation.Data="{x:Bind Data}"` — **REQUIRED** when passing typed data. Without it, the clicked `NavigationViewItem` container becomes the navigation data instead of the intended payload.
    - `MenuItemsSource="{Binding Children}"` to enable nested child items (note: uses `{Binding}` not `{x:Bind}` due to known Uno Platform x:Bind source generator issues in nested DataTemplate contexts — see unoplatform/uno#7279, #18509, #8471)
 4. **Content region** uses `uen:Region.Navigator="Visibility"` so pages are shown/hidden rather than recreated.
 
 ### Critical routing details
-1. The routes for the Main page and the default page within Main - Home - must be registered as default routes: pass `IsDefault:true` into their `RouteMap` constructor. This ensures that on the initial navigate to MainPage, Home is displayed within it.
+
+1. **Default routes**: The shell page and the default page within it must be registered with `IsDefault: true` in their `RouteMap` constructor. This ensures the landing page displays on initial navigation.
+2. **Fully qualified route names**: All leaf menu item routes MUST include the region prefix (e.g. `"Main/Home"`, `"Main/Settings"`). Do NOT use relative names. Mixed/relative names cause context-sensitive failures — submenu children can navigate at shell scope instead of within the content region, or header selection changes while content stays on the prior page.
+3. **`NavigationViewNavigator` enumerates top-level only**: Route-to-selected-item synchronization only walks `MenuItems` + `FooterMenuItems` — it does NOT recursively descend into nested submenu children. Keep nesting to **one level maximum** or accept that selection highlight may desync from the actual navigated page.
+
+### Flyout command bindings in NavigationView.Header (Uno Skia)
+
+When adding flyouts (notifications, profile, org switcher) in `NavigationView.Header`, **command bindings fail silently on Uno Skia**. Flyout content renders in `PopupRoot` where DataContext resolves to the shell's ViewModel, not the expected scope. Data bindings work (read-only) but commands resolve to null.
+
+**Fix**: Wrap the command in a data model so it travels with the data through the Flyout boundary:
+
+```csharp
+public sealed class ProfileInfo
+{
+    public string Name { get; init; } = "";
+    public string Email { get; init; } = "";
+    public IRelayCommand LogoutCommand { get; init; } = null!;
+}
+```
+
+In the ViewModel, create the model with the command embedded:
+```csharp
+ProfileInfo = new ProfileInfo { Name = user.Name, LogoutCommand = LogoutCommand };
+```
+
+In the Flyout XAML, bind through the data model:
+```xml
+<Button Content="Log out" Command="{Binding ProfileInfo.LogoutCommand}"/>
+```
+
+Do NOT use Click handlers as a workaround.
+
+### Sibling route navigation
+
+`NavigateViewModelAsync` resolves routes within the current navigator scope (child routes only). To navigate to a **sibling route** (e.g. from the main shell to a login page), use `NavigateRouteAsync` with the `-/` qualifier:
+
+```csharp
+await navigator.NavigateRouteAsync(this, "-/Login");
+```
+
+WHY: `NavigateViewModelAsync` to a sibling ViewModel fails silently.
+
+### `.UseThemeSwitching()` host builder requirement
+
+The `dotnet new unoapp` template does NOT include `.UseThemeSwitching()`. Add it to the host builder chain for `IThemeService` to resolve:
+
+```csharp
+.Configure(host => host
+    .UseThemeSwitching()  // required for IThemeService injection
+    .UseNavigation(RegisterRoutes)
+)
+```
 
 ## ViewModel: MainViewModel
 
@@ -134,22 +185,28 @@ public partial class MainViewModel : ObservableObject
     const int ReportsCount = 3;
 
     [ObservableProperty]
+    string pageTitle = "";
+
+    [ObservableProperty]
     ObservableCollection<NavMenuItem> menuItems = [];
 
     [ObservableProperty]
     ObservableCollection<NavMenuItem> footerMenuItems = [];
 
+    // CRITICAL: Must be object?, NOT NavMenuItem? — Uno Navigation's SelectorNavigator
+    // sets SelectedItem to a NavigationViewItem container, not your NavMenuItem model.
+    // Using NavMenuItem? causes runtime TypeConverter errors.
     [ObservableProperty]
-    NavMenuItem? selectedMenuItem;
+    object? selectedMenuItem;
 
-    partial void OnSelectedMenuItemChanged(NavMenuItem? value)
+    partial void OnSelectedMenuItemChanged(object? value)
     {
-        // React to menu selection changes, e.g. update page title
-        // Skip parent items (items with children) if desired:
-        if (value?.Children?.Any() == true)
-            return;
-
-        // Update title or perform other actions based on selected route
+        // Must handle BOTH NavMenuItem (from programmatic selection) and
+        // NavigationViewItem (from Uno Navigation's SelectorNavigator.Show)
+        if (value is NavMenuItem { Children: null or { Count: 0 } } menuItem)
+            PageTitle = menuItem.Title;
+        else if (value is NavigationViewItem { Tag: string tag })
+            PageTitle = tag;
     }
 
     public MainViewModel()
@@ -241,7 +298,45 @@ Routes follow the pattern `"RegionName/PageName"`, e.g.:
 - `"Main/Home"` navigates to `HomePage` in the region named `"Main"`
 - `"Main/Monitoring"` navigates to `MonitoringPage` in the `"Main"` region
 
-The region name in the route must match the `uen:Region.Name` on the content `Grid` in XAML.
+The region name in the route must match the `uen:Region.Name` on the content `Grid` in XAML. Always use the fully qualified form — see "Critical routing details" above.
+
+## Route registration for login + hamburger shell
+
+The `dotnet new unoapp` template shows flat sibling routes. The hamburger menu pattern typically requires nested routes under a shell page, with a login page as a sibling:
+
+```csharp
+static void RegisterRoutes(IViewRegistry views, IRouteRegistry routes)
+{
+    _ = views.Register(
+        new ViewMap(ViewModel: typeof(ShellViewModel)),
+        new ViewMap<LoginPage, LoginViewModel>(),
+        new ViewMap<MainPage, MainViewModel>(),
+        new ViewMap<HomePage, HomeViewModel>(),
+        new ViewMap<SettingsPage, SettingsViewModel>(),
+        new DataViewMap<DetailPage, DetailViewModel, DetailInfo>()  // typed navigation data
+    );
+
+    _ = routes.Register(
+        new RouteMap("", View: views.FindByViewModel<ShellViewModel>(),
+            Nested: [
+                new("Login", View: views.FindByViewModel<LoginViewModel>(), IsDefault: true),
+                new("Main", View: views.FindByViewModel<MainViewModel>(),
+                    Nested: [
+                        new("Home", View: views.FindByViewModel<HomeViewModel>(), IsDefault: true),
+                        new("Settings", View: views.FindByViewModel<SettingsViewModel>()),
+                        new("Detail", View: views.FindByViewModel<DetailViewModel>()),
+                    ]
+                ),
+            ]
+        )
+    );
+}
+```
+
+Key differences from template:
+- Login as `IsDefault: true` sibling — shown first on app start
+- Main has its own nested children with `IsDefault: true` on the landing page
+- `DataViewMap` for pages receiving typed navigation data
 
 ## Dependencies
 

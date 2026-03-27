@@ -3,7 +3,7 @@ name: uno-fluent2
 description: Fluent 2 Design System for Uno Platform. Use when designing UI layouts, choosing colors, applying typography, setting elevation/shadows, using theme resources, applying lightweight styling, or implementing Fluent Design principles in WinUI/Uno XAML apps. Covers color, typography, geometry, materials, motion, iconography, spacing, elevation, and responsive breakpoints.
 metadata:
   author: vhnet
-  version: "1.0"
+  version: "1.1"
   framework: uno-platform
   category: design-system
   sources:
@@ -96,6 +96,7 @@ Use `{ThemeResource BrushName}` in XAML:
 
 ### Usability
 - Ensure 4.5:1 contrast ratio for body text, 3:1 for large text
+- **Non-text contrast**: 3:1 minimum for UI component boundaries (borders, strokes, icons). Custom border brushes must be contrast-checked against both the card background AND the page background in both Light and Dark themes — colors that look acceptable often fail WCAG 2.2 non-text contrast.
 - Consider colorblindness (8% of men are red-green colorblind)
 - Avoid using color as the sole differentiator between elements
 
@@ -347,6 +348,101 @@ For styled variants (Filled, Outlined, Text): prefix with style name:
 - `OutlinedButtonForeground`, `OutlinedButtonBackground`
 - `TextButtonForeground`, `TextButtonBackground`
 
+### NavigationView — Full-Bleed Header Overrides
+
+When using `NavigationView` as the app shell with a custom top bar in `NavigationView.Header`, the default chrome adds padding and rounded corners that conflict with a full-bleed header design. Override these three keys at app level:
+
+```xaml
+<!-- In App.xaml resources -->
+<Thickness x:Key="NavigationViewHeaderMargin">0</Thickness>
+<Thickness x:Key="NavigationViewContentGridBorderThickness">0</Thickness>
+<CornerRadius x:Key="NavigationViewContentGridCornerRadius">0</CornerRadius>
+```
+
+### Reusable Card Container Style
+
+A shared card style combining border, elevation, theme-aware background, and content alignment. Define in `App.xaml` resources:
+
+```xaml
+<Style x:Key="AppCardContainerStyle" TargetType="ContentControl">
+    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+    <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+    <Setter Property="Template">
+        <Setter.Value>
+            <ControlTemplate TargetType="ContentControl">
+                <Border CornerRadius="4"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource ControlStrokeColorDefaultBrush}"
+                        BorderThickness="1" Padding="16" Translation="0,0,8">
+                    <Border.Shadow><ThemeShadow/></Border.Shadow>
+                    <ContentPresenter Content="{TemplateBinding Content}"
+                                      HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                      VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                </Border>
+            </ControlTemplate>
+        </Setter.Value>
+    </Setter>
+</Style>
+```
+
+Usage: wrap card content in `<ContentControl Style="{StaticResource AppCardContainerStyle}">`.
+
+### Transparent Icon Button Style (Header Bar)
+
+For icon buttons (notifications, profile, settings) in a top bar:
+
+```xaml
+<Style x:Key="TopBarIconButtonStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="BorderBrush" Value="Transparent"/>
+    <Setter Property="Padding" Value="8"/>
+    <Setter Property="MinWidth" Value="36"/>
+    <Setter Property="MinHeight" Value="36"/>
+</Style>
+```
+
+### Custom App Theme Color Dictionary
+
+Apps typically need custom theme-aware brushes beyond WinUI defaults. Pattern:
+
+1. Create `Themes/AppColors.xaml` with `ThemeDictionaries` containing Light and Dark `ResourceDictionary` entries
+2. **Must have a code-behind** (`.xaml.cs`) — required by Uno to load the XAML resource
+3. Include in `App.xaml` via typed reference: `<themes:AppColors/>` in `MergedDictionaries`
+4. Naming convention: `{App}{Surface}{Purpose}Brush` (e.g. `MyAppCardBorderBrush`, `MyAppTopBarBackgroundBrush`)
+
+```xaml
+<ResourceDictionary x:Class="MyApp.Themes.AppColors" ...>
+    <ResourceDictionary.ThemeDictionaries>
+        <ResourceDictionary x:Key="Light">
+            <!-- Override accent color for brand identity -->
+            <Color x:Key="SystemAccentColor">#0C54B0</Color>
+            <Color x:Key="SystemAccentColorLight1">#285EE4</Color>
+            <!-- App surfaces -->
+            <SolidColorBrush x:Key="MyAppPageBackgroundBrush" Color="#F3F3F3"/>
+            <SolidColorBrush x:Key="MyAppCardBorderBrush" Color="#E0E0E0"/>
+            <SolidColorBrush x:Key="MyAppTopBarBackgroundBrush" Color="#FFFFFF"/>
+            <!-- Semantic status -->
+            <SolidColorBrush x:Key="MyAppStatusOnlineBrush" Color="#107C10"/>
+            <SolidColorBrush x:Key="MyAppStatusWarningBrush" Color="#CA5010"/>
+            <SolidColorBrush x:Key="MyAppStatusCriticalBrush" Color="#D13438"/>
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="Dark">
+            <!-- Lighter accent for dark backgrounds -->
+            <Color x:Key="SystemAccentColor">#5A8AF0</Color>
+            <Color x:Key="SystemAccentColorLight1">#94B4F5</Color>
+            <!-- App surfaces -->
+            <SolidColorBrush x:Key="MyAppPageBackgroundBrush" Color="#1C1C28"/>
+            <SolidColorBrush x:Key="MyAppCardBorderBrush" Color="#3E3E50"/>
+            <SolidColorBrush x:Key="MyAppTopBarBackgroundBrush" Color="#1E1E2E"/>
+            <!-- Semantic status (lighter for contrast on dark) -->
+            <SolidColorBrush x:Key="MyAppStatusOnlineBrush" Color="#6CCB5F"/>
+            <SolidColorBrush x:Key="MyAppStatusWarningBrush" Color="#F7A94B"/>
+            <SolidColorBrush x:Key="MyAppStatusCriticalBrush" Color="#FF6B6B"/>
+        </ResourceDictionary>
+    </ResourceDictionary.ThemeDictionaries>
+</ResourceDictionary>
+```
+
 ---
 
 ## 10. Uno Toolkit — Lightweight Styling Keys
@@ -423,6 +519,9 @@ Key pattern: `TabBarItem{Property}{State}` — use the Uno Toolkit docs or `uno-
 | ThemeResource brushes | Full support |
 | Lightweight styling | Full support (both Uno.Themes and Uno.Toolkit) |
 | Compact density | Supported |
+| `AutomationProperties.HeadingLevel` | **Not supported** on Skia (Uno0001 build error). Use `AutomationProperties.Name` instead. |
+| `WrapGrid.Orientation` | **Not supported** on Skia (Uno0001 build error). Use default orientation or a different panel. |
+| Nested `ItemsRepeater` | Inner repeater gets 0 width/height on Skia — layout collapses. Flatten to single repeater with `DataTemplateSelector`. |
 
 ---
 

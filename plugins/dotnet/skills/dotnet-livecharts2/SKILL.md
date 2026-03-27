@@ -3,7 +3,7 @@ name: dotnet-livecharts2
 description: LiveCharts2 development guide — installation, XAML source generator integration, theme config, gotchas, and sample index with exact repo file paths. Use when implementing any LiveCharts2 chart (line, area, bar, pie, gauge, heatmap, scatter, polar, financial). Covers all platforms (WinUI, Uno, Avalonia, MAUI, WPF, Blazor, WinForms, Eto).
 metadata:
   author: vhnet
-  version: "1.0"
+  version: "1.1"
   library: LiveCharts2
   library-version: "2.0.0-rc6.1"
   category: charting
@@ -44,10 +44,33 @@ xmlns:lvc="using:LiveChartsCore.SkiaSharpView.WinUI"
 
 The Uno package re-exports from the WinUI namespace. Using the wrong namespace causes UXAML0001 build errors.
 
-## 2. XAML Source Generator Integration
+## 2. Series Approach: ViewModel-First vs XAML-First
 
-Prefer XAML-defined series over ViewModel-created `ISeries[]` for UI customization.
-Use `SeriesCollection` with `Xaml*Series` types inside `Chart.Series`:
+Choose the right approach per chart type:
+
+### ViewModel-first (preferred for most charts)
+
+Build `ISeries[]` / `IReadOnlyList<ISeries>` in the ViewModel; XAML just binds `Series`, `XAxes`, `YAxes`:
+
+```xml
+<lvc:CartesianChart Series="{Binding Series}" XAxes="{Binding XAxes}" YAxes="{Binding YAxes}"
+                    TooltipPosition="Top" AnimationsSpeed="00:00:00.400" ZoomMode="X"/>
+```
+```csharp
+[ObservableProperty] public partial IReadOnlyList<ISeries> Series { get; set; }
+public IReadOnlyList<Axis> XAxes { get; }
+public IReadOnlyList<Axis> YAxes { get; }
+```
+
+Use ViewModel-first when:
+- Series need **semantic dark/light colors** from a centralized palette (see §2b)
+- Theme changes require series rebuild via `OnThemeChanged()` → `Series = BuildSeries()`
+- Data is computed/aggregated from injected services
+- `Paint` objects need programmatic construction with helpers (`ChartPalette.Stroke()`, `ChartPalette.Fill()`)
+
+### XAML-first (for gauges and simple static charts)
+
+Use `SeriesCollection` / `AxesCollection` wrappers with `Xaml*` types:
 
 ```xml
 <lvc:CartesianChart>
@@ -56,18 +79,204 @@ Use `SeriesCollection` with `Xaml*Series` types inside `Chart.Series`:
             <lvc:XamlLineSeries Values="{Binding Values}" Fill="{x:Null}" GeometrySize="20"/>
         </lvc:SeriesCollection>
     </lvc:CartesianChart.Series>
+    <lvc:CartesianChart.XAxes>
+        <lvc:AxesCollection>
+            <lvc:XamlAxis Labels="{Binding Labels}" MinStep="1" ForceStepToMin="True"/>
+        </lvc:AxesCollection>
+    </lvc:CartesianChart.XAxes>
 </lvc:CartesianChart>
 ```
+
+Use XAML-first when:
+- **Gauges** — layout is inherently visual (DrawMargin, DataLabelsPadding, InnerRadius)
+- Simple static charts where colors don't need dark/light variants
+- Designer-editable colors without touching C#
+
+Even in XAML-first gauges, Paint objects can be bound from ViewModel (`Fill="{Binding GaugeFill}"`) for theme-aware colors.
 
 **XAML series types**: `XamlLineSeries`, `XamlColumnSeries`, `XamlRowSeries`, `XamlStackedAreaSeries`, `XamlStackedColumnSeries`, `XamlStackedRowSeries`, `XamlStackedStepAreaSeries`, `XamlScatterSeries`, `XamlStepLineSeries`, `XamlPieSeries`, `XamlHeatSeries`, `XamlBoxSeries`, `XamlCandlesticksSeries`, `XamlPolarLineSeries`, `XamlGaugeSeries`, `XamlGaugeBackgroundSeries`, `XamlAngularGaugeSeries`, `XamlNeedle`, `XamlAngularTicks`.
 
 **XAML axis types**: `XamlAxis`, `XamlDateTimeAxis`, `XamlTimeSpanAxis`, `XamlLogarithmicAxis`, `XamlPolarAxis`.
 
-**Markup extensions**: `{lvc:SolidColorPaint Color='#AARRGGBB'}`, `{lvc:Float Value='25'}`, `{lvc:Padding Value='15'}`.
+**XAML collection wrappers**: `SeriesCollection` (for `Chart.Series`), `AxesCollection` (for `Chart.XAxes`/`Chart.YAxes`).
 
-When charts need **explicit series colors** (e.g. green=generation, blue=consumption), create series in the ViewModel instead. `AddDefaultTheme` unconditionally overwrites `Fill`/`Stroke` with palette colors — use `HasTheme` directly with `HasDefaultTooltip`/`HasDefaultLegend` to preserve explicit colors.
+### Markup extensions
+
+- `{lvc:SolidColorPaint Color='#AARRGGBB'}` — solid fill/stroke paint
+- `{lvc:Float Value='25'}` — float literal
+- `{lvc:Padding Value='L,T,R,B'}` or `{lvc:Padding Value='15'}` — padding
+- `{lvc:Margin Value='L,T,R,B'}` — chart DrawMargin override
+- `{lvc:ColorArray Values='#FF4FC3F7, #FFFFF176, #FFFF5722'}` — color gradient (for `HeatMap` property)
+
+**CRITICAL: `{lvc:SolidColorPaint}` only accepts the `Color` parameter.** Do NOT add `StrokeThickness` or other properties inside the markup extension (e.g. `Color='FF107C10', StrokeThickness=2`). The comma causes UXAML0001 parse errors. Set stroke thickness separately on the series or in C#.
+
+### Anti-pattern: `AddDefaultTheme` overwrites explicit colors
+
+`AddDefaultTheme` adds `HasRuleForLineSeries`/`HasRuleForBarSeries` etc. that unconditionally overwrite `Fill`/`Stroke` with palette colors, breaking explicit XAML `{lvc:SolidColorPaint}` values and ViewModel-set semantic colors. Use `HasTheme` directly with `HasDefaultTooltip`/`HasDefaultLegend` + selective `HasRuleFor*` to preserve explicit colors.
+
+## 2b. Data Types
+
+Choose the right data type for your series:
+
+| Type | When to use | Example chart |
+|---|---|---|
+| `double` / `int` | Simple categorical data, gauge values, sparklines | Column chart, gauge `GaugeValue`, sparkline |
+| `ObservableValue` | Single value needing live update via `.Value` setter | Row bar with real-time noise (use with `ObservableCollection<ObservableValue>`) |
+| `ObservablePoint` | Explicit X/Y coordinates | Scatter, custom-positioned points |
+| `DateTimePoint` | Time-series data (X = DateTime) | Power flow, energy balance, range forecast |
+| `WeightedPoint` | X/Y/weight (3 dimensions) | Heatmap (`HeatSeries`), bubble scatter |
+| `FinancialPoint` | OHLC candle data | Candlestick chart |
+
+**CRITICAL: `XamlGaugeSeries.GaugeValue` expects `double`, NOT `ObservableValue`.** Binding to an `ObservableValue` object shows "0". Use `[ObservableProperty] double GaugeValue` with PropertyChanged notification. `ObservableValue` is a LiveCharts data container for `ISeries`-level data collections, not for XAML DependencyProperty bindings.
+
+## 2c. Semantic Color Palette Architecture
+
+For charts with domain-specific meaning (green=generation, blue=consumption), create a centralized palette helper:
+
+```csharp
+static class ChartPalette
+{
+    public static bool IsDark { get; private set; }
+
+    // Set from LiveCharts.Configure() theme callback
+    internal static void SetTheme(bool isDark) => IsDark = isDark;
+
+    // Named semantic colors with dark/light variants
+    public static SKColor Generation  => IsDark ? new(108, 203, 95)  : new(16, 124, 16);
+    public static SKColor Consumption => IsDark ? new(96, 205, 255)  : new(0, 120, 212);
+    public static SKColor GridImport  => IsDark ? new(247, 169, 75)  : new(247, 99, 12);
+    public static SKColor Storage     => IsDark ? new(158, 168, 255) : new(135, 100, 184);
+
+    // Reusable paint helpers
+    public static SolidColorPaint Stroke(SKColor c) => new(c) { StrokeThickness = 2 };
+    public static SolidColorPaint Fill(SKColor c, byte alpha = 80) => new(c.WithAlpha(alpha));
+}
+```
+
+Usage in ViewModel series builders:
+```csharp
+new LineSeries<DateTimePoint>
+{
+    Name = "Generation",
+    Values = GenerationValues,
+    Stroke = ChartPalette.Stroke(ChartPalette.Generation),
+    Fill = ChartPalette.Fill(ChartPalette.Generation),
+    GeometrySize = 0,
+    LineSmoothness = 0.65,
+}
+```
+
+For dark/light band colors (e.g. SoC distribution), use the same pattern with static methods:
+```csharp
+static SKColor Band0Color(bool dark) => dark ? new(255, 100, 100) : new(209, 52, 56); // critical
+static SKColor Band3Color(bool dark) => dark ? new(108, 203, 95)  : new(16, 124, 16); // healthy
+```
+
+## 2d. Common Recipes
+
+### Sparkline (inline mini-chart)
+
+ViewModel builds series lazily; XAML uses fixed height, hidden axes/tooltip/legend:
+
+```csharp
+// Lazy construction from data array
+public IReadOnlyList<ISeries>? SparklineSeries =>
+    field ??= DataPoints is { } pts
+        ? [new LineSeries<double> {
+            Values = pts,
+            Stroke = ChartPalette.Stroke(ChartPalette.Generation),
+            Fill = ChartPalette.Fill(ChartPalette.Generation, 60),
+            GeometrySize = 0, LineSmoothness = 0.6 }]
+        : null;
+```
+```xml
+<lvc:CartesianChart Height="30"
+                    Series="{Binding SparklineSeries}"
+                    TooltipPosition="Hidden"
+                    LegendPosition="Hidden"
+                    AnimationsSpeed="00:00:00.200"/>
+```
+
+For XAML-defined sparklines, disable geometry dots and hide all axes:
+```xml
+<lvc:CartesianChart Height="40" LegendPosition="Hidden">
+    <lvc:CartesianChart.Series>
+        <lvc:SeriesCollection>
+            <lvc:XamlLineSeries Values="{Binding Values}"
+                Fill="{lvc:SolidColorPaint Color='40107C10'}"
+                Stroke="{lvc:SolidColorPaint Color='FF107C10'}"
+                GeometryFill="{x:Null}" GeometryStroke="{x:Null}" GeometrySize="0"
+                LineSmoothness="0.8"/>
+        </lvc:SeriesCollection>
+    </lvc:CartesianChart.Series>
+    <lvc:CartesianChart.XAxes>
+        <lvc:AxesCollection>
+            <lvc:XamlAxis IsVisible="False" ShowSeparatorLines="False"/>
+        </lvc:AxesCollection>
+    </lvc:CartesianChart.XAxes>
+    <lvc:CartesianChart.YAxes>
+        <lvc:AxesCollection>
+            <lvc:XamlAxis IsVisible="False" ShowSeparatorLines="False" MinLimit="0"/>
+        </lvc:AxesCollection>
+    </lvc:CartesianChart.YAxes>
+</lvc:CartesianChart>
+```
+
+Key: `GeometryFill="{x:Null}" GeometryStroke="{x:Null}" GeometrySize="0"` removes point dots. This triplet is needed on every area/line chart that should show a clean curve.
+
+### Theme change rebuild
+
+When theme switches, ViewModel Paint objects (built from `ChartPalette.IsDark`) are stale. Rebuild the entire `ISeries[]`:
+
+```csharp
+public void OnThemeChanged() => Series = BuildSeries();
+```
+
+Call this from the page/shell when the theme service fires a change event.
+
+### Stacked horizontal bar (e.g. SoC distribution)
+
+ViewModel-first with categorical Y-axis labels:
+
+```csharp
+IReadOnlyList<ISeries> BuildSeries() =>
+[
+    new StackedRowSeries<int> { Name = "0-25%",  Values = band0, Fill = new SolidColorPaint(Band0Color(dark)), Stroke = null },
+    new StackedRowSeries<int> { Name = "25-50%", Values = band1, Fill = new SolidColorPaint(Band1Color(dark)), Stroke = null },
+    new StackedRowSeries<int> { Name = "50-75%", Values = band2, Fill = new SolidColorPaint(Band2Color(dark)), Stroke = null },
+    new StackedRowSeries<int> { Name = "75-100%", Values = band3, Fill = new SolidColorPaint(Band3Color(dark)), Stroke = null },
+];
+
+// Y-axis with fleet/category labels
+YAxes = [new Axis { Labels = fleetNames, TextSize = 11 }];
+XAxes = [new Axis { TextSize = 11, MinLimit = 0, Name = "Vehicles" }];
+```
+
+### Stacked area (e.g. energy balance)
+
+```csharp
+new StackedAreaSeries<DateTimePoint>
+{
+    Name = "Solar",
+    Values = SolarValues,
+    Stroke = ChartPalette.Stroke(ChartPalette.Generation),
+    Fill = ChartPalette.Fill(ChartPalette.Generation, 120),
+    GeometrySize = 0,
+    LineSmoothness = 0.5,
+}
+```
 
 ## 3. Theme Configuration
+
+### Initialization
+
+**`LiveCharts.Configure()` returns `void`** — do NOT assign it: `_ = LiveCharts.Configure(...)` causes CS8209. Call as a statement:
+
+```csharp
+LiveCharts.Configure(config => config.HasTheme(...));
+```
+
+Call `LiveCharts.Configure()` once in `App.xaml.cs` (or a static method called from there) **before any chart control renders**. Typically in `OnLaunched` before `InitializeComponent`.
 
 ### Built-in palette
 
@@ -75,19 +284,76 @@ Built-in palettes e.g. `.FluentDesign` are defined in `LiveChartsCore.Themes.Col
 
 ### Dark/light switching
 
-Use `theme.Initialized.Add(() => { ... })` inside `HasTheme` callback. `theme.IsDark` reflects current state. Fires on first render and on each dark/light toggle.
+Use `theme.OnInitialized(() => { ... })` inside `HasTheme` callback (fluent API). `theme.IsDark` reflects current state. Fires on first render and on each dark/light toggle.
 
 ```csharp
 LiveCharts.Configure(config => config
     .HasTheme(theme =>
-        theme.Initialized.Add(() =>
-        {
-            theme.Colors = theme.IsDark ? DarkPalette : ColorPalletes.FluentDesign;
-            // axis/tooltip styling based on theme.IsDark
-        })
+        theme
+            .OnInitialized(() =>
+            {
+                theme.Colors = theme.IsDark ? DarkPalette : ColorPalletes.FluentDesign;
+                theme.AnimationsSpeed = TimeSpan.FromMilliseconds(500);
+                theme.EasingFunction = EasingFunctions.QuadraticOut;
+
+                // Note: API typo — "Backround" not "Background"
+                theme.VirtualBackroundColor = theme.IsDark
+                    ? new LvcColor(28, 28, 40)
+                    : new LvcColor(255, 255, 255);
+
+                theme.TooltipTextPaint = new SolidColorPaint(
+                    theme.IsDark ? new SKColor(220, 220, 230) : new SKColor(40, 40, 40));
+                theme.TooltipBackgroundPaint = new SolidColorPaint(
+                    theme.IsDark ? new SKColor(42, 42, 58, 230) : new SKColor(245, 245, 245, 230));
+                theme.TooltipTextSize = 12;
+                theme.LegendTextPaint = new SolidColorPaint(
+                    theme.IsDark ? new SKColor(220, 220, 230) : new SKColor(40, 40, 40));
+
+                // Update ChartPalette for ViewModel series builders
+                ChartPalette.SetTheme(theme.IsDark);
+            })
+            .HasDefaultTooltip(() => new SKDefaultTooltip())
+            .HasDefaultLegend(() => new SKDefaultLegend())
+            .HasRuleForAxes(axis =>
+            {
+                axis.TextSize = 11;
+                axis.ShowSeparatorLines = true;
+                axis.NamePaint = new SolidColorPaint(
+                    theme.IsDark ? new SKColor(200, 200, 210) : new SKColor(60, 60, 60));
+                axis.LabelsPaint = new SolidColorPaint(
+                    theme.IsDark ? new SKColor(185, 185, 195) : new SKColor(80, 80, 80));
+
+                SKColor lineColor = theme.IsDark ? new(55, 55, 70) : new(225, 225, 225);
+                if (axis is ICartesianAxis cartesian)
+                {
+                    axis.SeparatorsPaint = cartesian.Orientation == AxisOrientation.X
+                        ? null  // no vertical gridlines
+                        : new SolidColorPaint(lineColor) { StrokeThickness = 1 };
+                }
+                else
+                {
+                    axis.SeparatorsPaint = new SolidColorPaint(lineColor) { StrokeThickness = 1 };
+                }
+            })
     )
 );
 ```
+
+### Theme rule methods reference
+
+Use selective rules with `HasTheme` to control which series types get themed:
+
+| Method | Purpose |
+|---|---|
+| `HasRuleForAxes(Action<IPlane>)` | Style all axes (labels, separators, name paint) |
+| `HasRuleForAnySeries(Action<ISeries>)` | Style all series (data labels, hover state) |
+| `HasRuleForLineSeries(...)` | Style line series — **overwrites Fill/Stroke** |
+| `HasRuleForBarSeries(...)` | Style bar/column series — **overwrites Fill/Stroke** |
+| `HasRuleForGaugeSeries(...)` | Style gauge foreground (DataLabelsPosition, CornerRadius) |
+| `HasRuleForGaugeFillSeries(...)` | Style gauge background arc (Fill) |
+| `HasRuleFor<BaseLabelVisual>(...)` | Style label visual elements |
+
+**Only include `HasRuleForLineSeries`/`HasRuleForBarSeries` etc. if you want palette auto-coloring.** Omit them to preserve explicit series colors set in XAML or ViewModel.
 
 ## 4. Chart Layout Model
 
@@ -259,11 +525,55 @@ Example: 180° gauge filling a card with value text above the arc's flat edge:
 
 ### Gauges
 
-- **Use `XamlGaugeSeries` + `XamlGaugeBackgroundSeries`** — NOT `PieSeries<double>(isGauge: true)`. See sample **Pies/Gauge2**.
+**Anti-pattern: manual PieSeries gauge.** Do NOT create gauges with `new PieSeries<double> { Values = [75] }` + `new PieSeries<double> { Values = [25] }` (manually calculating the background remainder). This is fragile. Use `XamlGaugeSeries` + `XamlGaugeBackgroundSeries` instead — the background auto-fills the remaining arc. See sample **Pies/Gauge2**.
+
 - **Top-half (speedometer) gauge**: `InitialRotation="180"`, `MaxAngle="180"`. NOT `-90` (that produces a right-side half). 0° = 3 o'clock in LiveCharts2.
 - **Set `InnerRadius` on the series** (not the PieChart) to create the donut arc gap.
 - **Fill a 180° gauge into its card**: use negative `DrawMargin` + `DataLabelsPadding` — see "Combining DrawMargin + DataLabelsPadding" in the Chart Layout Model section above.
+- **Always set `LegendPosition="Hidden"` and `TooltipPosition="Hidden"`** on gauge PieCharts — default legend/tooltip are meaningless for gauges.
+- **`AnimationsSpeed` as XAML TimeSpan string**: `AnimationsSpeed="00:00:00.500"` (500ms). Set on the PieChart control.
+- **`GaugeValue` expects `double`** — NOT `ObservableValue`. Use `[ObservableProperty] double GaugeValue` in ViewModel.
 - **`{Binding}` doesn't work for `DataLabelsPaint` on `XamlGaugeSeries`** — use `{lvc:SolidColorPaint}` markup extension instead.
+- **`Fill` and `BackgroundFill` DO support `{Binding}`** — bind `Paint` objects from ViewModel for theme-aware gauge colors:
+
+```xml
+<lvc:PieChart DrawMargin="{lvc:Margin Value='-20,0,-20,-120'}"
+              InitialRotation="180" MaxAngle="180" MinValue="0" MaxValue="100"
+              LegendPosition="Hidden" TooltipPosition="Hidden"
+              AnimationsSpeed="00:00:00.500">
+    <lvc:PieChart.Series>
+        <lvc:SeriesCollection>
+            <lvc:XamlGaugeSeries
+                GaugeValue="{Binding GaugeValue}"
+                Fill="{Binding GaugeFill}"
+                InnerRadius="55"
+                ShowDataLabels="True" DataLabelsSize="24"
+                DataLabelsPaint="{lvc:SolidColorPaint Color='#DDDDE6'}"
+                DataLabelsPadding="{lvc:Padding Value='6,6,6,50'}"
+                DataLabelsPosition="ChartCenter"/>
+            <lvc:XamlGaugeBackgroundSeries
+                InnerRadius="55"
+                Fill="{Binding BackgroundFill}"/>
+        </lvc:SeriesCollection>
+    </lvc:PieChart.Series>
+</lvc:PieChart>
+```
+
+```csharp
+// ViewModel: theme-aware Paint objects
+public Paint GaugeFill { get; init; } = new SolidColorPaint(SKColors.Gray);
+public Paint BackgroundFill { get; init; } = new SolidColorPaint(new SKColor(220, 220, 225));
+
+// Factory method with semantic color from ChartPalette
+static RadialGaugeViewModel Build(string title, double value, SKColor color) => new()
+{
+    GaugeValue = value,
+    GaugeFill = new SolidColorPaint(color),
+    BackgroundFill = new SolidColorPaint(ChartPalette.IsDark
+        ? new SKColor(60, 60, 75, 90)
+        : new SKColor(180, 200, 240, 90)),
+};
+```
 
 ### HeatSeries
 
@@ -273,14 +583,95 @@ Example: 180° gauge filling a card with value text above the arc's flat edge:
 
 ### Real-time Charts
 
-- Use `ObservableCollection<DateTimePoint>` for auto-updating time series.
-- Use `PeriodicTimer` or `Task.Delay` loop for update ticks.
-- For thread safety: set `SyncContext="{Binding Sync}"` on the chart, where `Sync` is a shared `object`.
-- Trim old points to maintain a sliding window.
+Use `PeriodicTimer` with `CancellationToken` and `IDisposable` for proper lifecycle:
+
+```csharp
+public sealed partial class PowerFlowChartViewModel : ObservableObject, IDisposable
+{
+    const int WindowMinutes = 240;
+    readonly PeriodicTimer timer = new(TimeSpan.FromMilliseconds(5000));
+    readonly CancellationTokenSource cts = new();
+
+    public ObservableCollection<DateTimePoint> GenerationValues { get; } = [];
+    [ObservableProperty] public partial IReadOnlyList<ISeries> Series { get; set; }
+    public object Sync { get; } = new();  // thread-safety lock
+
+    public PowerFlowChartViewModel()
+    {
+        SeedHistoricData();
+        Series = BuildSeries();
+        _ = TickLoop();
+    }
+
+    async Task TickLoop()
+    {
+        try { while (await timer.WaitForNextTickAsync(cts.Token)) AddDataPoint(); }
+        catch (OperationCanceledException) { }
+    }
+
+    void AddDataPoint()
+    {
+        var now = DateTime.Now;
+        GenerationValues.Add(new DateTimePoint(now, ComputeValue()));
+
+        // Sliding window: trim old points
+        var cutoff = now.AddMinutes(-WindowMinutes);
+        while (GenerationValues.Count > 0 && GenerationValues[0].DateTime < cutoff)
+            GenerationValues.RemoveAt(0);
+    }
+
+    public void Dispose() { cts.Cancel(); cts.Dispose(); timer.Dispose(); }
+}
+```
+
+```xml
+<lvc:CartesianChart Series="{Binding Series}" SyncContext="{Binding Sync}" ZoomMode="X"/>
+```
+
+Key points:
+- **`ObservableCollection<DateTimePoint>`** for auto-updating time series
+- **`SyncContext="{Binding Sync}"`** on the chart, where `Sync` is a shared `object`
+- **`PeriodicTimer`** is preferred over `Task.Delay` loop (proper cancellation semantics)
+- **Sliding window**: trim old points from index 0 to maintain bounded memory
 
 ### Axes
 
-- `DateTimeAxis(TimeSpan interval, Func<DateTime, string> formatter)` for time axes.
+**DateTimeAxis in C#** (ViewModel-first approach):
+```csharp
+new DateTimeAxis(TimeSpan.FromHours(2), date => date.ToString("HH:mm", CultureInfo.InvariantCulture))
+{
+    TextSize = 11,
+}
+```
+
+**DateTimeAxis in XAML** (`XamlDateTimeAxis`):
+```xml
+<lvc:XamlDateTimeAxis Interval="0:0:1"
+                      DateFormatter="{Binding TimeFormatter}"
+                      AnimationsSpeed="0"
+                      CustomSeparators="{Binding Separators}"/>
+```
+- `AnimationsSpeed="0"` on axis: disables axis label animation for real-time charts (prevents jitter)
+- `CustomSeparators`: bind to `double[]` of tick values
+
+**Categorical axis** (named labels):
+```xml
+<lvc:XamlAxis Labels="{Binding CategoryLabels}" MinStep="1" ForceStepToMin="True"/>
+```
+- `MinStep="1"` + `ForceStepToMin="True"`: ensures one label per category (no interpolation)
+
+**Common axis properties:**
+
+| Property | Effect |
+|---|---|
+| `MinLimit` / `MaxLimit` | Clamp axis range |
+| `MinStep` | Minimum step between labels |
+| `ForceStepToMin` | Force step to exactly `MinStep` (no auto-scaling) |
+| `IsVisible` | Hide axis (consumes no space) |
+| `ShowSeparatorLines` | Toggle gridlines |
+| `LabelsRotation` | Rotate labels in degrees (e.g. `-45`) |
+| `AnimationsSpeed` | Axis animation speed (`"0"` to disable) |
+
 - Axis separator paint for X-axis is typically `null` (no vertical gridlines); Y-axis gets horizontal gridlines.
 
 ## 6. Sample Index
