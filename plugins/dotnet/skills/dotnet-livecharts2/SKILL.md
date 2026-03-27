@@ -3,7 +3,7 @@ name: dotnet-livecharts2
 description: LiveCharts2 development guide — installation, XAML source generator integration, theme config, gotchas, and sample index with exact repo file paths. Use when implementing any LiveCharts2 chart (line, area, bar, pie, gauge, heatmap, scatter, polar, financial). Covers all platforms (WinUI, Uno, Avalonia, MAUI, WPF, Blazor, WinForms, Eto).
 metadata:
   author: vhnet
-  version: "1.1"
+  version: "1.2"
   library: LiveCharts2
   library-version: "2.0.0-rc6.1"
   category: charting
@@ -15,6 +15,8 @@ metadata:
 # LiveCharts2 Development Guide
 
 Use when implementing charts, gauges, heatmaps, or any LiveCharts2 visualization.
+
+For Uno Platform apps that need reliable in-app dark/light/system theme switching with shared XAML palettes, use `uno-livecharts2-theme-switching` together with this skill. When they conflict, prefer the Uno skill for theme-switch behavior and palette sourcing.
 
 ## 1. Installation
 
@@ -64,7 +66,7 @@ public IReadOnlyList<Axis> YAxes { get; }
 
 Use ViewModel-first when:
 - Series need **semantic dark/light colors** from a centralized palette (see §2b)
-- Theme changes require series rebuild via `OnThemeChanged()` → `Series = BuildSeries()`
+- Theme changes require series rebuild via `OnThemeChanged()` → `Series = BuildSeries()`, but only when theme-dependent paints are baked into the series objects and are not being refreshed centrally by chart theme rules
 - Data is computed/aggregated from injected services
 - `Paint` objects need programmatic construction with helpers (`ChartPalette.Stroke()`, `ChartPalette.Fill()`)
 
@@ -131,7 +133,17 @@ Choose the right data type for your series:
 
 ## 2c. Semantic Color Palette Architecture
 
-For charts with domain-specific meaning (green=generation, blue=consumption), create a centralized palette helper:
+For charts with domain-specific meaning (green=generation, blue=consumption), create a centralized palette helper.
+
+Generic option:
+- hardcoded light/dark semantic colors in C#
+
+Uno shared-palette option:
+- themed XAML `ChartSeries...Brush` resources as the source of truth
+- `ChartPalette` resolves those resources into SKColors/Paints
+- if using Uno in-app theme switching, prefer the full pattern in `uno-livecharts2-theme-switching`
+
+Example of the generic hardcoded option:
 
 ```csharp
 static class ChartPalette
@@ -226,13 +238,15 @@ Key: `GeometryFill="{x:Null}" GeometryStroke="{x:Null}" GeometrySize="0"` remove
 
 ### Theme change rebuild
 
-When theme switches, ViewModel Paint objects (built from `ChartPalette.IsDark`) are stale. Rebuild the entire `ISeries[]`:
+When theme switches, ViewModel Paint objects can become stale. Rebuild the entire `ISeries[]` only if your app stores theme-dependent paints directly in the series and does not have a central chart theme refresh path:
 
 ```csharp
 public void OnThemeChanged() => Series = BuildSeries();
 ```
 
 Call this from the page/shell when the theme service fires a change event.
+
+Do NOT combine this blindly with the Uno central `ChartTheme`/`ApplyTheme()` refresh pattern from `uno-livecharts2-theme-switching`; pick one primary refresh strategy.
 
 ### Stacked horizontal bar (e.g. SoC distribution)
 
@@ -286,6 +300,8 @@ Built-in palettes e.g. `.FluentDesign` are defined in `LiveChartsCore.Themes.Col
 
 Use `theme.OnInitialized(() => { ... })` inside `HasTheme` callback (fluent API). `theme.IsDark` reflects current state. Fires on first render and on each dark/light toggle.
 
+For Uno apps with in-app theme switching and shared XAML theme resources, do NOT stop here; load `uno-livecharts2-theme-switching` too. That skill covers the additional app-owned theme state + live-tree refresh required when `IThemeService` does not propagate through `Application.Current.RequestedTheme`.
+
 ```csharp
 LiveCharts.Configure(config => config
     .HasTheme(theme =>
@@ -338,6 +354,49 @@ LiveCharts.Configure(config => config
     )
 );
 ```
+
+### Tooltips with custom themes
+
+If you replace the default theme with `HasTheme(...)`, keep the tooltip/legend factories and register the `Hover` visual state yourself.
+
+Why:
+- `HasTheme(...)` starts from an empty `Theme`
+- without `HasDefaultTooltip(() => new SKDefaultTooltip())`, hover can produce no tooltip
+- without `series.HasState("Hover", ...)`, `Series.OnPointerEnter()` can throw `KeyNotFoundException: 'Hover'` before tooltips render
+- changing `TooltipPosition` alone does NOT fix this
+
+Safe pattern:
+
+```csharp
+using LiveChartsCore.Drawing;
+using LiveChartsCore.SkiaSharpView.SKCharts;
+using LiveChartsCore.VisualStates;
+
+LiveCharts.Configure(config => config
+    .HasTheme(theme =>
+        theme
+            .OnInitialized(() =>
+            {
+                theme.Colors = ColorPalletes.FluentDesign;
+                // axis/tooltip styling here
+            })
+            .HasDefaultTooltip(() => new SKDefaultTooltip())
+            .HasDefaultLegend(() => new SKDefaultLegend())
+            .HasRuleForAnySeries(series =>
+            {
+                _ = series.HasState("Hover",
+                [
+                    (nameof(DrawnGeometry.Opacity), 0.8f)
+                ]);
+            })
+    )
+);
+```
+
+If tooltips still do not appear:
+- verify you did not remove `HasDefaultTooltip`
+- verify your replacement theme still defines the `Hover` state
+- only then inspect `TooltipPosition`
 
 ### Theme rule methods reference
 
