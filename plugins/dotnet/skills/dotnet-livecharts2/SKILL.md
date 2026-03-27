@@ -3,7 +3,7 @@ name: dotnet-livecharts2
 description: LiveCharts2 development guide — installation, XAML source generator integration, theme config, gotchas, and sample index with exact repo file paths. Use when implementing any LiveCharts2 chart (line, area, bar, pie, gauge, heatmap, scatter, polar, financial). Covers all platforms (WinUI, Uno, Avalonia, MAUI, WPF, Blazor, WinForms, Eto).
 metadata:
   author: vhnet
-  version: "1.2"
+  version: "1.4"
   library: LiveCharts2
   library-version: "2.0.0-rc6.1"
   category: charting
@@ -15,8 +15,6 @@ metadata:
 # LiveCharts2 Development Guide
 
 Use when implementing charts, gauges, heatmaps, or any LiveCharts2 visualization.
-
-For Uno Platform apps that need reliable in-app dark/light/system theme switching with shared XAML palettes, use `uno-livecharts2-theme-switching` together with this skill. When they conflict, prefer the Uno skill for theme-switch behavior and palette sourcing.
 
 ## 1. Installation
 
@@ -65,10 +63,8 @@ public IReadOnlyList<Axis> YAxes { get; }
 ```
 
 Use ViewModel-first when:
-- Series need **semantic dark/light colors** from a centralized palette (see §2b)
-- Theme changes require series rebuild via `OnThemeChanged()` → `Series = BuildSeries()`, but only when theme-dependent paints are baked into the series objects and are not being refreshed centrally by chart theme rules
 - Data is computed/aggregated from injected services
-- `Paint` objects need programmatic construction with helpers (`ChartPalette.Stroke()`, `ChartPalette.Fill()`)
+- `Paint` objects need programmatic construction with helpers
 
 ### XAML-first (for gauges and simple static charts)
 
@@ -91,10 +87,9 @@ Use `SeriesCollection` / `AxesCollection` wrappers with `Xaml*` types:
 
 Use XAML-first when:
 - **Gauges** — layout is inherently visual (DrawMargin, DataLabelsPadding, InnerRadius)
-- Simple static charts where colors don't need dark/light variants
-- Designer-editable colors without touching C#
+- Simple static charts where colors don't need programmatic variants
 
-Even in XAML-first gauges, Paint objects can be bound from ViewModel (`Fill="{Binding GaugeFill}"`) for theme-aware colors.
+Even in XAML-first gauges, Paint objects can be bound from ViewModel (`Fill="{Binding GaugeFill}"`) for dynamic colors.
 
 **XAML series types**: `XamlLineSeries`, `XamlColumnSeries`, `XamlRowSeries`, `XamlStackedAreaSeries`, `XamlStackedColumnSeries`, `XamlStackedRowSeries`, `XamlStackedStepAreaSeries`, `XamlScatterSeries`, `XamlStepLineSeries`, `XamlPieSeries`, `XamlHeatSeries`, `XamlBoxSeries`, `XamlCandlesticksSeries`, `XamlPolarLineSeries`, `XamlGaugeSeries`, `XamlGaugeBackgroundSeries`, `XamlAngularGaugeSeries`, `XamlNeedle`, `XamlAngularTicks`.
 
@@ -131,164 +126,10 @@ Choose the right data type for your series:
 
 **CRITICAL: `XamlGaugeSeries.GaugeValue` expects `double`, NOT `ObservableValue`.** Binding to an `ObservableValue` object shows "0". Use `[ObservableProperty] double GaugeValue` with PropertyChanged notification. `ObservableValue` is a LiveCharts data container for `ISeries`-level data collections, not for XAML DependencyProperty bindings.
 
-## 2c. Semantic Color Palette Architecture
 
-For charts with domain-specific meaning (green=generation, blue=consumption), create a centralized palette helper.
-
-Generic option:
-- hardcoded light/dark semantic colors in C#
-
-Uno shared-palette option:
-- themed XAML `ChartSeries...Brush` resources as the source of truth
-- `ChartPalette` resolves those resources into SKColors/Paints
-- if using Uno in-app theme switching, prefer the full pattern in `uno-livecharts2-theme-switching`
-
-Example of the generic hardcoded option:
-
-```csharp
-static class ChartPalette
-{
-    public static bool IsDark { get; private set; }
-
-    // Set from LiveCharts.Configure() theme callback
-    internal static void SetTheme(bool isDark) => IsDark = isDark;
-
-    // Named semantic colors with dark/light variants
-    public static SKColor Generation  => IsDark ? new(108, 203, 95)  : new(16, 124, 16);
-    public static SKColor Consumption => IsDark ? new(96, 205, 255)  : new(0, 120, 212);
-    public static SKColor GridImport  => IsDark ? new(247, 169, 75)  : new(247, 99, 12);
-    public static SKColor Storage     => IsDark ? new(158, 168, 255) : new(135, 100, 184);
-
-    // Reusable paint helpers
-    public static SolidColorPaint Stroke(SKColor c) => new(c) { StrokeThickness = 2 };
-    public static SolidColorPaint Fill(SKColor c, byte alpha = 80) => new(c.WithAlpha(alpha));
-}
-```
-
-Usage in ViewModel series builders:
-```csharp
-new LineSeries<DateTimePoint>
-{
-    Name = "Generation",
-    Values = GenerationValues,
-    Stroke = ChartPalette.Stroke(ChartPalette.Generation),
-    Fill = ChartPalette.Fill(ChartPalette.Generation),
-    GeometrySize = 0,
-    LineSmoothness = 0.65,
-}
-```
-
-For dark/light band colors (e.g. SoC distribution), use the same pattern with static methods:
-```csharp
-static SKColor Band0Color(bool dark) => dark ? new(255, 100, 100) : new(209, 52, 56); // critical
-static SKColor Band3Color(bool dark) => dark ? new(108, 203, 95)  : new(16, 124, 16); // healthy
-```
-
-## 2d. Common Recipes
-
-### Sparkline (inline mini-chart)
-
-ViewModel builds series lazily; XAML uses fixed height, hidden axes/tooltip/legend:
-
-```csharp
-// Lazy construction from data array
-public IReadOnlyList<ISeries>? SparklineSeries =>
-    field ??= DataPoints is { } pts
-        ? [new LineSeries<double> {
-            Values = pts,
-            Stroke = ChartPalette.Stroke(ChartPalette.Generation),
-            Fill = ChartPalette.Fill(ChartPalette.Generation, 60),
-            GeometrySize = 0, LineSmoothness = 0.6 }]
-        : null;
-```
-```xml
-<lvc:CartesianChart Height="30"
-                    Series="{Binding SparklineSeries}"
-                    TooltipPosition="Hidden"
-                    LegendPosition="Hidden"
-                    AnimationsSpeed="00:00:00.200"/>
-```
-
-For XAML-defined sparklines, disable geometry dots and hide all axes:
-```xml
-<lvc:CartesianChart Height="40" LegendPosition="Hidden">
-    <lvc:CartesianChart.Series>
-        <lvc:SeriesCollection>
-            <lvc:XamlLineSeries Values="{Binding Values}"
-                Fill="{lvc:SolidColorPaint Color='40107C10'}"
-                Stroke="{lvc:SolidColorPaint Color='FF107C10'}"
-                GeometryFill="{x:Null}" GeometryStroke="{x:Null}" GeometrySize="0"
-                LineSmoothness="0.8"/>
-        </lvc:SeriesCollection>
-    </lvc:CartesianChart.Series>
-    <lvc:CartesianChart.XAxes>
-        <lvc:AxesCollection>
-            <lvc:XamlAxis IsVisible="False" ShowSeparatorLines="False"/>
-        </lvc:AxesCollection>
-    </lvc:CartesianChart.XAxes>
-    <lvc:CartesianChart.YAxes>
-        <lvc:AxesCollection>
-            <lvc:XamlAxis IsVisible="False" ShowSeparatorLines="False" MinLimit="0"/>
-        </lvc:AxesCollection>
-    </lvc:CartesianChart.YAxes>
-</lvc:CartesianChart>
-```
-
-Key: `GeometryFill="{x:Null}" GeometryStroke="{x:Null}" GeometrySize="0"` removes point dots. This triplet is needed on every area/line chart that should show a clean curve.
-
-### Theme change rebuild
-
-When theme switches, ViewModel Paint objects can become stale. Rebuild the entire `ISeries[]` only if your app stores theme-dependent paints directly in the series and does not have a central chart theme refresh path:
-
-```csharp
-public void OnThemeChanged() => Series = BuildSeries();
-```
-
-Call this from the page/shell when the theme service fires a change event.
-
-Do NOT combine this blindly with the Uno central `ChartTheme`/`ApplyTheme()` refresh pattern from `uno-livecharts2-theme-switching`; pick one primary refresh strategy.
-
-### Stacked horizontal bar (e.g. SoC distribution)
-
-ViewModel-first with categorical Y-axis labels:
-
-```csharp
-IReadOnlyList<ISeries> BuildSeries() =>
-[
-    new StackedRowSeries<int> { Name = "0-25%",  Values = band0, Fill = new SolidColorPaint(Band0Color(dark)), Stroke = null },
-    new StackedRowSeries<int> { Name = "25-50%", Values = band1, Fill = new SolidColorPaint(Band1Color(dark)), Stroke = null },
-    new StackedRowSeries<int> { Name = "50-75%", Values = band2, Fill = new SolidColorPaint(Band2Color(dark)), Stroke = null },
-    new StackedRowSeries<int> { Name = "75-100%", Values = band3, Fill = new SolidColorPaint(Band3Color(dark)), Stroke = null },
-];
-
-// Y-axis with fleet/category labels
-YAxes = [new Axis { Labels = fleetNames, TextSize = 11 }];
-XAxes = [new Axis { TextSize = 11, MinLimit = 0, Name = "Vehicles" }];
-```
-
-### Stacked area (e.g. energy balance)
-
-```csharp
-new StackedAreaSeries<DateTimePoint>
-{
-    Name = "Solar",
-    Values = SolarValues,
-    Stroke = ChartPalette.Stroke(ChartPalette.Generation),
-    Fill = ChartPalette.Fill(ChartPalette.Generation, 120),
-    GeometrySize = 0,
-    LineSmoothness = 0.5,
-}
-```
 
 ## 3. Theme Configuration
 
-### Initialization
-
-**`LiveCharts.Configure()` returns `void`** — do NOT assign it: `_ = LiveCharts.Configure(...)` causes CS8209. Call as a statement:
-
-```csharp
-LiveCharts.Configure(config => config.HasTheme(...));
-```
 
 Call `LiveCharts.Configure()` once in `App.xaml.cs` (or a static method called from there) **before any chart control renders**. Typically in `OnLaunched` before `InitializeComponent`.
 
@@ -296,64 +137,10 @@ Call `LiveCharts.Configure()` once in `App.xaml.cs` (or a static method called f
 
 Built-in palettes e.g. `.FluentDesign` are defined in `LiveChartsCore.Themes.ColorPalletes` (note double 'l' in `Palletes`).
 
-### Dark/light switching
+### Custom theme styling
 
-Use `theme.OnInitialized(() => { ... })` inside `HasTheme` callback (fluent API). `theme.IsDark` reflects current state. Fires on first render and on each dark/light toggle.
+Use `theme.OnInitialized(() => { ... })` inside `HasTheme` callback (fluent API). Use it to populate palette colors, animation defaults, and axis/legend/tooltip styling for the theme instance.
 
-For Uno apps with in-app theme switching and shared XAML theme resources, do NOT stop here; load `uno-livecharts2-theme-switching` too. That skill covers the additional app-owned theme state + live-tree refresh required when `IThemeService` does not propagate through `Application.Current.RequestedTheme`.
-
-```csharp
-LiveCharts.Configure(config => config
-    .HasTheme(theme =>
-        theme
-            .OnInitialized(() =>
-            {
-                theme.Colors = theme.IsDark ? DarkPalette : ColorPalletes.FluentDesign;
-                theme.AnimationsSpeed = TimeSpan.FromMilliseconds(500);
-                theme.EasingFunction = EasingFunctions.QuadraticOut;
-
-                // Note: API typo — "Backround" not "Background"
-                theme.VirtualBackroundColor = theme.IsDark
-                    ? new LvcColor(28, 28, 40)
-                    : new LvcColor(255, 255, 255);
-
-                theme.TooltipTextPaint = new SolidColorPaint(
-                    theme.IsDark ? new SKColor(220, 220, 230) : new SKColor(40, 40, 40));
-                theme.TooltipBackgroundPaint = new SolidColorPaint(
-                    theme.IsDark ? new SKColor(42, 42, 58, 230) : new SKColor(245, 245, 245, 230));
-                theme.TooltipTextSize = 12;
-                theme.LegendTextPaint = new SolidColorPaint(
-                    theme.IsDark ? new SKColor(220, 220, 230) : new SKColor(40, 40, 40));
-
-                // Update ChartPalette for ViewModel series builders
-                ChartPalette.SetTheme(theme.IsDark);
-            })
-            .HasDefaultTooltip(() => new SKDefaultTooltip())
-            .HasDefaultLegend(() => new SKDefaultLegend())
-            .HasRuleForAxes(axis =>
-            {
-                axis.TextSize = 11;
-                axis.ShowSeparatorLines = true;
-                axis.NamePaint = new SolidColorPaint(
-                    theme.IsDark ? new SKColor(200, 200, 210) : new SKColor(60, 60, 60));
-                axis.LabelsPaint = new SolidColorPaint(
-                    theme.IsDark ? new SKColor(185, 185, 195) : new SKColor(80, 80, 80));
-
-                SKColor lineColor = theme.IsDark ? new(55, 55, 70) : new(225, 225, 225);
-                if (axis is ICartesianAxis cartesian)
-                {
-                    axis.SeparatorsPaint = cartesian.Orientation == AxisOrientation.X
-                        ? null  // no vertical gridlines
-                        : new SolidColorPaint(lineColor) { StrokeThickness = 1 };
-                }
-                else
-                {
-                    axis.SeparatorsPaint = new SolidColorPaint(lineColor) { StrokeThickness = 1 };
-                }
-            })
-    )
-);
-```
 
 ### Tooltips with custom themes
 
@@ -363,7 +150,6 @@ Why:
 - `HasTheme(...)` starts from an empty `Theme`
 - without `HasDefaultTooltip(() => new SKDefaultTooltip())`, hover can produce no tooltip
 - without `series.HasState("Hover", ...)`, `Series.OnPointerEnter()` can throw `KeyNotFoundException: 'Hover'` before tooltips render
-- changing `TooltipPosition` alone does NOT fix this
 
 Safe pattern:
 
@@ -377,7 +163,6 @@ LiveCharts.Configure(config => config
         theme
             .OnInitialized(() =>
             {
-                theme.Colors = ColorPalletes.FluentDesign;
                 // axis/tooltip styling here
             })
             .HasDefaultTooltip(() => new SKDefaultTooltip())
@@ -592,8 +377,6 @@ Example: 180° gauge filling a card with value text above the arc's flat edge:
 - **Always set `LegendPosition="Hidden"` and `TooltipPosition="Hidden"`** on gauge PieCharts — default legend/tooltip are meaningless for gauges.
 - **`AnimationsSpeed` as XAML TimeSpan string**: `AnimationsSpeed="00:00:00.500"` (500ms). Set on the PieChart control.
 - **`GaugeValue` expects `double`** — NOT `ObservableValue`. Use `[ObservableProperty] double GaugeValue` in ViewModel.
-- **`{Binding}` doesn't work for `DataLabelsPaint` on `XamlGaugeSeries`** — use `{lvc:SolidColorPaint}` markup extension instead.
-- **`Fill` and `BackgroundFill` DO support `{Binding}`** — bind `Paint` objects from ViewModel for theme-aware gauge colors:
 
 ```xml
 <lvc:PieChart DrawMargin="{lvc:Margin Value='-20,0,-20,-120'}"
@@ -604,34 +387,15 @@ Example: 180° gauge filling a card with value text above the arc's flat edge:
         <lvc:SeriesCollection>
             <lvc:XamlGaugeSeries
                 GaugeValue="{Binding GaugeValue}"
-                Fill="{Binding GaugeFill}"
                 InnerRadius="55"
                 ShowDataLabels="True" DataLabelsSize="24"
-                DataLabelsPaint="{lvc:SolidColorPaint Color='#DDDDE6'}"
                 DataLabelsPadding="{lvc:Padding Value='6,6,6,50'}"
                 DataLabelsPosition="ChartCenter"/>
             <lvc:XamlGaugeBackgroundSeries
-                InnerRadius="55"
-                Fill="{Binding BackgroundFill}"/>
+                InnerRadius="55"/>
         </lvc:SeriesCollection>
     </lvc:PieChart.Series>
 </lvc:PieChart>
-```
-
-```csharp
-// ViewModel: theme-aware Paint objects
-public Paint GaugeFill { get; init; } = new SolidColorPaint(SKColors.Gray);
-public Paint BackgroundFill { get; init; } = new SolidColorPaint(new SKColor(220, 220, 225));
-
-// Factory method with semantic color from ChartPalette
-static RadialGaugeViewModel Build(string title, double value, SKColor color) => new()
-{
-    GaugeValue = value,
-    GaugeFill = new SolidColorPaint(color),
-    BackgroundFill = new SolidColorPaint(ChartPalette.IsDark
-        ? new SKColor(60, 60, 75, 90)
-        : new SKColor(180, 200, 240, 90)),
-};
 ```
 
 ### HeatSeries
