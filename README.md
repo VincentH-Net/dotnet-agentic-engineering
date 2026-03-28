@@ -59,10 +59,10 @@ claude plugin install dotnet@dotnet-agentic-engineering
 claude plugin install uno-platform@dotnet-agentic-engineering
 ```
 
-Install a skill in Codex:
+Install a skill in Codex by invoking:
 
-```bash
-$skill-installer install https://github.com/VincentH-Net/dotnet-agentic-engineering/tree/main/plugins/uno-platform/skills/uno-fluent2
+```text
+$skill-installer https://github.com/VincentH-Net/dotnet-agentic-engineering/tree/main/plugins/uno-platform/skills/uno-fluent2
 ```
 
 Install a skill / all skills in any agent with `npx skills` (requires `Node.js`) :
