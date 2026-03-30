@@ -8,11 +8,12 @@ Agentic engineering setups, directives and skills that I use for building real-w
 
 Everything here has been used with real-world codebases - not generated with prompts and uploaded untested.
 
-Examples:
+Demos:
 
-[LiveCharts2 with Uno Platform](https://x.com/vincenth_net/status/2033966275324444819) (app video)
-
-[GPT 5.4 vs Opus 4.6 for UI with Uno Platform](https://x.com/compose/articles/edit/2031388424310075392) (article with side-by-side apps video)
+- [LiveCharts2 with Uno Platform](https://x.com/vincenth_net/status/2033966275324444819)
+  (post with app video)
+- [GPT 5.4 vs Opus 4.6 for UI with Uno Platform](https://x.com/compose/articles/edit/2031388424310075392)
+  (article with side-by-side apps video)
 
 This repo exists to:
 
