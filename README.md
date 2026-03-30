@@ -69,7 +69,7 @@ Install an optimized combination of models, harnesses, plugins, MCP's, skills an
 
 To install the plugins / skills that above setups recommend, follow below steps.
 
-Install a skills plugin in Claude Code:
+Install skills plugins in Claude Code:
 
 ```bash
 claude plugin marketplace add VincentH-Net/dotnet-agentic-engineering
@@ -77,25 +77,22 @@ claude plugin install dotnet@dotnet-agentic-engineering
 claude plugin install uno-platform@dotnet-agentic-engineering
 ```
 
-For Codex you need to install per skill for now; **Codex plugin** install is coming as soon as [Codex releases plugin install from GitHub repo](https://developers.openai.com/codex/plugins/build#publish-official-public-plugins).
+Install skills in any agent with `npx skills` (requires `Node.js`) :
 
-Install a skill in Codex by invoking:
+```bash
+# Select skills in this repo and install them in agents you choose
+npx skills add VincentH-Net/dotnet-agentic-engineering
+```
+
+Note that to install the same skills in both Claude Code and Codex you can install plugins for Claude Code and use `npx skills` for Codex. There is no need to specify Codex as target agent in the `npx skills` command: Codex supports skills under the `.agents` folder, which `npx skills` always installs to, while Claude Code does not support `.agents`.
+
+**Codex plugin** install is coming as soon as [Codex releases plugin install from GitHub repo](https://developers.openai.com/codex/plugins/build#publish-official-public-plugins).
+
+You can also install a single skill in Codex by invoking:
 
 ```text
 $skill-installer https://github.com/VincentH-Net/dotnet-agentic-engineering/tree/main/plugins/uno-platform/skills/uno-fluent2
 ```
-
-Install a skill / all skills in any agent with `npx skills` (requires `Node.js`) :
-
-```bash
-# List skills in this repo
-npx skills add VincentH-Net/dotnet-agentic-engineering --list
-
-# Install a specific skill
-npx skills add VincentH-Net/dotnet-agentic-engineering --skill uno-fluent2
-```
-
-Note that to install the same skills in both Claude Code and Codex you can install plugins for Claude Code and use `npx skills` for Codex. There is no need to specify Codex as target agent in the `npx skills` command: Codex supports skills under the `.agents` folder, which `npx skills` always installs to, while Claude Code does not support `.agents`.
 
 ### Directives Install
 
