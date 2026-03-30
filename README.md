@@ -77,7 +77,7 @@ claude plugin install dotnet@dotnet-agentic-engineering
 claude plugin install uno-platform@dotnet-agentic-engineering
 ```
 
-For Codex you need to install per skill for now; **Codex plugin** install is coming as soon as Codex releases plugin install from GitHub repo.
+For Codex you need to install per skill for now; **Codex plugin** install is coming as soon as [Codex releases plugin install from GitHub repo](https://developers.openai.com/codex/plugins/build#publish-official-public-plugins).
 
 Install a skill in Codex by invoking:
 
