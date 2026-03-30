@@ -55,8 +55,9 @@ Install an optimized combination of models, harnesses, plugins, MCP's, skills an
 
 Install only the directives and skills relevant for your use case.
 
-Install a directive:
-Paste the content of a `directives/<name>.md` file in your `AGENTS.MD` - make sure to follow [Foundation setup](./setups/foundation.md)
+### Plugins / Skills install
+
+To install the plugins / skills that above setups recommend, follow below steps.
 
 Install a skills plugin in Claude Code:
 
@@ -85,6 +86,10 @@ npx skills add VincentH-Net/dotnet-agentic-engineering --skill uno-fluent2
 ```
 
 Note that to install the same skills in both Claude Code and Codex you can install plugins for Claude Code and use `npx skills` for Codex. There is no need to specify Codex as target agent in the `npx skills` command: Codex supports skills under the `.agents` folder, which `npx skills` always installs to, while Claude Code does not support `.agents`.
+
+### Directive install
+
+Paste the content of a `directives/<name>.md` file in your `AGENTS.MD`. Make sure to follow [Foundation setup](./setups/foundation.md) so you do not have to duplicate directives in `CLAUDE.MD`.
 
 ## Structure
 

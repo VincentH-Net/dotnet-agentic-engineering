@@ -1,6 +1,6 @@
 # Prompt Log Directive
 
-Keep the **most important part of your source** - your prompts and your answers to the question that agents ask you - in git, together, but separate from, the source commit that contains the source that was created from your input.
+Keep the **most important part of your source** - your prompts and your answers to the question that agents ask you - in an accompanying git commit to the source commit that contains the source that was created from your input.
 
 This preserves **intent** in source control, using the same unit of work as your branching strategy, and makes it possible to **replay** your input at a later stage with better models, harnesses and tools.
 
