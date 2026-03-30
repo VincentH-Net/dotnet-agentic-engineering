@@ -53,3 +53,7 @@ Use below content in `CLAUDE.MD`, in the same folder as `AGENTS.MD`, to have Cla
 
 This file provides any instructions specific to Claude Code (claude.ai/code), when working with code in this repository. These instructions are supplemental to the generic agents instructions (imported above) 
 ```
+
+## Directives
+
+Install the [Prompt Log Directive](../directives/prompt-log.md)

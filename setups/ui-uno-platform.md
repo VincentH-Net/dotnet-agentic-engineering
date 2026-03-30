@@ -15,6 +15,7 @@ Additionally, install:
 - [.NET Agentic Engineering](https://github.com/VincentH-Net/dotnet-agentic-engineering#installation) by [VincentH-Net](https://github.com/VincentH-Net)
   - Uno Platform Claude Code plugin
   - Uno Platform Codex skills
+- [Uno Plaform Build and Run Directive](../directives/uno-build-and-run.md)
 
 ## Which model for what
 

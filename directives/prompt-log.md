@@ -42,5 +42,4 @@ git log --grep="^prompt-log:" --since="2026-01-26" --until="2026-02-07" --format
 # oneline overview
 git log --grep="^prompt-log:" --oneline
 ```
-
 ```
