@@ -8,11 +8,17 @@ Agentic engineering setups, directives and skills that I use for building real-w
 
 Everything here has been used with real-world codebases - not generated with prompts and uploaded untested.
 
+Examples:
+
+[LiveCharts2 with Uno Platform](https://x.com/vincenth_net/status/2033966275324444819) (app video)
+
+[GPT 5.4 vs Opus 4.6 for UI with Uno Platform](https://x.com/compose/articles/edit/2031388424310075392) (article with side-by-side apps video)
+
 This repo exists to:
 
-- filter proven engineering value from untested content and marketing in the agentic ecosystem
-- fill agentic ecosystem gaps, both technology-independent and for specific technologies
-- extend the agentic ecosystem with specialized technology/pattern skills for distributed/cross-platform applications
+- **filter** proven engineering value from untested content and marketing in the agentic ecosystem
+- **fill** agentic ecosystem gaps, both technology-independent and for specific technologies
+- **extend** the agentic ecosystem with specialized technology/pattern skills for distributed/cross-platform applications
 
 ## What's included
 
@@ -98,9 +104,9 @@ To install the directives that above setups recommend, paste the content of a `d
 
 ```text
 dotnet-agentic-engineering/
-├── setups/             # Optimized combinations of harness, model, configuration, plugins, MCPs and skill libraries - for specific use cases
+├── setups/             # Optimized combinations of harness, model, configuration, plugins and MCPs - for specific tech stacks
 ├── directives/         # Proven agent instruction snippets for AGENTS.MD / CLAUDE.MD
-└── plugins/            # Technology/pattern-specific knowledge
+└── plugins/            # Technology/pattern-specific skills
 ```
 
 ## License
