@@ -4,7 +4,9 @@ This lets you:
 
 - Avoid unnecessary dotnet build prior to starting an app, speeding up the agent's inner loop
 - Keep a separate time-stamped log file of each app run, outside source control, which the agent can analyze to solve runtime errors and warnings
-- Pass in a RUN_BY_AGENT startup arg to the app so it can e.g. disable Hot Reload / Hot Design UI, which can get in the way of agents testing the app
+- Pass in a RUN_BY_AGENT startup arg to the app so it can e.g.:
+  - Disable Hot Reload / Hot Design UI, which can get in the way of agents testing the app
+  - Enable debug logging to the console as early as possible during app start, so the agents can see and address any runtime warnings and errors
 
 Copy below markdown in your `AGENTS.MD`
 
