@@ -44,18 +44,21 @@ Skills for [Uno Platform](https://platform.uno) cross-platform app development.
 | `uno-responsive-spanning-gridwrap-layout` | A responsive, non-virtualizing wrapping grid layout with column spans, proportional stretch-to-fill, and vertically aligned gaps. |
 | `uno-test-resize-app-window` | Resize a running Uno Platform desktop app window on macOS for visual testing using the Accessibility API. |
 
+| Directive | Description |
+|----------|-------------|
+| [`prompt-log`](./directives/prompt-log.md) | Records sanitized user prompts and agent question-and-answer pairs as companion git commits so intent is preserved and can be replayed later. |
+| [`uno-build-and-run`](./directives/uno-build-and-run.md) | Standardizes Uno app launch for agents by skipping redundant pre-builds, writing per-run stdout logs, passing `RUN_BY_AGENT`, and verifying or stopping the app with the Uno runtime tools. |
+
 ## Installation
 
 Install an optimized combination of models, harnesses, plugins, MCP's, skills and directives for your tech stack with these steps:
 
 1. [Foundation Setup](./setups/foundation.md)
 2. For the technologies in your target stack:
-    - [ ] [.NET Setup](./setups/dotnet.md)
+    - [x] [.NET Setup](./setups/dotnet.md)
     - [ ] [UI with Uno Platform Setup](./setups/ui-uno-platform.md)
 
-Install only the directives and skills relevant for your use case.
-
-### Plugins / Skills install
+### Plugins / Skills Install
 
 To install the plugins / skills that above setups recommend, follow below steps.
 
@@ -87,9 +90,9 @@ npx skills add VincentH-Net/dotnet-agentic-engineering --skill uno-fluent2
 
 Note that to install the same skills in both Claude Code and Codex you can install plugins for Claude Code and use `npx skills` for Codex. There is no need to specify Codex as target agent in the `npx skills` command: Codex supports skills under the `.agents` folder, which `npx skills` always installs to, while Claude Code does not support `.agents`.
 
-### Directive install
+### Directives Install
 
-Paste the content of a `directives/<name>.md` file in your `AGENTS.MD`. Make sure to follow [Foundation setup](./setups/foundation.md) so you do not have to duplicate directives in `CLAUDE.MD`.
+To install the directives that above setups recommend, paste the content of a `directives/<name>.md` file in your `AGENTS.MD`. Make sure to follow [Foundation setup](./setups/foundation.md) so you do not have to duplicate directives in `CLAUDE.MD`.
 
 ## Structure
 
