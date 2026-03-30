@@ -50,8 +50,8 @@ Install an optimized combination of models, harnesses, plugins, MCP's, skills an
 
 1. [Foundation Setup](./setups/foundation.md)
 2. For the technologies in your target stack:
-    - [.NET Setup](./setups/dotnet.md)
-    - [UI with Uno Platform Setup](./setups/ui-uno-platform.md)
+    - [ ] [.NET Setup](./setups/dotnet.md)
+    - [ ] [UI with Uno Platform Setup](./setups/ui-uno-platform.md)
 
 Install only the directives and skills relevant for your use case.
 
