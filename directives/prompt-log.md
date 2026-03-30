@@ -6,7 +6,7 @@ This preserves **intent** in source control, using the same unit of work as your
 
 Copy below markdown in your `AGENTS.MD`
 
-```md
+~~~md
 ## Prompt Log
 
 Prompt logs are stored as git commits.
@@ -42,4 +42,4 @@ git log --grep="^prompt-log:" --since="2026-01-26" --until="2026-02-07" --format
 # oneline overview
 git log --grep="^prompt-log:" --oneline
 ```
-```
+~~~
