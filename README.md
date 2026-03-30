@@ -49,7 +49,7 @@ Skills for [Uno Platform](https://platform.uno) cross-platform app development.
 Install only the directives and skills relevant for your use case.
 
 Install a directive:
-Paste the content of a `directives/<name>.md` file in your `AGENTS.MD` / `CLAUDE.md`
+Paste the content of a `directives/<name>.md` file in your `AGENTS.MD` - make sure to follow [Foundation setup](./setups/foundation.md)
 
 Install a skills plugin in Claude Code:
 
@@ -58,6 +58,8 @@ claude plugin marketplace add VincentH-Net/dotnet-agentic-engineering
 claude plugin install dotnet@dotnet-agentic-engineering
 claude plugin install uno-platform@dotnet-agentic-engineering
 ```
+
+For Codex you need to install per skill for now; **Codex plugin** install is coming as soon as Codex releases plugin install from GitHub repo.
 
 Install a skill in Codex by invoking:
 
@@ -83,8 +85,7 @@ Note that to install the same skills in both Claude Code and Codex you can insta
 dotnet-agentic-engineering/
 ├── setups/             # Optimized combinations of harness, model, configuration, plugins, MCPs and skill libraries - for specific use cases
 ├── directives/         # Proven agent instruction snippets for AGENTS.MD / CLAUDE.MD
-├── plugins/            # Technology/pattern-specific knowledge
-└── examples/           # Sample projects demonstrating usage
+└── plugins/            # Technology/pattern-specific knowledge
 ```
 
 ## License
