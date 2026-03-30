@@ -1,4 +1,6 @@
-# Foundational engineering setup for any target technology
+# Foundational Engineering Setup
+
+For any target technology.
 
 ## Model
 

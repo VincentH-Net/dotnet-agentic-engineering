@@ -1,4 +1,4 @@
-# Setup for engineering cross-platform UI with Uno Platform
+# Cross-platform UI with Uno Platform Engineering Setup
 
 Prerequisites:
 
