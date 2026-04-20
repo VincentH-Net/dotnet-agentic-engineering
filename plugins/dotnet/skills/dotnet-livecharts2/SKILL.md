@@ -3,7 +3,7 @@ name: dotnet-livecharts2
 description: LiveCharts2 development guide — installation, XAML source generator integration, theme config, gotchas, and sample index with exact repo file paths. Use when implementing any LiveCharts2 chart (line, area, bar, pie, gauge, heatmap, scatter, polar, financial). Covers all platforms (WinUI, Uno, Avalonia, MAUI, WPF, Blazor, WinForms, Eto).
 metadata:
   author: vhnet
-  version: "1.4"
+  version: "1.4.1"
   library: LiveCharts2
   library-version: "2.0.0-rc6.1"
   category: charting
@@ -680,13 +680,8 @@ Key doc files in `/tmp/LiveCharts2/docs/`:
 If you need content only available on the website (e.g. rendered screenshots, API browser):
 
 ```bash
-# livecharts.dev has an incomplete TLS certificate chain.
-# Download the intermediate cert first (only if /tmp/sectigo-intermediate.pem doesn't exist or is outdated):
-curl -s http://crt.sectigo.com/SectigoPublicServerAuthenticationCADVR36.crt -o /tmp/sectigo-intermediate.crt
-openssl x509 -inform DER -in /tmp/sectigo-intermediate.crt -out /tmp/sectigo-intermediate.pem
-
-# Then fetch any page:
-curl -s --cacert /tmp/sectigo-intermediate.pem "https://livecharts.dev/docs/UnoWinUi/{library-version}/{page}"
+# Fetch any page:
+curl -s "https://livecharts.dev/docs/UnoWinUi/{library-version}/{page}"
 ```
 
 Website platform URL prefixes: `UnoWinUi`, `avalonia`, `blazor`, `maui`, `wpf`, `winforms`, `winui`, `eto`
