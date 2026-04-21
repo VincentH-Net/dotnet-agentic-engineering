@@ -33,6 +33,7 @@ Select this skill for any of:
 
 - A **Uno Platform 6** solution already exists with an app project containing `App.cs` (the `mcs-uno-markup2` template layers a Presentation project **onto** an existing Uno app; it does not scaffold a full Uno solution from scratch — run `dotnet new unoapp` first)
 - .NET 10 (LTS) or .NET 9 (STS) SDK installed
+- PowerShell 7+ (required for `New-View.ps1` and the post-action scripts — pass `--allow-scripts Yes`)
 - `Modern.CSharp.Templates` installed:
 
 ```bash
@@ -67,7 +68,7 @@ dotnet new mcs-uno-markup2 \
 | `-tf`, `--tfm` | Target .NET version | `net9.0` / `net10.0` (default) |
 | `-n`, `--name` | Output project name (default: output directory name) | string |
 | `-o`, `--output` | Output folder | path |
-| `--allow-scripts` | Run post-action scripts (required for full setup) | `No` / `Prompt` (default) / `Yes` |
+| `--allow-scripts` | Run post-action PowerShell scripts (required for full setup) | `No` / `Prompt` (default) / `Yes` |
 
 ### Choosing `--presentation`
 
