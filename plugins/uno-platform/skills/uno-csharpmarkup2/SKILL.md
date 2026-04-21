@@ -3,7 +3,7 @@ name: uno-csharpmarkup2
 description: Build a Uno Platform 6 UI in pure C# using the concise, declarative, strongly-typed C# Markup 2 (CSharpForMarkup) library — replacing XAML with a fluent-builder, code-first approach. Covers BOTH the initial Presentation-project setup (via the `mcs-uno-markup2` template) AND ongoing per-page authoring (via the `New-View.ps1` helper that ships in the generated Presentation project and drives the `mcs-uno-view` item template under the hood). Use for new or existing Uno 6 apps on .NET 10/9 with MVVM (CommunityToolkit.Mvvm) or MVUX (Uno.Extensions.Reactive), with Uno.Extensions Navigation/Toolkit, and for supported C# Markup 2 packages (LiveCharts2, ScottPlot, Mapsui). Explains the bind-without-strings pattern (CallerArgumentExpression), Spread for variable-length children, null-as-conditional-child, attached-property syntax (e.g. `Grid_Row(0)`), Assign/Invoke markup↔logic bridging, the partial-class `<Name>Page.cs` / `<Name>Page.logic.cs` split, and the MVUX `BasePage<Bindable…Model>` wiring.
 metadata:
   author: https://github.com/VincentH-Net
-  version: "1.1"
+  version: "1.2"
   framework: uno-platform
   category: ui-markup
   sources:
@@ -95,16 +95,25 @@ Each markup file defines UI via a chain of extension-method property setters on 
 
 ### 4.2 Bind without strings (CallerArgumentExpression)
 
-`.Bind(...)` accepts a C# expression and the compiler captures the path text. No `nameof()`, no string literals, full rename / refactor support:
+`.Bind(...)` accepts a C# expression and the compiler captures the path text via `CallerArgumentExpression`. No `nameof()`, no string literals, full rename / refactor support:
 
 ```csharp
-.Bind(vm.SelectedTweet)               // binds path "SelectedTweet"
-.Bind(vm.SelectedTweet.Title)         // binds path "Title"
-.Bind(vm?.SelectedTweet?.Title)       // also binds path "Title" (null-propagation stripped)
-.Bind("SelectedTweet")                // string overload still available for edge cases
+.Bind (vm.SelectedTweet)               // binds path "SelectedTweet"
+.Bind ((vm.SelectedTweet).Title)       // binds path "Title"
+.Bind ((vm.SelectedTweet).Author.Name) // binds path "Author.Name"
 ```
 
 Performance is equivalent to string paths; there is no runtime reflection.
+
+ONLY if the C# expression form truly doesn't fit (e.g. binding to a property name you only know as a string), use the explicit string-escape overloads:
+
+```csharp
+// ✅ Explicit escape hatch.
+.BindWithString("Title")
+.BindCommandWithString("DeleteCommand")
+```
+
+**In practice you almost never need the `*WithString` overloads.** For `DataTemplate` / `ControlTemplate` / other scopes where the source type isn't naturally in scope, prefer the typed null-proxy pattern in §4.7 — it keeps the expression-based API and full rename support.
 
 ### 4.3 Children composition, conditional children, Spread
 
@@ -142,6 +151,59 @@ The strict usings separation prevents IntelliSense pollution and keeps markup re
 - **`.Invoke(control => { ... })`** — run imperative setup on a created control inline in the markup chain.
 
 Both are the supported mechanism for hooking into controls that need imperative setup (event handlers, focus, etc.) without breaking the markup file structure.
+
+### 4.7 Typed null proxies for bind-without-strings
+
+`.Bind(...)` extracts the binding path from the caller's C# expression (the substring after the last `.`). This means the source object referenced in the expression does not need to exist at runtime — only its *type* matters, so the compiler can resolve the property name. A **typed null proxy** is the standard way to get that type in scope whenever the natural source isn't already reachable.
+
+Common cases:
+
+- **`DataTemplate`** — items have a DataContext of type `T`, but no `T` variable is in scope in the markup. A `T? item = null` proxy lets you write `.Bind(item?.Prop)`.
+- **`ControlTemplate` / `Style.Setters`** — templated-parent or styled-element properties need a typed reference to resolve the path.
+- **Any binding where the source type isn't reachable via `this.vm` / a local** — e.g. binding to a sibling element's property when no `.Assign(out var x)` reference exists yet.
+
+**Rule: declare the null proxy as a field in `<Page>.logic.cs`, never inline in the `.cs` markup file.**
+
+```csharp
+// ❌ Avoid — local in the markup file forces a block-bodied lambda
+// and leaks a type declaration into the declarative surface.
+// <Page>.cs
+.ItemTemplate(DataTemplate(() =>
+{
+    TodoItem? item = null;
+    return Grid(
+        CheckBox().Bind(item?.IsDone, mode: BindingMode.TwoWay),
+        TextBlock().Bind(item?.Text)
+    );
+}))
+```
+
+```csharp
+// ✅ Prefer — proxy lives in <Page>.logic.cs; markup stays expression-bodied.
+// <Page>.logic.cs
+public sealed partial class TodoPage : BasePage<TodoViewModel>, IBuildUI
+{
+    static readonly TodoItem? item = null;
+    public TodoPage() => BuildUI();
+}
+
+// <Page>.cs
+.ItemTemplate(DataTemplate(() =>
+    Grid(
+        CheckBox().Bind(item?.IsDone, mode: BindingMode.TwoWay),
+        TextBlock().Bind(item?.Text)
+    )
+))
+```
+
+Why the logic-partial: proxies are state declarations, not markup. Keeping them in `.logic.cs` preserves the declarative, expression-bodied style of the markup file, avoids block-bodied lambdas, and matches the partial-class split in §4.5 — the logic partial already owns non-markup fields.
+
+Conventions for the proxy:
+
+- **`static readonly`** — never allocated, never mutated; only its compile-time type is used.
+- **`= null`** — always. The `?.` in the binding expression safely short-circuits at capture time.
+- **Lowercase name** — reads naturally in the markup (`item?.Text`, not `Item?.Text`).
+- **One proxy per source type** — if a page has both a `TodoItem` list and a `TagItem` list, declare both fields in `.logic.cs`.
 
 ## 5. Package ecosystem
 
@@ -193,12 +255,12 @@ Under the hood the script calls `dotnet new mcs-uno-view` with the correct `--na
 
 After adding a new page, the Windows native / WinAppSDK target may need a rebuild of the main Uno project first to regenerate `XamlTypeInfo` for the new view. Other targets (Desktop / Skia / Wasm) pick the new page up via C# Hot Reload without a rebuild.
 
-## 7. Repo conventions to enforce
+## 7. Conventions to enforce
 
 - Never `using Microsoft.UI.Xaml` (or any UI object-model namespace) inside a `<Page>.cs` markup file.
 - Never put logic that directly uses the UI object-model in a `<Page>.cs` markup file — move it to `<Page>.logic.cs`.
-- Prefer `.Bind(vm.X)` over `.Bind("X")`. String paths are only for rare cases where the C# expression form isn't possible.
-- Use `.Assign(out _)` and `.Invoke(...)` instead of creating named fields for controls in the markup.
+- Typed null-proxy fields (`static readonly T? item = null;`) used to drive `.Bind(item?.Prop)` in `DataTemplate` / `ControlTemplate` / any scope without a natural source live in `<Page>.logic.cs`, never inline in the `.cs` markup. See §4.7.
+- Use `.Assign(out ...)` and `.Invoke(...)` instead of creating named fields for controls in the markup.
 - Compose with `null` children for conditional UI and `Spread(...)` for dynamic-length lists — avoid building the tree imperatively in the code-behind.
 
 ## References

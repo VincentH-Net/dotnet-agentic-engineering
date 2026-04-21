@@ -1,6 +1,6 @@
 {
   "name": "uno-platform",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Skills for Uno Platform cross-platform development including Fluent design, navigation, responsive layouts, C# Markup 2 (CSharpForMarkup), and testing.",
   "author": {
     "name": "Vincent Hoogendoorn",
