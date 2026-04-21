@@ -13,7 +13,10 @@ Prompt logs are stored as git commits.
 
 ### Prompt Log Habit (MANDATORY after each code commit)
 
-After each code commit, immediately add a Prompt log commit with `--allow-empty`. Only include user prompts (skip continuation prompts) and agent question + user answers since the previous Prompt log commit (or session start if none yet). If there is no meaningful Prompt to log, do not add a Prompt log commit.
+After each code commit, immediately add a Prompt log commit with `--allow-empty`. 
+Only include user prompts (skip continuation prompts) and agent question + user answers since the 
+previous Prompt log commit (or session start if none yet). If there is no meaningful Prompt to log, 
+do not add a Prompt log commit.
 
 Commit format:
 
@@ -28,7 +31,8 @@ prompt-log:
 Rules:
 
 - Only include prompts/Q&A since the previous session log commit.
-- Sanitized means redact secrets, tokens, credentials, private URLs, and personal data. Keep all other text VERBATIM — do NOT summarize.
+- Sanitized means redact secrets, tokens, credentials, private URLs, and personal data. 
+  Keep all other text VERBATIM — do NOT summarize.
 
 ### Retrieving Prompt Logs
 
