@@ -55,7 +55,7 @@ Skills for [Uno Platform](https://platform.uno) cross-platform app development.
 
 | Skill | Description |
 |-------|-------------|
-| `uno-csharp-markup2-setup` | Add a concise, strongly-typed C# Markup 2 ([CSharpForMarkup](https://github.com/VincentH-Net/CSharpForMarkup)) Presentation project to a Uno Platform 6 solution on .NET 10/9 — replacing XAML with declarative fluent-builder C# UI. Covers MVVM/MVUX, Skia/native renderer choice, the bind-without-strings pattern, Spread, conditional children, and the markup/logic partial-class split. Adding new pages is done via the included `New-View.ps1` helper. |
+| `uno-csharpmarkup2` | Build a Uno Platform 6 UI in pure C# with [C# Markup 2 (CSharpForMarkup)](https://github.com/VincentH-Net/CSharpForMarkup) — covers both the initial Presentation-project setup and ongoing per-page authoring via the included `New-View.ps1` helper. MVVM/MVUX, Skia/native renderer, bind-without-strings, Spread, conditional children, and the markup/logic partial-class split. |
 | `uno-fluent2` | Fluent 2 Design System for Uno Platform — color, typography, geometry, materials, motion, iconography, spacing, elevation, lightweight styling, and responsive breakpoints. |
 | `uno-hamburgermenu-databinding` | Data-bound, hierarchical hamburger menu with dynamic navigation using Uno Navigation Extensions `NavigationView` and MVVM. |
 | `uno-livecharts2-theme-switching` | Reliable in-app dark/light/system theme switching for LiveCharts2 in Uno Platform — shared palettes, central chart refresh, and rendered-pixel verification. |
