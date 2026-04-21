@@ -3,7 +3,7 @@ name: uno-csharpmarkup2
 description: Build a Uno Platform 6 UI in pure C# using the concise, declarative, strongly-typed C# Markup 2 (CSharpForMarkup) library — replacing XAML with a fluent-builder, code-first approach. Covers BOTH the initial Presentation-project setup (via the `mcs-uno-markup2` template) AND ongoing per-page authoring (via the `New-View.ps1` helper that ships in the generated Presentation project and drives the `mcs-uno-view` item template under the hood). Use for new or existing Uno 6 apps on .NET 10/9 with MVVM (CommunityToolkit.Mvvm) or MVUX (Uno.Extensions.Reactive), with Uno.Extensions Navigation/Toolkit, and for supported C# Markup 2 packages (LiveCharts2, ScottPlot, Mapsui). Explains the bind-without-strings pattern (CallerArgumentExpression), Spread for variable-length children, null-as-conditional-child, attached-property syntax (e.g. `Grid_Row(0)`), Assign/Invoke markup↔logic bridging, the partial-class `<Name>Page.cs` / `<Name>Page.logic.cs` split, and the MVUX `BasePage<Bindable…Model>` wiring.
 metadata:
   author: https://github.com/VincentH-Net
-  version: "1.2"
+  version: "1.3"
   framework: uno-platform
   category: ui-markup
   sources:
@@ -16,6 +16,26 @@ metadata:
 Use when you want to build a Uno Platform 6 UI in **pure C#** using the concise, declarative, strongly-typed **C# Markup 2** (`CSharpForMarkup`) library — no XAML, no CSS, no HTML. Provides a Flutter-like fluent-builder developer experience with allocation-free, reflection-free implementation and compile-time-checked bindings.
 
 > This skill is about **CSharpForMarkup** / **C# Markup 2** by VincentH-Net, distributed as the `CSharpMarkup.WinUI.*` / `CSharpMarkup.WPF` NuGet package family. It is **not** the same technology as the separately-named "C# Markup" shipped by the Uno Platform team under `Uno.Extensions.Markup`. The APIs, project structure, and conventions differ — only use the sources listed in the References section of this skill.
+
+## 0. STOP — gate before reading further
+
+**Scaffolding is a solved problem — use the templates. Do not hand-scaffold.**
+
+Before you read the rest of this skill, run this two-step check and act on the result.
+
+**Step 1: Does a Presentation project already exist?** Look in the solution root for a `*.Presentation` project that references `CSharpMarkup.WinUI`.
+
+- **No** → Your *first action* is `dotnet new mcs-uno-markup2` (see §3). Do **not** add `CSharpMarkup.*` NuGet packages by hand. Do **not** create `BasePage` / `BaseViewModel` / global usings / `Directory.Packages.props` entries by hand. Do **not** start converting XAML pages before the template has run. The template wires up the `BasePage<TVm>` base class, `IBuildUI` / `IBind` infrastructure, global usings, the `New-View.ps1` helper, and other non-obvious plumbing that is not safe to reproduce by hand.
+- **Yes** → Proceed to Step 2.
+
+**Step 2: Are you adding a new page?**
+
+- **Yes** → Your *next action* is `.\New-View.ps1 <Name>` from the Presentation project folder (see §6). Do **not** hand-create `<Name>Page.cs` / `<Name>Page.logic.cs` / `<Name>Model.cs`. Do **not** call `dotnet new mcs-uno-view` directly — the script computes the namespace, output path, and template args correctly.
+- **No (editing pages that already exist)** → Continue to §4 for authoring patterns.
+
+If `Modern.CSharp.Templates` is not installed, install it (`dotnet new install Modern.CSharp.Templates`) instead of working around it by hand-scaffolding.
+
+The rest of this skill is reference material for authoring inside an *already-generated* project. If you find yourself about to create a `.csproj`, a `BasePage`, or a `<Name>Page.cs` file from scratch, stop and re-read this section.
 
 ## 1. When to use this skill
 
@@ -257,6 +277,7 @@ After adding a new page, the Windows native / WinAppSDK target may need a rebuil
 
 ## 7. Conventions to enforce
 
+- Never hand-scaffold the Presentation project, `BasePage` / `BaseViewModel`, `Directory.Packages.props` entries, or page files. Use `dotnet new mcs-uno-markup2` and `.\New-View.ps1` — see §0.
 - Never `using Microsoft.UI.Xaml` (or any UI object-model namespace) inside a `<Page>.cs` markup file.
 - Never put logic that directly uses the UI object-model in a `<Page>.cs` markup file — move it to `<Page>.logic.cs`.
 - Typed null-proxy fields (`static readonly T? item = null;`) used to drive `.Bind(item?.Prop)` in `DataTemplate` / `ControlTemplate` / any scope without a natural source live in `<Page>.logic.cs`, never inline in the `.cs` markup. See §4.7.
