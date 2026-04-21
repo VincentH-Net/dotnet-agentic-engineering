@@ -17,6 +17,18 @@
       "category": "Coding"
     },
     {
+      "name": "orleans",
+      "source": {
+        "source": "local",
+        "path": "./plugins/orleans"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Coding"
+    },
+    {
       "name": "uno-platform",
       "source": {
         "source": "local",

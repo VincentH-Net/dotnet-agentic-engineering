@@ -23,7 +23,7 @@ This repo exists to:
 
 ## What's included
 
-Currently this repo includes technology-independent content and content specific for [.NET](https://dotnet.microsoft.com) and [Uno Platform](https://platform.uno).
+Currently this repo includes technology-independent content and content specific for [.NET](https://dotnet.microsoft.com), [Microsoft Orleans](https://learn.microsoft.com/en-us/dotnet/orleans) and [Uno Platform](https://platform.uno).
 
 ### Coming
 
@@ -38,6 +38,16 @@ Skills for .NET development.
 | Skill | Description |
 |-------|-------------|
 | `dotnet-livecharts2` | LiveCharts2 development guide — installation, XAML source generator integration, theme config, gotchas, and sample index with exact repo file paths. Covers all platforms (WinUI, Uno, Avalonia, MAUI, WPF, Blazor, WinForms, Eto). |
+| `dotnet-modern-csharp-editorconfig` | Drop-in opinionated `.editorconfig` for modern C# (C# 14 / .NET 10, also works with C# 10–13) — formatting, naming, style, and preview analyzer severities. Covers required `.csproj` flags and the .NET 8 vs .NET 9+ build-respect-editorconfig distinction. |
+
+### orleans plugin
+
+Skills for [Microsoft Orleans 10](https://learn.microsoft.com/en-us/dotnet/orleans) actor-based distributed applications.
+
+| Skill | Description |
+|-------|-------------|
+| `orleans-result-pattern` | Concise, version-tolerant result pattern for Orleans 8+ grain calls — `Result` / `Result<T>` with `enum ErrorNr` + `string` errors, `[Immutable]` for zero-copy within-silo calls, implicit conversions, and RFC7807 `ValidationProblemDetails` via `TryAsValidationErrors`. |
+| `orleans-multiservice-pattern` | Modular-monolith pattern for Orleans 10 — host multiple logical services in one silo with strict `Apis → Contracts`, `Apis → Service`, `Service → Contracts` dependency rules so any logical service can later be extracted to its own physical microservice with minimal changes. |
 
 ### uno-platform plugin
 
@@ -45,6 +55,8 @@ Skills for [Uno Platform](https://platform.uno) cross-platform app development.
 
 | Skill | Description |
 |-------|-------------|
+| `uno-csharp-markup2-setup` | Add a concise, strongly-typed C# Markup 2 ([CSharpForMarkup](https://github.com/VincentH-Net/CSharpForMarkup)) Presentation project to a Uno Platform 6 solution on .NET 10/9 — replacing XAML with declarative fluent-builder C# UI. Covers MVVM/MVUX, Skia/native renderer choice, the bind-without-strings pattern, Spread, conditional children, and the markup/logic partial-class split. |
+| `uno-csharp-markup2-page` | Add a new C# Markup 2 page (View + optional Model) to a Uno solution already set up for C# Markup 2 — choose MVVM, MVUX, or none (pure code-behind). Enforces the strict markup/logic split and namespace-separation conventions. |
 | `uno-fluent2` | Fluent 2 Design System for Uno Platform — color, typography, geometry, materials, motion, iconography, spacing, elevation, lightweight styling, and responsive breakpoints. |
 | `uno-hamburgermenu-databinding` | Data-bound, hierarchical hamburger menu with dynamic navigation using Uno Navigation Extensions `NavigationView` and MVVM. |
 | `uno-livecharts2-theme-switching` | Reliable in-app dark/light/system theme switching for LiveCharts2 in Uno Platform — shared palettes, central chart refresh, and rendered-pixel verification. |
@@ -74,6 +86,7 @@ Install skills plugins in Claude Code:
 ```bash
 claude plugin marketplace add VincentH-Net/dotnet-agentic-engineering
 claude plugin install dotnet@dotnet-agentic-engineering
+claude plugin install orleans@dotnet-agentic-engineering
 claude plugin install uno-platform@dotnet-agentic-engineering
 ```
 

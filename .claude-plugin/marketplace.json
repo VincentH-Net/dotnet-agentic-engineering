@@ -5,19 +5,24 @@
     "url": "https://github.com/VincentH-Net"
   },
   "metadata": {
-    "description": "Battle-tested agentic engineering plugins for .NET and Uno Platform",
-    "version": "1.1.1"
+    "description": "Battle-tested agentic engineering plugins for .NET, Orleans, and Uno Platform",
+    "version": "1.2.0"
   },
   "plugins": [
     {
       "name": "dotnet",
       "source": "./plugins/dotnet",
-      "description": "Skills for .NET development including charting with LiveCharts2"
+      "description": "Skills for .NET development including charting with LiveCharts2 and a modern C# 14 editorconfig baseline"
+    },
+    {
+      "name": "orleans",
+      "source": "./plugins/orleans",
+      "description": "Skills for Microsoft Orleans 10 development including the result pattern and the multiservice modular-monolith pattern"
     },
     {
       "name": "uno-platform",
       "source": "./plugins/uno-platform",
-      "description": "Skills for Uno Platform cross-platform development including Fluent design, navigation, responsive layouts, and testing"
+      "description": "Skills for Uno Platform cross-platform development including Fluent design, navigation, responsive layouts, C# Markup 2 (CSharpForMarkup), and testing"
     }
   ]
 }

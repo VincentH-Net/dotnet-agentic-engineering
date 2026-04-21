@@ -1,0 +1,33 @@
+{
+  "name": "orleans",
+  "version": "1.0.0",
+  "description": "Skills for Microsoft Orleans 10 development including the result pattern and the multiservice modular-monolith pattern.",
+  "author": {
+    "name": "Vincent Hoogendoorn",
+    "url": "https://github.com/VincentH-Net"
+  },
+  "repository": "https://github.com/VincentH-Net/dotnet-agentic-engineering",
+  "keywords": [
+    "orleans",
+    "microservice",
+    "modular-monolith",
+    "result-pattern"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Orleans",
+    "shortDescription": "Microsoft Orleans skills — result pattern and modular-monolith multiservice",
+    "longDescription": "Use Orleans to access reusable skills for Microsoft Orleans 10 development, covering a concise version-tolerant result pattern for grain calls and a modular-monolith multiservice pattern for painless logical-to-physical service separation.",
+    "developerName": "Vincent Hoogendoorn",
+    "category": "Coding",
+    "capabilities": [
+      "Interactive",
+      "Read"
+    ],
+    "websiteURL": "https://github.com/VincentH-Net/dotnet-agentic-engineering",
+    "defaultPrompt": [
+      "Use the Orleans plugin to help implement the result pattern or the modular-monolith multiservice pattern in Orleans 10."
+    ],
+    "brandColor": "#512BD4"
+  }
+}

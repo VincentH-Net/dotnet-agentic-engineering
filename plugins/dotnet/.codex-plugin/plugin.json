@@ -1,7 +1,7 @@
 {
   "name": "dotnet",
-  "version": "1.1.1",
-  "description": "Skills for .NET development including charting with LiveCharts2.",
+  "version": "1.2.0",
+  "description": "Skills for .NET development including charting with LiveCharts2 and a modern C# 14 editorconfig baseline.",
   "author": {
     "name": "Vincent Hoogendoorn",
     "url": "https://github.com/VincentH-Net"
@@ -10,14 +10,17 @@
   "keywords": [
     "dotnet",
     "csharp",
+    "csharp-14",
+    "editorconfig",
+    "code-style",
     "livecharts2",
     "charting"
   ],
   "skills": "./skills/",
   "interface": {
     "displayName": ".NET",
-    "shortDescription": "Reusable .NET skills, including LiveCharts2 guidance",
-    "longDescription": "Use .NET to access reusable development skills for charting and related .NET implementation workflows.",
+    "shortDescription": "Reusable .NET skills — LiveCharts2 guidance and a modern C# 14 editorconfig baseline",
+    "longDescription": "Use .NET to access reusable development skills for charting (LiveCharts2) and for setting up an opinionated C# 14 / .NET 10 editorconfig with preview analyzers and modern code-style rules.",
     "developerName": "Vincent Hoogendoorn",
     "category": "Coding",
     "capabilities": [
@@ -26,7 +29,7 @@
     ],
     "websiteURL": "https://github.com/VincentH-Net/dotnet-agentic-engineering",
     "defaultPrompt": [
-      "Use the .NET plugin to help with LiveCharts2 implementation details."
+      "Use the .NET plugin to help with LiveCharts2 implementation details or to set up a modern C# 14 editorconfig."
     ],
     "brandColor": "#512BD4"
   }
