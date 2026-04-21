@@ -119,6 +119,7 @@ For `--RootNamespace Company.Product --Multiservice TeamA --Logicalservice Catal
 
 ```text
 Company.Product.TeamA.sln
+├── .editorconfig                       ← extended Modern C# 14 baseline + Orleans rules
 ├── src/
 │   ├── Apis/
 │   │   └── Apis.CatalogApi/            ← ASP.NET Core endpoints
@@ -138,6 +139,16 @@ Namespaces follow the prefix + service pattern:
 - `Company.Product.Contracts.CatalogContract`
 - `Company.Product.CatalogService`
 - `Company.Product.TeamAHost`
+
+### Bundled `.editorconfig`
+
+The solution root includes an **extended** `.editorconfig` based on the `mcs-editorconfig` baseline (modern C# 14 formatting, naming, and preview-analyzer severities) with additional Orleans-specific rules layered on top. This means:
+
+- **Do not** run `dotnet new mcs-editorconfig` in this solution — the bundled file supersedes it.
+- The `.csproj` flags documented in the `dotnet-modern-csharp-editorconfig` skill (`Nullable=enable`, `TreatWarningsAsErrors=true`, `AnalysisLevel=preview-All`, `EnforceCodeStyleInBuild=true`) still apply and are required for the bundled `.editorconfig` severities to take effect on `dotnet build`. Add them to `Directory.Build.props` at the solution root if not already present in the generated project files.
+- Rationale for every non-default setting is documented inline inside the bundled `.editorconfig` file.
+
+See the companion `dotnet-modern-csharp-editorconfig` skill for the baseline opinions (no underscore prefix on private fields, modern-idiom severities, etc.) — the bundled Orleans version inherits all of them.
 
 ## 7. Adding more logical services to an existing multiservice
 

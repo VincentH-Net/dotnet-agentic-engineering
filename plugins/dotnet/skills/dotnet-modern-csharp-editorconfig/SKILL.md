@@ -98,17 +98,14 @@ On **.NET 9+**, the build respects editorconfig severities automatically — `An
 
 ## 6. Combining with other mcs templates
 
-When chained into a larger project-generation flow, suppress the standalone instructions:
+Other `mcs-*` templates may generate their own `.editorconfig` already based on this one. In particular:
+
+- **`mcs-orleans-multiservice`** writes an **extended** `.editorconfig` at the solution root that builds on this baseline and layers Orleans-specific rules on top. **Do not** run `mcs-editorconfig` separately in that solution — the extended file is already there. See the `orleans-multiservice-pattern` skill.
+
+When this template *is* chained into a custom project-generation flow (not superseded by another template that already includes it), suppress the standalone instructions blurb:
 
 ```bash
 dotnet new mcs-editorconfig -s
-```
-
-Example combined run for a new Orleans multiservice that also wants the style baseline:
-
-```bash
-dotnet new mcs-editorconfig -s
-dotnet new mcs-orleans-multiservice -R Company.Product -M TeamA -L Catalog --allow-scripts Yes
 ```
 
 ## 7. Verification
