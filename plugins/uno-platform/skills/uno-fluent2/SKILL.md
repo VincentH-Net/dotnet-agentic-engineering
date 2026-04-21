@@ -2,7 +2,7 @@
 name: uno-fluent2
 description: Fluent 2 Design System for Uno Platform. Use when designing UI layouts, choosing colors, applying typography, setting elevation/shadows, using theme resources, applying lightweight styling, or implementing Fluent Design principles in WinUI/Uno XAML apps. Covers color, typography, geometry, materials, motion, iconography, spacing, elevation, and responsive breakpoints.
 metadata:
-  author: vhnet
+  author: https://github.com/VincentH-Net
   version: "1.1"
   framework: uno-platform
   category: design-system

@@ -2,7 +2,7 @@
 name: uno-livecharts2-theme-switching
 description: Extends dotnet-livecharts2 for Uno Platform apps that need reliable in-app dark/light/system theme switching with LiveCharts2, shared theme palettes, central refresh of already-loaded charts, and rendered-pixel verification of chart text colors after theme changes.
 metadata:
-  author: vhnet
+  author: https://github.com/VincentH-Net
   version: "1.0"
   framework: uno-platform
   category: theming

@@ -2,7 +2,7 @@
 name: uno-test-resize-app-window
 description: Resize a running Uno Platform desktop app window on macOS for visual testing. Use when you need to verify responsive layout reflow, test breakpoints, or validate UI at different window sizes. Requires macOS Accessibility API access.
 metadata:
-  author: vhnet
+  author: https://github.com/VincentH-Net
   version: "1.1"
   category: testing
   platform: macOS

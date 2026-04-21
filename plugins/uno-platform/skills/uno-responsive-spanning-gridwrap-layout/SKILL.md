@@ -2,7 +2,7 @@
 name: uno-responsive-spanning-gridwrap-layout
 description: A responsive, non-virtualizing wrapping grid layout for ItemsRepeater that supports column spans, proportional stretch-to-fill, and vertically aligned gaps. Use when building dashboard-style or card-based layouts where items have varying widths but uniform height.
 metadata:
-  author: vhnet
+  author: https://github.com/VincentH-Net
   version: "1.1"
   category: controls
   platform: cross-platform

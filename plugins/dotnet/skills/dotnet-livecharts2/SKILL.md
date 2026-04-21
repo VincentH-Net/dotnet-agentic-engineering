@@ -2,10 +2,10 @@
 name: dotnet-livecharts2
 description: LiveCharts2 development guide — installation, XAML source generator integration, theme config, gotchas, and sample index with exact repo file paths. Use when implementing any LiveCharts2 chart (line, area, bar, pie, gauge, heatmap, scatter, polar, financial). Covers all platforms (WinUI, Uno, Avalonia, MAUI, WPF, Blazor, WinForms, Eto).
 metadata:
-  author: vhnet
+  author: https://github.com/VincentH-Net
   version: "1.4.1"
   library: LiveCharts2
-  library-version: "2.0.0-rc6.1"
+  library-version: "2.0.0"
   category: charting
   sources:
     - LiveCharts2 GitHub repo
