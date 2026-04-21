@@ -22,7 +22,7 @@ Use when you want to build a Uno Platform 6 UI in **pure C#** using the concise,
 Select this skill for any of:
 
 - Starting a new Uno 6 app and choosing C# over XAML for the UI layer
-- Adding a C# Markup 2 Presentation layer to an existing Uno 6 app (partial conversion is supported — existing XAML pages can coexist with new C# Markup pages)
+- Adding a C# Markup 2 Presentation layer to an existing Uno 6 app (partial conversion is supported — existing XAML pages can coexist with new C# Markup 2 pages)
 - Wanting compile-time-checked binding paths via `CallerArgumentExpression` — no string paths, full rename support
 - Wanting Flutter-like `children`-list composition with null-as-conditional-child and variable-length `Spread`
 - Targeting .NET 10 or .NET 9 with either **MVVM** (CommunityToolkit.Mvvm) or **MVUX** (Uno.Extensions.Reactive)
@@ -48,7 +48,7 @@ In the root of your Uno solution (alongside the existing app project):
 dotnet new mcs-uno-markup2 \
   --appRootNamespace Company.MyApp \
   --tfm net10.0 \
-  --presentation mvux \
+  --presentation mvvm \
   --renderer skia \
   --allow-scripts Yes
 ```
@@ -60,6 +60,8 @@ dotnet new mcs-uno-markup2 \
 | `-ap`, `--appRootNamespace` | Root namespace (no trailing dot) of the existing Uno app project — the project that contains `App.cs`. Used as the prefix for the generated Presentation project's root namespace. | e.g. `Company.MyApp` |
 | `-p`, `--presentation` | Design pattern baked into the Presentation project | `none` / `mvvm` / `mvux` |
 | `-r`, `--renderer` | Renderer for iOS, Android, and WebAssembly targets (desktop uses Skia regardless) | `skia` / `native` |
+
+Note that the `--presentation` parameter determines the default presentation pattern used by the `New-View.ps1` script when adding new pages. You can override the pattern per-page when running `New-View.ps1`, but the project-level default is set by this parameter.
 
 ### Optional parameters
 
@@ -158,21 +160,43 @@ The template wires up a subset of these depending on `--presentation` and `--ren
 
 ## 6. After setup — adding pages
 
-Use the sibling item template **`mcs-uno-view`** to add each new page; the companion `uno-csharp-markup2-page` skill covers parameters and conventions. Briefly:
+The generated Presentation project includes a **`New-View.ps1`** helper script at its root. This is the supported path for adding new pages — do **not** invoke `dotnet new mcs-uno-view` directly.
 
-```bash
-dotnet new mcs-uno-view \
-  --name Home \
-  --namespace Company.MyApp.Presentation \
-  --presentation mvux
+### Running the script
+
+From the Presentation project folder:
+
+```powershell
+.\New-View.ps1 Home                       # Use the Presentation project's default presentation pattern (mvvm / mvux / none)
+.\New-View.ps1 Home mvvm                  # MVVM page
+.\New-View.ps1 Home mvux                  # MVUX page
+.\New-View.ps1 Home none                  # No model; logic lives in HomePage.logic.cs
+.\New-View.ps1 Features.Home.Details      # Creates Features/Home/DetailsPage in sub-namespace Features.Home
 ```
 
-The item template produces `<Name>Page.cs` (markup), `<Name>Page.logic.cs` (partial code-behind), and (for `mvvm` / `mvux`) the paired model file.
+### Parameters
+
+| Parameter | Purpose | Default |
+|---|---|---|
+| `Name` (positional, required) | View identifier. `"Page"` suffix is added automatically. Dots split the name into **sub-folders and sub-namespaces** — `Features.Home.Details` produces `Features/Home/DetailsPage.cs` under namespace `<PresentationRoot>.Features.Home`. | — |
+| `Presentation` (positional, optional) | Model pattern for the page. | `mvvm` (`none` / `mvvm` / `mvux`) |
+
+### What the script produces
+
+- `<Name>Page.cs` — markup file
+- `<Name>Page.logic.cs` — code-behind partial class
+- `<Name>Model.cs` — viewmodel (only when `Presentation` is `mvvm` or `mvux`)
+
+Under the hood the script calls `dotnet new mcs-uno-view` with the correct `--name`, `--namespace` (prefixed with the Presentation project's root namespace), `--presentation`, and `--output` path. That wiring is non-trivial — always go through the script.
+
+### Windows native (WinAppSDK) rebuild note
+
+After adding a new page, the Windows native / WinAppSDK target may need a rebuild of the main Uno project first to regenerate `XamlTypeInfo` for the new view. Other targets (Desktop / Skia / Wasm) pick the new page up via C# Hot Reload without a rebuild.
 
 ## 7. Repo conventions to enforce
 
 - Never `using Microsoft.UI.Xaml` (or any UI object-model namespace) inside a `<Page>.cs` markup file.
-- Never put imperative logic in a `<Page>.cs` markup file — move it to `<Page>.logic.cs`.
+- Never put logic that directly uses the UI object-model in a `<Page>.cs` markup file — move it to `<Page>.logic.cs`.
 - Prefer `.Bind(vm.X)` over `.Bind("X")`. String paths are only for rare cases where the C# expression form isn't possible.
 - Use `.Assign(out _)` and `.Invoke(...)` instead of creating named fields for controls in the markup.
 - Compose with `null` children for conditional UI and `Spread(...)` for dynamic-length lists — avoid building the tree imperatively in the code-behind.
@@ -180,6 +204,5 @@ The item template produces `<Name>Page.cs` (markup), `<Name>Page.logic.cs` (part
 ## References
 
 - [CSharpForMarkup repo](https://github.com/VincentH-Net/CSharpForMarkup) — API, examples, WinUI/Uno/WPF setups
-- [Modern.CSharp.Templates repo](https://github.com/VincentH-Net/Modern.CSharp.Templates) — `mcs-uno-markup2`
+- [Modern.CSharp.Templates repo](https://github.com/VincentH-Net/Modern.CSharp.Templates) — `mcs-uno-markup2` and the `mcs-uno-view` item template invoked by `New-View.ps1`
 - [NuGet: CSharpMarkup.WinUI](https://www.nuget.org/packages/CSharpMarkup.WinUI)
-- Companion skill: `uno-csharp-markup2-page` — the per-page item template that follows this setup
