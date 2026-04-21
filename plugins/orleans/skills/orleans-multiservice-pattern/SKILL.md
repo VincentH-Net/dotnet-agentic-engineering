@@ -105,14 +105,6 @@ dotnet new mcs-orleans-multiservice \
 | `-n`, `--name` | Output project root name | from `--Multiservice` |
 | `-o`, `--output` | Output folder | current directory |
 
-### Sentinel: `--Multiservice .`
-
-Passing `.` as the multiservice name tells the template to target an **existing** multiservice rooted in the current folder and add another logical service to it (equivalent to running `AddLogicalService.ps1 <name>`):
-
-```bash
-dotnet new mcs-orleans-multiservice --Multiservice . --Logicalservice Basket --allow-scripts Yes
-```
-
 ## 6. Generated solution layout
 
 For `--RootNamespace Company.Product --Multiservice TeamA --Logicalservice Catalog`:
@@ -152,19 +144,13 @@ See the companion `dotnet-modern-csharp-editorconfig` skill for the baseline opi
 
 ## 7. Adding more logical services to an existing multiservice
 
-Two equivalent options:
+Run the script generated alongside the solution:
 
 ```powershell
 .\AddLogicalService.ps1 Basket
 ```
 
-or
-
-```bash
-dotnet new mcs-orleans-multiservice --Multiservice . --Logicalservice Basket --allow-scripts Yes
-```
-
-Both produce the same three projects (`Apis.BasketApi`, `Contracts.BasketContract`, `BasketService`), register them in the solution, and wire them into the existing host.
+This produces the three projects for the new logical service (`Apis.BasketApi`, `Contracts.BasketContract`, `BasketService`), registers them in the solution, and wires them into the existing host.
 
 ## 8. Service-to-service calls (inside the same multiservice)
 
