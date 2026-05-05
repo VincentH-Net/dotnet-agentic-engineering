@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "Battle-tested agentic engineering plugins for .NET, Orleans, and Uno Platform",
-    "version": "1.3.0"
+    "version": "1.4.0"
   },
   "plugins": [
     {
@@ -22,7 +22,7 @@
     {
       "name": "uno-platform",
       "source": "./plugins/uno-platform",
-      "description": "Skills for Uno Platform cross-platform development including Fluent design, navigation, responsive layouts, C# Markup 2 (CSharpForMarkup), agentic app run support, and testing"
+      "description": "Skills for Uno Platform cross-platform development including Fluent design, navigation, responsive layouts, C# Markup 2 (CSharpForMarkup), agent directives, agentic app run support, and testing"
     }
   ]
 }
