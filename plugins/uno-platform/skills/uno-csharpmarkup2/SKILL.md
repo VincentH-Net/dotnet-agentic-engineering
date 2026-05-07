@@ -1,9 +1,9 @@
 ---
 name: uno-csharpmarkup2
-description: Build a Uno Platform 6 UI in declarative C# using the concise, strongly-typed C# Markup 2 (CSharpForMarkup) library — instead of XAML. Requires an existing C# Markup 2 Presentation-project setup (via the `mcs-uno-markup2` template, a link to instructions is shown if not present). Supports UI editing and quickly adding new views and models (via the `New-View.ps1` helper that ships in the generated Presentation project and drives the `mcs-uno-view` item template under the hood). Use for new or existing Uno 6 apps on .NET 10/9 with MVVM (CommunityToolkit.Mvvm) or MVUX (Uno.Extensions.Reactive), with Uno.Extensions Navigation/Toolkit, and for supported C# Markup 2 packages (LiveCharts2, ScottPlot, Mapsui). Explains the bind-without-strings pattern (CallerArgumentExpression), Spread for variable-length children, null-as-conditional-child, attached-property syntax (e.g. `Grid_Row(0)`), Assign/Invoke markup↔logic bridging, the partial-class `<Name>Page.cs` / `<Name>Page.logic.cs` split, and the MVUX `BasePage<Bindable…Model>` wiring.
+description: Build or edit Uno Platform 6 UI in declarative C# with C# Markup 2 (CSharpForMarkup), instead of XAML. Use for Uno 6 apps on .NET 10/9 with MVVM or MVUX, Uno Extensions Navigation/Toolkit, and supported C# Markup 2 integrations such as LiveCharts2, ScottPlot, and Mapsui.
 metadata:
   author: https://github.com/VincentH-Net
-  version: "1.4.1"
+  version: "1.4.2"
   framework: uno-platform
   category: ui-markup
   sources:
@@ -44,22 +44,22 @@ If any of these are not true, STOP and point the user to the ["Agentic Engineeri
 
 **Step 2: Are you adding a new page?**
 
-- **Yes** → Your *next action* is `.\New-View.ps1 <Name>` from the Presentation project folder (see §6). Do **not** hand-create `<Name>Page.cs` / `<Name>Page.logic.cs` / `<Name>Model.cs`. Do **not** call `dotnet new mcs-uno-view` directly — the script computes the namespace, output path, and template args correctly.
-- **No (editing pages that already exist)** → Continue to §4 for authoring patterns.
+- **Yes** → Your *next action* is `pwsh ./New-View.ps1 <Name>` from the Presentation project folder (see §5). Do **not** hand-create `<Name>Page.cs` / `<Name>Page.logic.cs` / `<Name>Model.cs`. Do **not** call `dotnet new mcs-uno-view` directly — the script computes the namespace, output path, and template args correctly.
+- **No (editing pages that already exist)** → Continue to §3 for authoring patterns.
 
 If `Modern.CSharp.Templates` is not installed, install it (`dotnet new install Modern.CSharp.Templates`) instead of working around it by hand-scaffolding.
 
 The rest of this skill is reference material for authoring inside an *already-generated* project. If you find yourself about to create a `.csproj`, a `BasePage`, or a `<Name>Page.cs` file from scratch, stop and re-read this section.
 
-## 4. Core C# Markup 2 patterns to know
+## 3. Core C# Markup 2 patterns to know
 
 The template sets up the Presentation layer; these are the patterns you apply inside it when authoring UI.
 
-### 4.1 Declarative fluent builder
+### 3.1 Declarative fluent builder
 
 Each markup file defines UI via a chain of extension-method property setters on layouts and views. Property values are strongly typed (enums, not strings). Automatic type conversion lets you write `.Margin(12)` instead of `new Thickness(12)`.
 
-### 4.2 Bind without strings (CallerArgumentExpression)
+### 3.2 Bind without strings (CallerArgumentExpression)
 
 `.Bind(...)` accepts a C# expression and the compiler captures the path text via `CallerArgumentExpression`. No `nameof()`, no string literals, full rename / refactor support:
 
@@ -79,16 +79,16 @@ ONLY if the C# expression form truly doesn't fit (e.g. binding to a property nam
 .BindCommandWithString("DeleteCommand")
 ```
 
-**In practice you almost never need the `*WithString` overloads.** For `DataTemplate` / `ControlTemplate` / other scopes where the source type isn't naturally in scope, prefer the typed null-proxy pattern in §4.7 — it keeps the expression-based API and full rename support.
+**In practice you almost never need the `*WithString` overloads.** For `DataTemplate` / `ControlTemplate` / other scopes where the source type isn't naturally in scope, prefer the typed null-proxy pattern in §3.7 — it keeps the expression-based API and full rename support.
 
-### 4.3 Children composition, conditional children, Spread
+### 3.3 Children composition, conditional children, Spread
 
 Layouts take a `children` list. Two patterns make composition concise:
 
 - **Conditional children**: `null` values in a `children` list are ignored. Use a ternary `cond ? view : null` to include/exclude a child.
 - **`Spread(...)`**: inserts a variable-length child list at a specific position in a parent's `children`. Similar to Flutter's spread operator.
 
-### 4.4 Attached property syntax
+### 3.4 Attached property syntax
 
 Attached properties are prefixed with the defining type plus underscore:
 
@@ -100,7 +100,7 @@ Grid_RowSpan(2)      // Grid.RowSpan="2"
 
 Multiple attached-property setters can be chained on the same element.
 
-### 4.5 Partial class markup/logic split
+### 3.5 Partial class markup/logic split
 
 Split each page across two partial class files:
 
@@ -111,14 +111,14 @@ Split each page across two partial class files:
 
 The strict usings separation prevents IntelliSense pollution and keeps markup readable. Repo review rule: any `Microsoft.UI.Xaml` using in a `<Page>.cs` file is wrong; move that code to `<Page>.logic.cs`.
 
-### 4.6 Assign() and Invoke() — bridging markup and logic
+### 3.6 Assign() and Invoke() — bridging markup and logic
 
 - **`.Assign(out var control)`** — capture a reference to a created control from within the markup chain, for later use in the `.logic.cs` file.
 - **`.Invoke(control => { ... })`** — run imperative setup on a created control inline in the markup chain.
 
 Both are the supported mechanism for hooking into controls that need imperative setup (event handlers, focus, etc.) without breaking the markup file structure.
 
-### 4.7 Typed null proxies for bind-without-strings
+### 3.7 Typed null proxies for bind-without-strings
 
 `.Bind(...)` extracts the binding path from the caller's C# expression (the substring after the last `.`). This means the source object referenced in the expression does not need to exist at runtime — only its *type* matters, so the compiler can resolve the property name. A **typed null proxy** is the standard way to get that type in scope whenever the natural source isn't already reachable.
 
@@ -162,7 +162,7 @@ public sealed partial class TodoPage : BasePage<TodoViewModel>, IBuildUI
 ))
 ```
 
-Why the logic-partial: proxies are state declarations, not markup. Keeping them in `.logic.cs` preserves the declarative, expression-bodied style of the markup file, avoids block-bodied lambdas, and matches the partial-class split in §4.5 — the logic partial already owns non-markup fields.
+Why the logic-partial: proxies are state declarations, not markup. Keeping them in `.logic.cs` preserves the declarative, expression-bodied style of the markup file, avoids block-bodied lambdas, and matches the partial-class split in §3.5 — the logic partial already owns non-markup fields.
 
 Conventions for the proxy:
 
@@ -171,7 +171,7 @@ Conventions for the proxy:
 - **Lowercase name** — reads naturally in the markup (`item?.Text`, not `Item?.Text`).
 - **One proxy per source type** — if a page has both a `TodoItem` list and a `TagItem` list, declare both fields in `.logic.cs`.
 
-## 5. Package ecosystem
+## 4. Package ecosystem
 
 The template wires up a subset of these depending on `--presentation` and `--renderer`; add the rest as features are needed:
 
@@ -186,7 +186,7 @@ The template wires up a subset of these depending on `--presentation` and `--ren
 | `CSharpMarkup.WinUI.ScottPlot` | ScottPlot plots in C# Markup |
 | `CSharpMarkup.WinUI.Mapsui` | Mapsui maps in C# Markup |
 
-## 6. After setup — adding pages
+## 5. After setup — adding pages
 
 The generated Presentation project includes a **`New-View.ps1`** helper script at its root. This is the supported path for adding new pages — do **not** invoke `dotnet new mcs-uno-view` directly.
 
@@ -195,12 +195,14 @@ The generated Presentation project includes a **`New-View.ps1`** helper script a
 From the Presentation project folder:
 
 ```powershell
-.\New-View.ps1 Home                       # Use the Presentation project's default presentation pattern (mvvm / mvux / none)
-.\New-View.ps1 Home mvvm                  # MVVM page
-.\New-View.ps1 Home mvux                  # MVUX page
-.\New-View.ps1 Home none                  # No model; logic lives in HomePage.logic.cs
-.\New-View.ps1 Features.Home.Details      # Creates Features/Home/DetailsPage in sub-namespace Features.Home
+pwsh ./New-View.ps1 Home                       # Use the Presentation project's default presentation pattern (mvvm / mvux / none)
+pwsh ./New-View.ps1 Home mvvm                  # MVVM page
+pwsh ./New-View.ps1 Home mvux                  # MVUX page
+pwsh ./New-View.ps1 Home none                  # No model; logic lives in HomePage.logic.cs
+pwsh ./New-View.ps1 Features.Home.Details      # Creates Features/Home/DetailsPage in sub-namespace Features.Home
 ```
+
+On Windows PowerShell, `.\New-View.ps1 Home` is also valid.
 
 ### Parameters
 
@@ -221,12 +223,20 @@ Under the hood the script calls `dotnet new mcs-uno-view` with the correct `--na
 
 After adding a new page, the Windows native / WinAppSDK target may need a rebuild of the main Uno project first to regenerate `XamlTypeInfo` for the new view. Other targets (Desktop / Skia / Wasm) pick the new page up via C# Hot Reload without a rebuild.
 
+## 6. Validation
+
+After editing or adding C# Markup 2 UI:
+
+1. build and run the Uno app using the repository's normal Uno app build and run instructions and inspect the tool result and the app log file for build or runtime errors.
+
+2. If you added a page, verify the generated files are under the expected Presentation project namespace and folder, and that the Uno app can resolve the new view.
+
 ## 7. Conventions to enforce
 
-- Never hand-scaffold the Presentation project, `BasePage` / `BaseViewModel`, `Directory.Packages.props` entries, or page files. Use `dotnet new mcs-uno-markup2` and `.\New-View.ps1` — see §0.
+- Never hand-scaffold the Presentation project, `BasePage` / `BaseViewModel`, `Directory.Packages.props` entries, or page files. Use `dotnet new mcs-uno-markup2` and `pwsh ./New-View.ps1` — see §2 and §5.
 - Never `using Microsoft.UI.Xaml` (or any UI object-model namespace) inside a `<Page>.cs` markup file.
 - Never put logic that directly uses the UI object-model in a `<Page>.cs` markup file — move it to `<Page>.logic.cs`.
-- Typed null-proxy fields (`static readonly T? item = null;`) used to drive `.Bind(item?.Prop)` in `DataTemplate` / `ControlTemplate` / any scope without a natural source live in `<Page>.logic.cs`, never inline in the `.cs` markup. See §4.7.
+- Typed null-proxy fields (`static readonly T? item = null;`) used to drive `.Bind(item?.Prop)` in `DataTemplate` / `ControlTemplate` / any scope without a natural source live in `<Page>.logic.cs`, never inline in the `.cs` markup. See §3.7.
 - Use `.Assign(out ...)` and `.Invoke(...)` instead of creating named fields for controls in the markup.
 - Compose with `null` children for conditional UI and `Spread(...)` for dynamic-length lists — avoid building the tree imperatively in the code-behind.
 

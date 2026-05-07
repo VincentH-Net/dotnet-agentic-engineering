@@ -91,16 +91,23 @@ claude plugin install orleans@dotnet-agentic-engineering
 claude plugin install uno-platform@dotnet-agentic-engineering
 ```
 
-Install skills in any agent with `npx skills` (requires `Node.js`) :
+Install skill plugins in Codex:
+
+```bash
+codex plugin marketplace add VincentH-Net/dotnet-agentic-engineering
+codex plugin install dotnet@dotnet-agentic-engineering
+codex plugin install orleans@dotnet-agentic-engineering
+codex plugin install uno-platform@dotnet-agentic-engineering
+```
+
+Install individual skills in any agent with `npx skills` (requires `Node.js`) :
 
 ```bash
 # Select skills in this repo and install them in agents you choose
 npx skills add VincentH-Net/dotnet-agentic-engineering
 ```
 
-Note that to install the same skills in both Claude Code and Codex you can install plugins for Claude Code and use `npx skills` for Codex. There is no need to specify Codex as target agent in the `npx skills` command: Codex supports skills under the `.agents` folder, which `npx skills` always installs to, while Claude Code does not support `.agents`.
-
-**Codex plugin** install is coming as soon as [Codex releases plugin install from GitHub repo](https://developers.openai.com/codex/plugins/build#publish-official-public-plugins).
+Codex and Claude Code can install the plugins from this repository directly. `npx skills` remains useful when you want to select or install individual skills instead of whole plugins.
 
 You can also install a single skill in Codex by invoking:
 

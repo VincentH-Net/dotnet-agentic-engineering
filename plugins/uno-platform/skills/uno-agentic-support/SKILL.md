@@ -1,9 +1,9 @@
 ---
 name: uno-agentic-support
-description: In-app support for agentic development of Uno Platform apps. Use when running or preparing a Uno Platform app for agent-driven execution with uno_app_start. Also use when the expected log file specified in AGENT_CONSOLE_LOG is missing, lacks "uno-agentic-support", or Hot Reload / Hot Design remains visible during agent UI testing.
+description: In-app support for agentic development of Uno Platform apps. Use when running or preparing a Uno Platform app for agent-driven execution with uno_app_start. Also use when the expected log file specified in AGENT_CONSOLE_LOG is missing or lacks "uno-agentic-support" entry, or Hot Reload / Hot Design remains visible during agent UI testing.
 metadata:
   author: https://github.com/VincentH-Net
-  version: "1.0"
+  version: "1.0.1"
   framework: uno-platform
   category: agentic-support
   sources: https://github.com/VincentH-Net
