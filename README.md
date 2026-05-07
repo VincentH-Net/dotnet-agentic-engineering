@@ -90,15 +90,16 @@ claude plugin install dotnet@dotnet-agentic-engineering
 claude plugin install orleans@dotnet-agentic-engineering
 claude plugin install uno-platform@dotnet-agentic-engineering
 ```
+To update a plugin, use `update` instead of `install`
 
 Install skill plugins in Codex:
 
 ```bash
 codex plugin marketplace add VincentH-Net/dotnet-agentic-engineering
-codex plugin install dotnet@dotnet-agentic-engineering
-codex plugin install orleans@dotnet-agentic-engineering
-codex plugin install uno-platform@dotnet-agentic-engineering
 ```
+To update all plugins, use `upgrade` instead of `add`
+
+Then enable the plugins you want with the `/plugins` command in codex (you can filter on "dotnet-agentic-engineering" in the plugins list).
 
 Install individual skills in any agent with `npx skills` (requires `Node.js`) :
 
@@ -107,7 +108,7 @@ Install individual skills in any agent with `npx skills` (requires `Node.js`) :
 npx skills add VincentH-Net/dotnet-agentic-engineering
 ```
 
-Codex and Claude Code can install the plugins from this repository directly. `npx skills` remains useful when you want to select or install individual skills instead of whole plugins.
+Codex and Claude Code can use the plugins from this repository directly. `npx skills` remains useful when you want to select or install individual skills instead of whole plugins.
 
 You can also install a single skill in Codex by invoking:
 
