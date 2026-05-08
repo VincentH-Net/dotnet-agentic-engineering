@@ -33,7 +33,7 @@ Apply when any of the following is true:
 - Standardizing style across a multi-project solution — drop at the repo root, every project inherits
 - Combining with other `mcs-*` templates that already trigger this generation (pass `-s` to skip the standalone blurb)
 
-Do NOT use when the repo already has a deliberate, bespoke `.editorconfig`; running the template with `--force` would overwrite it. Prefer hand-merging the opinions described below.
+If the repo already has an `.editorconfig` in the target folder, ask the user if it is OK to overwrite it. If no, STOP. If yes, run the template with `--force`.
 
 ## 2. Prerequisites
 
