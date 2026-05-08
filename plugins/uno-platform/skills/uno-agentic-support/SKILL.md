@@ -44,14 +44,13 @@ In `App.xaml.cs`:
 
     ```csharp
     #if DEBUG
-        readonly ILoggerFactory earlyFactory;
         readonly bool startedByAgent;
     #endif
 
     #if DEBUG
         bool InitializeAgentSupport()
         {
-            var agentConsoleLogPath = ResolveAgentConsoleLogPath();
+            string? agentConsoleLogPath = ResolveAgentConsoleLogPath();
             if (agentConsoleLogPath is not null)
             {
                 var stream = new FileStream(agentConsoleLogPath, FileMode.CreateNew, FileAccess.Write, FileShare.Read);
@@ -60,12 +59,11 @@ In `App.xaml.cs`:
                 Console.SetError(writer);
             }
             // Make sure that loggings made before the application host is initialized are captured
-            LogExtensionPoint.AmbientLoggerFactory = earlyFactory = LoggerFactory.Create(ConfigureAppLogging);
+            LogExtensionPoint.AmbientLoggerFactory = LoggerFactory.Create(ConfigureAppLogging);
             #if HAS_UNO
                 Uno.UI.Adapter.Microsoft.Extensions.Logging.LoggingAdapter.Initialize();
             #endif
 
-            this.Log().LogDebug("Application Launched in DEBUG mode. uno-agentic-support: {StartedByAgent}", startedByAgent);
             return agentConsoleLogPath is not null;
         }
 
@@ -73,31 +71,29 @@ In `App.xaml.cs`:
         {
             const string Key = "AGENT_CONSOLE_LOG";
 
-            var prefix = Key + "=";
-            foreach (var arg in Environment.GetCommandLineArgs())
+            string prefix = Key + "=";
+            foreach (string arg in Environment.GetCommandLineArgs())
             {
                 if (arg.StartsWith(prefix, StringComparison.Ordinal))
                 {
-                    var value = arg[prefix.Length..];
+                    string value = arg[prefix.Length..];
                     if (!string.IsNullOrEmpty(value)) return value;
                 }
             }
 
-            var fromEnv = Environment.GetEnvironmentVariable(Key);
-            if (!string.IsNullOrEmpty(fromEnv)) return fromEnv;
-
-            return null;
+            string? fromEnv = Environment.GetEnvironmentVariable(Key);
+            return string.IsNullOrEmpty(fromEnv) ? null : fromEnv;
         }
     #endif
 
         void ConfigureAppLogging(ILoggingBuilder logBuilder)
         {
-            logBuilder.SetMinimumLevel(LogLevel.Warning);
+            _ = logBuilder.SetMinimumLevel(LogLevel.Warning);
         #if DEBUG
             // Set the default log level for the app's own namespace to Debug
-            logBuilder.AddFilter(GetType().Namespace!.Split('.')[0], LogLevel.Debug);
+            _ = logBuilder.AddFilter(GetType().Namespace!.Split('.')[0], LogLevel.Debug);
             // Make sure that agents receive the logs in the console
-            if (startedByAgent) logBuilder.AddConsole();
+            if (startedByAgent) _ = logBuilder.AddConsole();
 
             // Uno Platform namespace filter groups
             // Uncomment individual methods to see more detailed logging
@@ -123,6 +119,8 @@ In `App.xaml.cs`:
     ```csharp
     #if DEBUG
         startedByAgent = InitializeAgentSupport();
+        var logger = this.Log();
+        if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Application Launched in DEBUG mode. uno-agentic-support: {StartedByAgent}", startedByAgent);
     #endif
     ```
 
