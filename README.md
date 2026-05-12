@@ -37,6 +37,7 @@ Skills for .NET development.
 
 | Skill | Description |
 |-------|-------------|
+| `ensure-directives` | Create or update AGENTS.md and CLAUDE.md with agentic engineering directives for your tech stack. |
 | `dotnet-livecharts2` | LiveCharts2 development guide — installation, XAML source generator integration, theme config, gotchas, and sample index with exact repo file paths. Covers all platforms (WinUI, Uno, Avalonia, MAUI, WPF, Blazor, WinForms, Eto). |
 | `dotnet-modern-csharp-editorconfig` | Drop-in opinionated `.editorconfig` for modern C# (C# 14 / .NET 10, also works with C# 10–13) — formatting, naming, style, and preview analyzer severities. Covers required `.csproj` flags and the .NET 8 vs .NET 9+ build-respect-editorconfig distinction. |
 
@@ -55,7 +56,6 @@ Skills for [Uno Platform](https://platform.uno) cross-platform app development.
 
 | Skill | Description |
 |-------|-------------|
-| `uno-doctor-directives` | Ensures a Uno app repo has `AGENTS.md` / `CLAUDE.md` populated with required directives by reading the current public setup and directive docs from this GitHub repo. |
 | `uno-agentic-support` | In-app support for agent-driven Uno app runs — detects `AGENT_CONSOLE_LOG`, captures early stdout/stderr logging, and disables Uno Studio Hot Reload / Hot Design UI during agent UI testing. |
 | `uno-csharpmarkup2` | Build a Uno Platform 6 UI in pure C# with [C# Markup 2 (CSharpForMarkup)](https://github.com/VincentH-Net/CSharpForMarkup) — covers both the initial Presentation-project setup and ongoing per-page authoring via the included `New-View.ps1` helper. MVVM/MVUX, Skia/native renderer, bind-without-strings, Spread, conditional children, and the markup/logic partial-class split. |
 | `uno-fluent2` | Fluent 2 Design System for Uno Platform — color, typography, geometry, materials, motion, iconography, spacing, elevation, lightweight styling, and responsive breakpoints. |
@@ -64,14 +64,19 @@ Skills for [Uno Platform](https://platform.uno) cross-platform app development.
 | `uno-responsive-spanning-gridwrap-layout` | A responsive, non-virtualizing wrapping grid layout with column spans, proportional stretch-to-fill, and vertically aligned gaps. |
 | `uno-test-resize-app-window` | Resize a running Uno Platform desktop app window on macOS for visual testing using the Accessibility API. |
 
+### Directives
+
 | Directive | Description |
 |----------|-------------|
 | [`prompt-log`](./directives/prompt-log.md) | Records sanitized user prompts and agent question-and-answer pairs as companion git commits so intent is preserved and can be replayed later. |
+| [`dotnet-build-errors-and-warnings`](./directives/dotnet-build-errors-and-warnings.md) | Configures .NET build warnings and errors and a modern C# .editorconfig, then directs agents to fix build errors and warnings or document rare justified suppressions. |
 | [`uno-build-and-run`](./directives/uno-build-and-run.md) | Standardizes Uno app launch for agents by skipping redundant pre-builds, writing per-run stdout logs via `AGENT_CONSOLE_LOG`, and verifying or stopping the app with the Uno runtime tools. |
 
 ## Installation
 
 Install an optimized combination of models, harnesses, plugins, MCP's, skills and directives for your tech stack with these steps:
+
+### Dev tools setup
 
 1. [Foundation Setup](./setups/foundation.md)
 2. For the technologies in your target stack:
@@ -116,9 +121,13 @@ You can also install a single skill in Codex by invoking:
 $skill-installer https://github.com/VincentH-Net/dotnet-agentic-engineering/tree/main/plugins/uno-platform/skills/uno-fluent2
 ```
 
-### Directives Install
+### Directives Install or Update
 
-To install the directives that above setups recommend, paste the content of a `directives/<name>.md` file in your `AGENTS.MD`. Make sure to follow [Foundation setup](./setups/foundation.md) so you do not have to duplicate directives in `CLAUDE.MD`.
+When you add `.csproj` files in your working folder, use the `ensure-directives` skill from your target repository root to create / update CLAUDE.md and AGENTS.md with directives for the technologies that your projects reference.
+
+Then restart the agent harness from that folder so the updated startup instructions are loaded.
+
+Currently installs unprefixed directives for every repository, `dotnet-*` directives when a `.csproj` file is found, and `uno-*` directives when `Uno.Sdk` is found in `.csproj`, `.props`, or `.targets` files.
 
 ## Structure
 
