@@ -54,7 +54,9 @@ In `App.xaml.cs`:
             if (agentConsoleLogPath is not null)
             {
                 var stream = new FileStream(agentConsoleLogPath, FileMode.CreateNew, FileAccess.Write, FileShare.Read);
+                #pragma warning disable CA2000 // Dispose objects before losing scope
                 var writer = new StreamWriter(stream) { AutoFlush = true };
+                #pragma warning restore CA2000 // Dispose objects before losing scope
                 Console.SetOut(writer);
                 Console.SetError(writer);
             }
@@ -69,9 +71,9 @@ In `App.xaml.cs`:
 
         static string? ResolveAgentConsoleLogPath()
         {
-            const string Key = "AGENT_CONSOLE_LOG";
+            const string key = "AGENT_CONSOLE_LOG";
 
-            string prefix = Key + "=";
+            string prefix = key + "=";
             foreach (string arg in Environment.GetCommandLineArgs())
             {
                 if (arg.StartsWith(prefix, StringComparison.Ordinal))
@@ -81,7 +83,7 @@ In `App.xaml.cs`:
                 }
             }
 
-            string? fromEnv = Environment.GetEnvironmentVariable(Key);
+            string? fromEnv = Environment.GetEnvironmentVariable(key);
             return string.IsNullOrEmpty(fromEnv) ? null : fromEnv;
         }
     #endif
@@ -151,5 +153,5 @@ After editing:
 
 - Build or start the app using the repository's active Build and Run directive; pass in `AGENT_CONSOLE_LOG=<new-log-path>`.
 - Confirm the log file exists.
-- Confirm it contains `uno-agentic-support: True`.
+- Confirm it contains `uno-agentic-support:`. Match this case-insensitively.
 - Confirm Hot Reload / Hot Design UI is not visible.
