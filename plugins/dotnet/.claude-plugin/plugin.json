@@ -1,7 +1,7 @@
 {
   "name": "dotnet",
-  "version": "1.2.1",
-  "description": "Skills for .NET development including charting with LiveCharts2 and a modern C# 14 editorconfig baseline",
+  "version": "1.2.2",
+  "description": "Skills for .NET development including agent directives, charting with LiveCharts2 and a modern C# 14 editorconfig baseline",
   "author": {
     "name": "Vincent Hoogendoorn",
     "url": "https://github.com/VincentH-Net"

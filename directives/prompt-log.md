@@ -4,9 +4,10 @@ Keep the **most important part of your source** - your prompts and your answers 
 
 This preserves **intent** in source control, using the same unit of work as your branching strategy, and makes it possible to **replay** your input at a later stage with better models, harnesses and tools.
 
-Copy below markdown in your `AGENTS.MD`
+Use the `ensure-directives` skill to install or update directives for your technology, or manually copy below markdown in your `AGENTS.MD`:
 
 ~~~md
+<!-- dotnet-agentic-engineering:prompt-log:start -->
 ## Prompt Log
 
 Prompt logs are stored as git commits.
@@ -46,4 +47,5 @@ git log --grep="^prompt-log:" --since="2026-01-26" --until="2026-02-07" --format
 # oneline overview
 git log --grep="^prompt-log:" --oneline
 ```
+<!-- dotnet-agentic-engineering:prompt-log:end -->
 ~~~

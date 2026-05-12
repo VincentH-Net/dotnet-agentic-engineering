@@ -1,4 +1,4 @@
-# Uno Plaform Build and Run Directive
+# Uno Platform Build and Run Directive
 
 This lets you:
 
@@ -8,11 +8,12 @@ This lets you:
   - Disable Hot Reload / Hot Design UI, which can get in the way of agents testing the app
   - Enable debug logging to specified file as early as possible during app start, so the agents can see and address any runtime warnings and errors
 
-Copy below markdown in your `AGENTS.MD`
+Use the `ensure-directives` skill to install or update directives for your technology, or manually copy below markdown in your `AGENTS.MD`:
 
 ~~~md
+<!-- dotnet-agentic-engineering:uno-build-and-run:start -->
 ## Build and Run
-Build and run app via `uno_app_start` (net10.0-desktop) with `args: ["AGENT_CONSOLE_LOG=<path>"]`. 
+Build and run app via `uno_app_start` with the actual desktop target framework from the project file, for example `net10.0-desktop`, and `args: ["AGENT_CONSOLE_LOG=<path>"]`. 
 The specified path is where the app's stdout and stderr output will be captured. You MUST specify this path, 
 which MUST be within the `bin` folder of the app. The file MUST not exist yet and MUST be named 
 with the current **local** time in ISO 8601 format: `app-stdout.YYYY-MM-DDTHHMMSS.log`. 
@@ -31,4 +32,5 @@ Do NOT run `dotnet build` prior to run the app - it would be redundant because `
 
 - Use `uno_app_get_runtime_info` to get PID
 - Use `uno_app_close` to terminate the app
+<!-- dotnet-agentic-engineering:uno-build-and-run:end -->
 ~~~

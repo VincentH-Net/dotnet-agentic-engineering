@@ -15,9 +15,8 @@ Additionally, install:
 - [x] [.NET Agentic Engineering](https://github.com/VincentH-Net/dotnet-agentic-engineering#installation) by [VincentH-Net](https://github.com/VincentH-Net)
   - [x] Uno Platform Claude Code plugin
   - [x] Uno Platform Codex skills
-- [x] [Uno Plaform Build and Run Directive](../directives/uno-build-and-run.md)
 
 ## Which model for what
 
 - For anything involving UI markup: use latest Claude Code CLI with Opus 1M High effort; no matter what you tell & give Codex, it often makes a visual mess when creating UX. Validated on Codex 5.4 High effort and older.
-- If Claude gets stuck in complex **UI logic** issues (e.g. how to use a complex UI library like LiveCharts2), latest Codex CLI with 5.4 High can get you unstuck.
+- If Claude gets stuck in complex **UI logic** issues (e.g. how to use a complex UI library like LiveCharts2), latest Codex CLI High can get you unstuck.

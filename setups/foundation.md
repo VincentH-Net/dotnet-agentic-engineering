@@ -47,18 +47,3 @@ IDE functionality for reading and navigating code quickly and easily is useful t
 Actual manual editing and debugging is more exception than rule in agentic engineering, but you do need it when the agents don't cut it.
 
 [VS Code](https://code.visualstudio.com/) and it's plugin ecosystem works well for all of the above, for many technologies including markdown, web, dotnet, C#, PowerShell and bash. VS Code keeps pace with the latest models and agentic engineering practices (weekly release cycle).
-
-## CLAUDE.MD and AGENTS.MD
-
-Use below content in `CLAUDE.MD`, in the same folder as `AGENTS.MD`, to have Claude Code, Codex and other agents all use `AGENTS.MD` for directives:
-
-~~~md
-# CLAUDE.md
-@AGENTS.md
-
-This file provides any instructions specific to Claude Code (claude.ai/code), when working with code in this repository. These instructions are supplemental to the generic agents instructions (imported above) 
-~~~
-
-## Directives
-
-Install the [Prompt Log Directive](../directives/prompt-log.md)
