@@ -29,7 +29,7 @@ NuGet package per platform:
 | Avalonia | `LiveChartsCore.SkiaSharpView.Avalonia` |
 | Blazor | `LiveChartsCore.SkiaSharpView.Blazor` |
 
-You MUST use the latest prerelease Nuget, E.g. for Uno Platform:
+You MUST use the latest compatible 2.x prerelease/stable Nuget, E.g. for Uno Platform:
 ```bash
 dotnet add package LiveChartsCore.SkiaSharpView.Uno.WinUI --prerelease
 ```

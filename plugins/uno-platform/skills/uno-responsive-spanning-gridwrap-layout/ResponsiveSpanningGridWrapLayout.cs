@@ -1,4 +1,6 @@
 using Windows.Foundation;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 
 namespace MyApp.Presentation.Controls; // TODO: Replace 'MyApp' with your app's top-level namespace
 
