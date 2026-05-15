@@ -87,7 +87,7 @@ Install an optimized combination of models, harnesses, plugins, MCP's, skills an
 
 To install the plugins / skills that above setups recommend, follow below steps.
 
-Install skills plugins in Claude Code:
+Install plugins in Claude Code:
 
 ```bash
 claude plugin marketplace add VincentH-Net/dotnet-agentic-engineering
@@ -97,14 +97,18 @@ claude plugin install uno-platform@dotnet-agentic-engineering
 ```
 To update a plugin, use `update` instead of `install`
 
-Install skill plugins in Codex:
+Install plugins in Codex:
 
 ```bash
 codex plugin marketplace add VincentH-Net/dotnet-agentic-engineering
 ```
-To update all plugins, use `upgrade` instead of `add`
 
 Then enable the plugins you want with the `/plugins` command in codex (you can filter on "dotnet-agentic-engineering" in the plugins list).
+
+To update plugins in Codex:
+```bash
+codex plugin marketplace upgrade dotnet-agentic-engineering
+```
 
 Install individual skills in any agent with `npx skills` (requires `Node.js`) :
 
