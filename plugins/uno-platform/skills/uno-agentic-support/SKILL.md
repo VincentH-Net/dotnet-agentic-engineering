@@ -3,7 +3,7 @@ name: uno-agentic-support
 description: In-app support for agentic development of Uno Platform apps. Use when running or preparing a Uno Platform app for agent-driven execution with uno_app_start. Also use when the expected log file specified in AGENT_CONSOLE_LOG is missing or lacks "uno-agentic-support" entry, or Hot Reload / Hot Design remains visible during agent UI testing.
 metadata:
   author: https://github.com/VincentH-Net
-  version: "1.0.1"
+  version: "1.0.2"
   framework: uno-platform
   category: agentic-support
   sources: https://github.com/VincentH-Net
@@ -48,9 +48,8 @@ In `App.xaml.cs`:
     #endif
 
     #if DEBUG
-        bool InitializeAgentSupport()
+        void InitializeAgentSupport(string? agentConsoleLogPath)
         {
-            string? agentConsoleLogPath = ResolveAgentConsoleLogPath();
             if (agentConsoleLogPath is not null)
             {
                 var stream = new FileStream(agentConsoleLogPath, FileMode.CreateNew, FileAccess.Write, FileShare.Read);
@@ -65,8 +64,6 @@ In `App.xaml.cs`:
             #if HAS_UNO
                 Uno.UI.Adapter.Microsoft.Extensions.Logging.LoggingAdapter.Initialize();
             #endif
-
-            return agentConsoleLogPath is not null;
         }
 
         static string? ResolveAgentConsoleLogPath()
@@ -120,7 +117,9 @@ In `App.xaml.cs`:
 -  The `App` constructor must begin with below statements. Add them if not present, or move them to the top of the constructor if present but not at the top:
     ```csharp
     #if DEBUG
-        startedByAgent = InitializeAgentSupport();
+        string? agentConsoleLogPath = ResolveAgentConsoleLogPath();
+        startedByAgent = agentConsoleLogPath is not null;
+        InitializeAgentSupport(agentConsoleLogPath);
         var logger = this.Log();
         if (logger.IsEnabled(LogLevel.Debug)) logger.LogDebug("Application Launched in DEBUG mode. uno-agentic-support: {StartedByAgent}", startedByAgent);
     #endif

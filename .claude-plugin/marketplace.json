@@ -6,7 +6,7 @@
   },
   "metadata": {
     "description": "Battle-tested agentic engineering plugins for .NET, Orleans, and Uno Platform",
-    "version": "1.4.3"
+    "version": "1.4.4"
   },
   "plugins": [
     {
