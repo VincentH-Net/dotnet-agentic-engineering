@@ -26,14 +26,14 @@ prompt-log:
 
 1. "sanitized user prompt"
 2. "sanitized next user prompt"
-3. Q: "sanitized agent question" → A: "sanitized user answer"
+3. Q: "sanitized agent question" -> A: "sanitized user answer"
 ```
 
 Rules:
 
 - Only include prompts/Q&A since the previous session log commit.
 - Sanitized means redact secrets, tokens, credentials, private URLs, and personal data. 
-  Keep all other text VERBATIM — do NOT summarize.
+  Keep all other text VERBATIM - do NOT summarize.
 
 ### Retrieving Prompt Logs
 

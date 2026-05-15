@@ -17,7 +17,7 @@ Build and run app via `uno_app_start` with the actual desktop target framework f
 The specified path is where the app's stdout and stderr output will be captured. You MUST specify this path, 
 which MUST be within the `bin` folder of the app. The file MUST not exist yet and MUST be named 
 with the current **local** time in ISO 8601 format: `app-stdout.YYYY-MM-DDTHHMMSS.log`. 
-You MUST query the system clock for the actual current local time — do NOT estimate or hardcode it, and do NOT use UTC.
+You MUST query the system clock for the actual current local time - do NOT estimate or hardcode it, and do NOT use UTC.
 
 Do NOT run `dotnet build` prior to run the app - it would be redundant because `uno_app_start` already does a build.
 
