@@ -14,7 +14,7 @@ Use the `ensure-directives` skill to install or update directives for your techn
 
 This directive does NOT govern WHEN to initiate a build, only WHAT to do before a build and when to repeat a build.
 
-You MUST run all `dotnet ...` commands directly in the foreground so the agent sees errors without delay. Do NOT run them in a background terminal, persistent shell session, or detached job. If sandboxed access blocks the foreground command, rerun the same foreground command with the required escalation.
+All `dotnet ...` commands MUST follow the separate `dotnet-run-cli` directive.
 
 1. Once per session, IMMEDIATELY BEFORE the first build, check if the current working folder
    contains an `.editorconfig` that contains the text

@@ -68,7 +68,8 @@ Skills for [Uno Platform](https://platform.uno) cross-platform app development.
 
 | Directive | Description |
 |----------|-------------|
-| [`prompt-log`](./directives/prompt-log.md) | Records sanitized user prompts and agent question-and-answer pairs as companion git commits so intent is preserved and can be replayed later. |
+| [`foundation-prompt-log`](./directives/foundation-prompt-log.md) | Records sanitized user prompts and agent question-and-answer pairs as companion git commits so intent is preserved and can be replayed later. |
+| [`dotnet-run-cli`](./directives/dotnet-run-cli.md) | Prevents long agent timeout delays from running `dotnet` in the background. |
 | [`dotnet-build-errors-and-warnings`](./directives/dotnet-build-errors-and-warnings.md) | Configures .NET build warnings and errors and a modern C# .editorconfig, then directs agents to fix build errors and warnings or document rare justified suppressions. |
 | [`uno-build-and-run`](./directives/uno-build-and-run.md) | Standardizes Uno app launch for agents by skipping redundant pre-builds, writing per-run stdout logs via `AGENT_CONSOLE_LOG`, and verifying or stopping the app with the Uno runtime tools. |
 
