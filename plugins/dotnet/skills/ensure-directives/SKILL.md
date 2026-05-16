@@ -3,7 +3,7 @@ name: ensure-directives
 description: Create or update AGENTS.md and CLAUDE.md with agentic engineering directives for your tech stack. Use before Claude Code or Codex app authoring/running, or when AGENTS.md / CLAUDE.md may be missing or stale.
 metadata:
   author: https://github.com/VincentH-Net
-  version: "1.0"
+  version: "1.0.2"
   category: agent-directives
   sources:
     - https://github.com/VincentH-Net/dotnet-agentic-engineering
@@ -32,7 +32,7 @@ Not allowed:
 ## Procedure
 
 Start from the public directives folder listing via the GitHub Contents API:
-`https://api.github.com/repos/VincentH-Net/dotnet-agentic-engineering/contents/directives?ref=main`
+`curl -s 'https://api.github.com/repos/VincentH-Net/dotnet-agentic-engineering/contents/directives?ref=main'`
 
 1. From that folder listing, collect the `download_url` for each directive `.md` file in that folder.
 2. Detect project files recursively under the current working folder, excluding `.git`, `.vs`, `bin`, `obj`, and `node_modules`.

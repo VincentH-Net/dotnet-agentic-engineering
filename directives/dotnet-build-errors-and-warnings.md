@@ -14,7 +14,7 @@ Use the `ensure-directives` skill to install or update directives for your techn
 
 This directive does NOT govern WHEN to initiate a build, only WHAT to do before a build and when to repeat a build.
 
-All `dotnet ...` commands MUST follow the separate `dotnet-run-cli` directive.
+All `dotnet ...` commands MUST follow the separate "Running `dotnet ...`" directive.
 
 1. Once per session, IMMEDIATELY BEFORE the first build, check if the current working folder
    contains an `.editorconfig` that contains the text
@@ -25,8 +25,9 @@ All `dotnet ...` commands MUST follow the separate `dotnet-run-cli` directive.
 2. IMMEDIATELY AFTER building, IF any build errors or warnings are reported:
 
    1. IF there are multiple IDE formatting/style diagnostics that `dotnet format` can fix, run
-      `dotnet format --include <files>` first, ONLY including files that contain those 
-      diagnostics, to fix many diagnostics quickly. Rebuild after formatting.
+      `dotnet format --include <files>` first IN THE FOREGROUND as described in the "Running `dotnet ...`" directive,
+      ONLY including files that contain those diagnostics, to fix many diagnostics quickly. 
+      Rebuild after formatting.
 
    2. Fix ALL remaining build errors and warnings by following these steps for each diagnostic:
 
