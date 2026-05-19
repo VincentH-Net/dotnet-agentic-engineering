@@ -3,7 +3,7 @@
 Prerequisites:
 
 - [x] [Foundation Setup](./foundation.md)
-  You need both Opus and Codex for UI with Uno platform - neither alone is capable enough yet, no matter how much tools and guidance you provide (validated through Opus 4.6 1M and Codex 5.4 High).
+  You need both Opus and Codex for UI with Uno platform - neither alone is capable enough yet, no matter how much tools and guidance you provide (validated through Opus 4.7 1M and Codex 5.5 High).
 - [x] [.NET Setup](./dotnet.md)
 
 Additionally, install:
@@ -18,5 +18,5 @@ Additionally, install:
 
 ## Which model for what
 
-- For anything involving UI markup: use latest Claude Code CLI with Opus 1M High effort; no matter what you tell & give Codex, it often makes a visual mess when creating UX. Validated on Codex 5.4 High effort and older.
+- For anything involving UI markup: use latest Claude Code CLI with Opus 1M High effort; no matter what you tell & give Codex, it often makes a visual mess when creating UX. Validated on Codex 5.5 High effort and older.
 - If Claude gets stuck in complex **UI logic** issues (e.g. how to use a complex UI library like LiveCharts2), latest Codex CLI High can get you unstuck.

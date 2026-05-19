@@ -4,7 +4,7 @@ For any target technology.
 
 ## Model
 
-The best models are the latest Opus and Codex, with effort High and biggest context available (validated through Opus 4.6 1M and Codex 5.4 High).
+The best models are the latest Opus and Codex, with effort High and biggest context available (validated through Opus 4.7 1M and Codex 5.5 High).
 
 Opus is best for:
 
