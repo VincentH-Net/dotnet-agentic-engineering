@@ -14,7 +14,7 @@ Additionally, install:
 - [x] [Uno Platform Skills](https://github.com/mtmattei/UnoPlatformSkills/tree/main#installation) by Uno's [Matthew Mattei](https://github.com/mtmattei)
 - [x] [.NET Agentic Engineering](https://github.com/VincentH-Net/dotnet-agentic-engineering#installation) by [VincentH-Net](https://github.com/VincentH-Net)
   - [x] Uno Platform Claude Code plugin
-  - [x] Uno Platform Codex skills
+  - [x] Uno Platform Codex plugin
 
 ## Which model for what
 
