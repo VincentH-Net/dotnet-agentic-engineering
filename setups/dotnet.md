@@ -11,4 +11,4 @@ Additionally, install:
 - [x] [.NET Agent Skills](https://github.com/dotnet/skills#installation) by the Microsoft .NET team
 - [x] [.NET Agentic Engineering](https://github.com/VincentH-Net/dotnet-agentic-engineering#installation) by [VincentH-Net](https://github.com/VincentH-Net)
   - [x] Claude Code .NET plugin
-  - [x] Codex .NET skills
+  - [x] Codex .NET plugin
