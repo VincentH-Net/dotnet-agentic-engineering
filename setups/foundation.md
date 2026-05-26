@@ -34,6 +34,13 @@ See:
 
 [Codex CLI Setup](https://developers.openai.com/codex/cli#cli-setup)
 
+### Enable automatic approvals
+
+Enabling automatic approvals is probably the single most important tip to increase your productivity.
+
+- Use the `/permissions` command in Codex CLI to configure `Auto-review`
+- In Claude Code CLI, turn `auto mode` on (`shift+tab` to cycle)
+
 ## OS
 
 Mac, linux or WSL on Windows works best - the harnesses 1st class shell is bash, as is the bulk of the model's training data. Even if a harness understands another shell well, such as Claude understanding PowerShell, it makes a lot more mistakes using that shell on Windows due to OS-specific differences.
