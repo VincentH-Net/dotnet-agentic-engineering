@@ -10,6 +10,8 @@ Everything here has been used with real-world codebases - not generated with pro
 
 Demos:
 
+- [.NET Agentic Engineering](https://x.com/vincenth_net/status/2060378391459586239)
+  (post with steps to get started)
 - [LiveCharts2 with Uno Platform](https://x.com/vincenth_net/status/2033966275324444819)
   (post with app video)
 - [GPT 5.4 vs Opus 4.6 for UI with Uno Platform](https://x.com/compose/articles/edit/2031388424310075392)
