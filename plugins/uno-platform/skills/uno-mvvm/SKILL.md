@@ -1,14 +1,15 @@
 ---
 name: uno-mvvm
-description: Uno Platform MVVM with CommunityToolkit.Mvvm: mutable ViewModels, ObservableObject, ObservableProperty, RelayCommand, async commands, constructor dependency injection, x:Bind binding patterns, and Uno Navigation from ViewModels. Use when the user selected MVVM as the update model or asks for ViewModel, ICommand, INotifyPropertyChanged, ObservableObject, ObservableProperty, RelayCommand, or CommunityToolkit.Mvvm in an Uno Platform app. Do NOT use for MVUX models/feeds/states; use Studio MVUX skills instead. Do NOT use for C# Markup 2 binding syntax; combine with uno-csharpmarkup2 only when the selected markup type is C# Markup 2.
+description: Uno Platform MVVM with CommunityToolkit.Mvvm: mutable ViewModels, ObservableObject, ObservableProperty on C# partial properties, RelayCommand, async commands, constructor dependency injection, x:Bind binding patterns, and Uno Navigation from ViewModels. Use when the user selected MVVM as the update model or asks for ViewModel, ICommand, INotifyPropertyChanged, ObservableObject, ObservableProperty, RelayCommand, or CommunityToolkit.Mvvm in an Uno Platform app. Do NOT use for MVUX models/feeds/states; use Studio MVUX skills instead. Do NOT use for C# Markup 2 binding syntax; combine with uno-csharpmarkup2 only when the selected markup type is C# Markup 2.
 metadata:
   author: https://github.com/VincentH-Net
-  version: "1.0"
+  version: "1.1"
   framework: uno-platform
   category: update-model
   sources:
     - https://github.com/mtmattei/UnoPlatformSkills
-    - CommunityToolkit.Mvvm patterns
+    - Microsoft Learn: C# partial members and partial properties
+    - Microsoft Learn: CommunityToolkit.Mvvm ObservableProperty partial-property generator diagnostics
     - Uno Extensions Navigation and Hosting patterns
 ---
 
@@ -34,6 +35,7 @@ MVVM in Uno Platform means mutable ViewModel classes, usually built with `Commun
 Before adding MVVM code, inspect the app project:
 
 - If the project uses Uno SDK features, ensure `Mvvm` is present in `<UnoFeatures>` or that `CommunityToolkit.Mvvm` is otherwise referenced.
+- For `[ObservableProperty]` on partial properties, use .NET 9 SDK or newer and set `<LangVersion>preview</LangVersion>`.
 - If using Uno Extensions Navigation, ensure `Navigation` is present in `<UnoFeatures>` and `.UseNavigation(RegisterRoutes)` is configured.
 - If resolving ViewModels/services through DI, ensure the host builder has `.ConfigureServices(...)`.
 
@@ -41,7 +43,7 @@ Do not add MVUX packages or `MVUX` features for an MVVM app.
 
 ## ViewModel Pattern
 
-Use `ObservableObject` plus source-generator attributes.
+Use `ObservableObject` plus source-generator attributes on **partial properties**. Do not use the older field annotation pattern for new Uno MVVM code.
 
 ```csharp
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -55,16 +57,19 @@ public sealed partial class ProfileViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(DisplayName))]
-    string? name;
+    public partial string? Name { get; set; }
 
     [ObservableProperty]
-    bool isLoading;
+    [NotifyPropertyChangedFor(nameof(CanSave))]
+    public partial bool IsLoading { get; set; }
 
     [ObservableProperty]
-    string? errorMessage;
+    [NotifyPropertyChangedFor(nameof(HasError))]
+    public partial string? ErrorMessage { get; set; }
 
     public string DisplayName => string.IsNullOrWhiteSpace(Name) ? "Guest" : Name;
     public bool CanSave => !IsLoading;
+    public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
 
     public ProfileViewModel(INavigator navigator, IProfileService profileService)
     {
@@ -92,9 +97,6 @@ public sealed partial class ProfileViewModel : ObservableObject
         }
     }
 
-    partial void OnIsLoadingChanged(bool value) =>
-        OnPropertyChanged(nameof(CanSave));
-
     [RelayCommand]
     Task OpenDetailsAsync() =>
         navigator.NavigateViewModelAsync<ProfileDetailsViewModel>(this);
@@ -104,11 +106,15 @@ public sealed partial class ProfileViewModel : ObservableObject
 Rules:
 
 - Use `partial` ViewModel classes so CommunityToolkit generators can emit properties and commands.
-- Use `[ObservableProperty]` fields for mutable UI state.
+- Use `[ObservableProperty] public partial T Name { get; set; }` for mutable UI state.
+- Partial observable properties must be definition-only declarations with semicolon accessors. Let the Toolkit generator provide the implementation; do not write a second partial implementation manually.
+- Partial observable properties need both `get` and `set`; do not use `init`.
 - Use `[NotifyPropertyChangedFor]` for dependent computed properties.
 - Use `[RelayCommand]` / `[AsyncRelayCommand]` patterns instead of hand-written `ICommand` unless the app already has a command convention.
 - Include `CancellationToken` parameters on async relay-command methods when the operation can be cancelled.
 - Keep side effects in commands, services, or partial property-change hooks; keep property setters simple.
+
+If existing code uses `[ObservableProperty]` on fields, convert it to partial properties. Microsoft Toolkit diagnostics recommend this for developer experience, analyzer/source-generator visibility, and WinRT/WinUI AOT compatibility.
 
 ## Property Change Hooks
 
@@ -234,20 +240,13 @@ Use explicit state properties so UI can bind without inspecting task internals.
 
 ```csharp
 [ObservableProperty]
-bool isLoading;
+public partial bool IsLoading { get; set; }
 
-[ObservableProperty]
-string? errorMessage;
-
-public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
-```
-
-Add dependent notifications:
-
-```csharp
 [ObservableProperty]
 [NotifyPropertyChangedFor(nameof(HasError))]
-string? errorMessage;
+public partial string? ErrorMessage { get; set; }
+
+public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
 ```
 
 For validation:
@@ -290,7 +289,10 @@ Those belong to the Studio MVUX skills and only apply when the update model is M
 ## Review Checklist
 
 - ViewModels inherit `ObservableObject` or the app's established MVVM base.
-- Generated properties and commands come from `CommunityToolkit.Mvvm` attributes.
+- Generated properties use `[ObservableProperty]` on partial properties, not fields.
+- Partial observable properties have `get; set;`, no implementation body, and no `init`.
+- The project uses a compatible SDK/language setup for partial-property generation.
+- Generated commands come from `CommunityToolkit.Mvvm` attributes.
 - Commands are bound from UI; no new Click/Tapped handlers for ViewModel actions.
 - Async commands manage loading/error state and do not leave `IsLoading` stuck.
 - Services and `INavigator` are constructor-injected.
