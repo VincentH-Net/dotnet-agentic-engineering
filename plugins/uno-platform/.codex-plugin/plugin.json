@@ -1,7 +1,7 @@
 {
   "name": "uno-platform",
-  "version": "1.4.3",
-  "description": "Skills for Uno Platform cross-platform development including Fluent design, navigation, responsive layouts, C# Markup 2 (CSharpForMarkup), agentic app run support, and testing.",
+  "version": "1.5.0",
+  "description": "Skills for Uno Platform cross-platform development including MVVM, Fluent design, navigation, responsive layouts, C# Markup 2 (CSharpForMarkup), agentic app run support, and testing.",
   "author": {
     "name": "Vincent Hoogendoorn",
     "url": "https://github.com/VincentH-Net"
@@ -20,8 +20,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "Uno Platform",
-    "shortDescription": "Cross-platform Uno skills for design, navigation, layout, app run support, C# Markup 2, and testing",
-    "longDescription": "Use Uno Platform to access reusable cross-platform development skills for Fluent design, data-bound navigation, responsive layouts, theme-aware charting, code-first UI with C# Markup 2 (CSharpForMarkup), agentic app run support, and test workflows.",
+    "shortDescription": "Cross-platform Uno skills for MVVM, design, navigation, layout, app run support, C# Markup 2, and testing",
+    "longDescription": "Use Uno Platform to access reusable cross-platform development skills for MVVM, Fluent design, data-bound navigation, responsive layouts, theme-aware charting, code-first UI with C# Markup 2 (CSharpForMarkup), agentic app run support, and test workflows.",
     "developerName": "Vincent Hoogendoorn",
     "category": "Coding",
     "capabilities": [
@@ -33,7 +33,7 @@
     ],
     "websiteURL": "https://github.com/VincentH-Net/dotnet-agentic-engineering",
     "defaultPrompt": [
-      "Use the Uno Platform plugin to help with layout, navigation, theming, C# Markup 2 UI, agentic app run support, or testing."
+      "Use the Uno Platform plugin to help with MVVM, layout, navigation, theming, C# Markup 2 UI, agentic app run support, or testing."
     ],
     "brandColor": "#159B84"
   }
