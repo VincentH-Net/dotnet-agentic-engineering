@@ -1,9 +1,9 @@
 ---
 name: uno-xaml
-description: "Uno Platform XAML correctness and performance guidance for XAML markup profiles: deferred loading with x:Load, virtualized item-template mechanics, UI-bound lifecycle cleanup, UI-thread safety at the Page/control boundary, input scopes, keyboard accelerators, focus, and drag/drop caveats. Use when the selected markup type is XAML or when existing XAML needs performance, lifecycle, input, or template fixes. Do NOT use for MVVM property/command patterns, Uno Navigation, Fluent or Material theming, visual design/layout composition, Uno C# Markup, or C# Markup 2; combine with the selected update-model, design-system, navigation, and markup skills instead."
+description: "Uno Platform XAML correctness and performance guidance for XAML markup profiles: deferred loading with x:Load, virtualized item-template mechanics, text trimming and layout resilience, UI-bound lifecycle cleanup, UI-thread safety at the Page/control boundary, input scopes, keyboard accelerators, focus, and drag/drop caveats. Use when the selected markup type is XAML or when existing XAML needs performance, lifecycle, input, text overflow, or template fixes. Do NOT use for MVVM property/command patterns, Uno Navigation, Fluent or Material theming, visual design/layout composition, Uno C# Markup, or C# Markup 2; combine with the selected update-model, design-system, navigation, and markup skills instead."
 metadata:
   author: https://github.com/VincentH-Net
-  version: "1.0"
+  version: "1.1"
   framework: uno-platform
   category: xaml
   sources:
@@ -65,6 +65,38 @@ Rules:
 - Prefer binding and commands inside templates. Use code-behind template events only for view-only mechanics that cannot be expressed as a command or behavior.
 - Use `x:Phase` only for complex `ListView`/`GridView` item templates after confirming support on the target Uno platforms. Do not apply it to `ItemsRepeater` dashboard layouts by default.
 - Use `DataTemplateSelector` for heterogeneous item types, but keep selector logic type-based and cheap. Do not perform service calls, visual tree inspection, or layout measurements in selector logic.
+
+## Text and Layout Resilience
+
+Keep text containers flexible so localization, text scaling, and runtime data do not clip or overlap.
+
+Rules:
+
+- Prefer `MinHeight` and `MinWidth` over fixed `Height` and `Width` for controls that contain text.
+- Avoid fixed heights on text containers. Let `TextBlock`, `TextBox`, and item rows grow when text scale or localization requires it.
+- Avoid fixed button widths unless repeated command columns need alignment. Use content-driven sizing with a sensible `MinWidth`.
+- Use `Grid` constraints when `TextTrimming` must work. `StackPanel` and `Auto` columns often measure children with unconstrained width, so ellipsis may never appear.
+- Use star-sized columns for trimmable text and `Auto` columns for fixed-size icons, badges, or actions.
+- Keep headers, command bars, and primary actions outside the scrolling region when the page has long content. Only the content area should scroll unless the whole page is intentionally document-like.
+- Use `VerticalScrollBarVisibility="Auto"` when a `ScrollViewer` is required.
+- Set `HorizontalContentAlignment="Stretch"` on list-like item containers when content collapses or fails to fill the available width.
+- Remove wrapper `Grid`, `StackPanel`, or `Border` elements that do not add layout, styling, semantics, or hit testing.
+- Use `Border` for a single-child background, border, or corner-radius container; use `Grid` when you need rows, columns, layering, or multiple children.
+
+```xml
+<Grid ColumnSpacing="8">
+    <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="Auto"/>
+    </Grid.ColumnDefinitions>
+
+    <TextBlock Text="{Binding Name}"
+               TextTrimming="CharacterEllipsis"/>
+    <Button Grid.Column="1"
+            Command="{Binding OpenCommand}"
+            MinWidth="44"/>
+</Grid>
+```
 
 ## UI Thread and Async Safety
 
@@ -138,6 +170,13 @@ Rules:
 - Use pointer events for custom pointer-specific UI only. Prefer built-in controls, commands, and gestures before custom pointer handling.
 - Drag/drop usually requires UI events. Keep drag/drop code in the view boundary, pass IDs or small DTOs, and call commands/services for the actual mutation. Test drag/drop on every target platform before relying on it.
 
+## Accessibility and Test Hooks
+
+- Set `AutomationProperties.Name` on icon-only controls and custom interactive elements whose visible content is not enough for assistive technology.
+- Use semantic controls such as `Button`, `HyperlinkButton`, `ToggleSwitch`, and `MenuFlyoutItem` instead of making `Border`, `Grid`, or `TextBlock` clickable.
+- Use `AutomationProperties.AutomationId` for elements that UI tests must find reliably. On Uno, native/browser automation mapping requires `IsUiAutomationMappingEnabled` or `Uno.UI.FrameworkElementHelper.IsUiAutomationMappingEnabled`; otherwise the property may not be projected to the platform accessibility layer.
+- Keep light-dismiss and overlay hit targets hit-test visible. If an invisible surface must receive pointer input, use `Background="Transparent"` rather than leaving the background unset.
+
 ## Rendering And Visibility
 
 - Use `Visibility="Collapsed"` instead of `Opacity="0"` when hidden content should not participate in hit testing, accessibility, or layout.
@@ -152,8 +191,11 @@ Rules:
 - Theme dictionaries and resource keys come only from the selected design-system skill.
 - Deferred UI uses `x:Load` only where construction cost justifies it.
 - Virtualized controls are not wrapped in `ScrollViewer`.
+- Text containers avoid fixed heights; trimmable text is constrained by a `Grid` or equivalent width constraint.
+- Long/localized strings and text scaling do not clip content or resize command surfaces unpredictably.
 - Template code avoids unnecessary `x:Name`, deep trees, and expensive selector logic.
 - UI-owned events, timers, and cancellation tokens are cleaned up on unload.
 - UI thread is never blocked.
 - Text inputs have appropriate `InputScope`.
+- Icon-only controls and UI-test targets have appropriate automation properties.
 - Keyboard, focus, pointer, and drag/drop logic remains at the view boundary and delegates business state changes.

@@ -3,7 +3,7 @@ name: uno-fluent2
 description: Fluent 2 Design System for Uno Platform. Use when designing UI layouts, choosing colors, applying typography, setting elevation/shadows, using theme resources, applying lightweight styling, or implementing Fluent Design principles in WinUI/Uno XAML apps. Covers color, typography, geometry, materials, motion, iconography, spacing, elevation, and responsive breakpoints.
 metadata:
   author: https://github.com/VincentH-Net
-  version: "1.1"
+  version: "1.2"
   framework: uno-platform
   category: design-system
   sources:
@@ -20,6 +20,32 @@ Authoritative design guidance for building WinUI apps with the Fluent 2 design l
 > **Scope**: This skill covers Fluent (WinUI native) theming. For Material Design theming, see the `uno-material-*` skills instead. Check `.csproj` `<UnoFeatures>` to determine which theme your project uses.
 
 ---
+
+## 0. Fluent Control Selection
+
+Choose standard WinUI/Uno controls before custom visual structures. These controls are implemented by Uno Platform on WASM, Skia, and mobile unless the target project has platform-specific exclusions:
+
+| Experience | Prefer |
+|------------|--------|
+| 2-7 app sections | `NavigationView` |
+| Document or session tabs | `TabView` |
+| Hierarchical browsing | `TreeView` with `ListView` and `BreadcrumbBar` |
+| Linear data | `ListView` |
+| Tile or card collections | `GridView` or `ItemsRepeater` |
+| Master/detail | `ListView` plus a detail `Grid` |
+| 2-3 modes | `SelectorBar` or `RadioButtons` |
+| Text input | `TextBox` |
+| Numeric input | `NumberBox` |
+| Search input | `AutoSuggestBox` |
+| Date input | `CalendarDatePicker` |
+| Boolean input | `ToggleSwitch` |
+| 4+ exclusive choices | `ComboBox` |
+| Blocking decision | `ContentDialog` |
+| Contextual actions | `Flyout` or `MenuFlyout` |
+| Inline status | `InfoBar` |
+| Contextual onboarding | `TeachingTip` |
+
+Avoid replacing these controls with clickable `Border`, `TextBlock`, or custom pill/tab visuals unless a real control cannot express the interaction. Do not import Windows-only shell patterns, App SDK notifications, JumpList, share UI, or file-picker guidance into cross-platform Fluent layout decisions.
 
 ## 1. Color System
 
@@ -47,7 +73,11 @@ Use `{ThemeResource BrushName}` in XAML:
 | `TextFillColorSecondaryBrush` | Secondary text |
 | `TextFillColorTertiaryBrush` | Tertiary/hint text |
 | `TextFillColorDisabledBrush` | Disabled text |
+| `TextFillColorInverseBrush` | Text on inverse surfaces |
 | `AccentTextFillColorPrimaryBrush` | Accent-colored text |
+| `TextOnAccentFillColorPrimaryBrush` | Text on accent fills |
+| `TextOnAccentFillColorSecondaryBrush` | Secondary text on accent fills |
+| `TextOnAccentFillColorDisabledBrush` | Disabled text on accent fills |
 
 **Surface/Background Brushes:**
 | Key | Purpose |
@@ -56,19 +86,27 @@ Use `{ThemeResource BrushName}` in XAML:
 | `SolidBackgroundFillColorSecondaryBrush` | Secondary background |
 | `SolidBackgroundFillColorTertiaryBrush` | Tertiary background |
 | `LayerFillColorDefaultBrush` | Content layer fill |
+| `LayerFillColorAltBrush` | Alternate content layer fill |
 | `CardBackgroundFillColorDefaultBrush` | Card backgrounds |
 | `CardBackgroundFillColorSecondaryBrush` | Secondary card backgrounds |
+| `CardStrokeColorDefaultBrush` | Card borders |
+| `DividerStrokeColorDefaultBrush` | Separators and dividers |
 
 **Control Brushes:**
 | Key | Purpose |
 |-----|---------|
 | `ControlFillColorDefaultBrush` | Default control fill |
 | `ControlFillColorSecondaryBrush` | Secondary control fill |
+| `ControlFillColorTertiaryBrush` | Pressed or lower-emphasis control fill |
 | `ControlFillColorDisabledBrush` | Disabled control fill |
+| `ControlFillColorInputActiveBrush` | Focused text input fill |
+| `ControlStrongFillColorDefaultBrush` | Strong control fill |
 | `ControlStrokeColorDefaultBrush` | Default control border |
 | `ControlStrokeColorSecondaryBrush` | Secondary control border |
+| `ControlStrongStrokeColorDefaultBrush` | Strong control border |
 | `SubtleFillColorTransparentBrush` | Subtle/transparent fills |
 | `SubtleFillColorSecondaryBrush` | Subtle hover state |
+| `SubtleFillColorTertiaryBrush` | Subtle pressed state |
 
 **Semantic/State Brushes:**
 | Key | Purpose |
@@ -77,22 +115,31 @@ Use `{ThemeResource BrushName}` in XAML:
 | `SystemFillColorCautionBrush` | Warning state |
 | `SystemFillColorCriticalBrush` | Error/critical state |
 | `SystemFillColorAttentionBrush` | Attention-required state |
+| `SystemFillColorNeutralBrush` | Neutral status |
+| `SystemFillColorSuccessBackgroundBrush` | Success background |
+| `SystemFillColorCautionBackgroundBrush` | Warning background |
+| `SystemFillColorCriticalBackgroundBrush` | Error background |
+| `SystemFillColorNeutralBackgroundBrush` | Neutral background |
+
+When assigning `Foreground`, `Background`, `BorderBrush`, or other brush-valued properties, target the `...Brush` key rather than the color key. Resource redirects should also point at brush resources.
 
 ### Theme Dictionary Best Practices
 ```xaml
 <!-- CORRECT: Use separate Light and Dark dictionaries -->
 <ResourceDictionary.ThemeDictionaries>
     <ResourceDictionary x:Key="Light">
-        <SolidColorBrush x:Key="MyBrush" Color="{StaticResource TextFillColorPrimary}"/>
+        <StaticResource x:Key="MyBrush" ResourceKey="TextFillColorPrimaryBrush"/>
     </ResourceDictionary>
     <ResourceDictionary x:Key="Dark">
-        <SolidColorBrush x:Key="MyBrush" Color="{StaticResource TextFillColorPrimary}"/>
+        <StaticResource x:Key="MyBrush" ResourceKey="TextFillColorPrimaryBrush"/>
     </ResourceDictionary>
 </ResourceDictionary.ThemeDictionaries>
 
 <!-- WRONG: Do NOT use "Default" key for Light/Dark; it causes theme-switching bugs -->
 <!-- WRONG: Do NOT use {ThemeResource} inside ThemeDictionaries; use {StaticResource} -->
 ```
+
+Prefer `StaticResource` redirects inside theme dictionaries for existing Fluent brushes. This reuses the platform brush and avoids creating duplicate `SolidColorBrush` instances. If a custom color is required, define Light and Dark values explicitly and keep matching keys in both dictionaries.
 
 ### Usability
 - Ensure 4.5:1 contrast ratio for body text, 3:1 for large text
@@ -157,11 +204,13 @@ All sizes are in effective pixels (epx). Use `Style="{StaticResource StyleName}"
 ### XAML
 ```xaml
 <!-- Dialog/flyout level -->
-<Border CornerRadius="8"/>
+<Border CornerRadius="{StaticResource OverlayCornerRadius}"/>
 
 <!-- Control level -->
-<Border CornerRadius="4"/>
+<Border CornerRadius="{StaticResource ControlCornerRadius}"/>
 ```
+
+Use `ControlCornerRadius` for in-page controls and `OverlayCornerRadius` for dialogs, flyouts, cards, and other top-level surfaces. Use `0` for edges that meet another straight edge.
 
 ---
 
@@ -190,7 +239,7 @@ All sizes are in effective pixels (epx). Use `Style="{StaticResource StyleName}"
 ### XAML (Uno Platform ThemeShadow)
 ```xaml
 <!-- Card elevation -->
-<Border CornerRadius="4" Translation="0,0,8">
+<Border CornerRadius="{StaticResource ControlCornerRadius}" Translation="0,0,8">
     <Border.Shadow>
         <ThemeShadow/>
     </Border.Shadow>
@@ -198,12 +247,19 @@ All sizes are in effective pixels (epx). Use `Style="{StaticResource StyleName}"
 </Border>
 
 <!-- Flyout elevation -->
-<Border CornerRadius="8" Translation="0,0,32">
+<Border CornerRadius="{StaticResource OverlayCornerRadius}" Translation="0,0,32">
     <Border.Shadow>
         <ThemeShadow/>
     </Border.Shadow>
 </Border>
 ```
+
+Rules:
+
+- `ThemeShadow` needs `Translation` on the elevated element.
+- Leave enough parent padding or surrounding space so the shadow is not clipped.
+- Ensure the receiver/background is behind the elevated element in z-order.
+- Prefer `ThemeShadow` over custom composition drop shadows for cross-platform Uno apps.
 
 ---
 
@@ -243,6 +299,9 @@ All sizes are in effective pixels (epx). Use `Style="{StaticResource StyleName}"
 ```
 
 ### Best Practices
+- Prefer icon types in this order: `SymbolIcon`, `FontIcon`, `AnimatedIcon`, `ImageIcon`, `PathIcon`. Avoid `BitmapIcon` for new Fluent UI unless legacy bitmap assets are required.
+- Use standard icon sizes: 16 for inline/compact, 20 for default controls, 24 for emphasis, 32 for large actions, and 48 for feature icons.
+- Use `{ThemeResource SymbolThemeFontFamily}` for `FontIcon` glyphs. Non-Windows Uno heads need the `Uno.Fonts.Fluent` package for cross-platform Fluent symbols.
 - Use base + modifier pattern for compound meanings
 - Validate cultural connotations of symbols
 - Layer two glyphs for active/selected states
@@ -290,6 +349,8 @@ Use these values for Margin, Padding, Spacing: **4, 8, 12, 16, 24, 32, 48, 64**
 - Text/content never touches screen edge (Margin >= 16px)
 - Inner padding for text/icon surfaces; images may be edge-to-edge
 - Use `HorizontalContentAlignment` and `VerticalContentAlignment` on ContentControls
+- Prefer content-driven button widths with sensible `MinWidth`/`MinHeight`; avoid fixed widths unless aligning repeated command columns.
+- Test Fluent surfaces with long/localized text and text scaling before accepting fixed visual density.
 
 ---
 
@@ -306,6 +367,14 @@ Lightweight styling overrides control appearance by providing alternate resource
 Keys follow: `{Style}{Property}{VisualState}`
 
 Visual states: (none)=Normal, `PointerOver`, `Pressed`, `Disabled`, `Focused`, `Checked`, `CheckedPointerOver`, etc.
+
+### Style Hygiene
+- Check existing WinUI and Uno Toolkit styles before creating a custom style.
+- Prefer lightweight styling/resource overrides for minor visual changes.
+- Avoid replacing a standard control template unless the interaction or structure genuinely requires it.
+- Keep default templates for `ProgressBar` and `ProgressRing`; custom template and foreground overrides easily break contrast and accessibility.
+- Reference styles with `{StaticResource}`. Use `{ThemeResource}` inside setters only for theme-dependent values.
+- Inline one-off values; promote resources only when values are reused across a feature or app.
 
 ### Example
 ```xaml
@@ -497,9 +566,9 @@ Key pattern: `TabBarItem{Property}{State}` — use the Uno Toolkit docs or `uno-
 | Success/Warning/Error | `SystemFillColorSuccessBrush/CautionBrush/CriticalBrush` |
 | Button | Default implicit style or `FilledButtonStyle` |
 | Card elevation | `ThemeShadow` + `Translation="0,0,8"` |
-| Divider line | `DividerForeground` or `ControlStrokeColorDefaultBrush` |
-| Corner radius (control) | `CornerRadius="4"` |
-| Corner radius (dialog) | `CornerRadius="8"` |
+| Divider line | `DividerStrokeColorDefaultBrush` or Toolkit `DividerForeground` |
+| Corner radius (control) | `ControlCornerRadius` |
+| Corner radius (dialog/card/flyout) | `OverlayCornerRadius` |
 | Spacing | Multiples of 4: 4, 8, 12, 16, 24, 32 |
 
 ---
