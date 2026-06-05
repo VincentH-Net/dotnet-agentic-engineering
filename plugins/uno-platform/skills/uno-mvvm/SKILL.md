@@ -1,15 +1,15 @@
 ---
 name: uno-mvvm
-description: Uno Platform MVVM with CommunityToolkit.Mvvm: mutable ViewModels, ObservableObject, ObservableProperty on C# partial properties, RelayCommand, async commands, constructor dependency injection, x:Bind binding patterns, and Uno Navigation from ViewModels. Use when the user selected MVVM as the update model or asks for ViewModel, ICommand, INotifyPropertyChanged, ObservableObject, ObservableProperty, RelayCommand, or CommunityToolkit.Mvvm in an Uno Platform app. Do NOT use for MVUX models/feeds/states; use Studio MVUX skills instead. Do NOT use for C# Markup 2 binding syntax; combine with uno-csharpmarkup2 only when the selected markup type is C# Markup 2.
+description: "Uno Platform MVVM with CommunityToolkit.Mvvm: mutable ViewModels, ObservableObject, ObservableProperty on C# partial properties, RelayCommand, async commands, constructor dependency injection, x:Bind binding patterns, and Uno Navigation from ViewModels. Use when the user selected MVVM as the update model or asks for ViewModel, ICommand, INotifyPropertyChanged, ObservableObject, ObservableProperty, RelayCommand, or CommunityToolkit.Mvvm in an Uno Platform app. Do NOT use for MVUX models/feeds/states; use Studio MVUX skills instead. Do NOT use for C# Markup 2 binding syntax; combine with uno-csharpmarkup2 only when the selected markup type is C# Markup 2."
 metadata:
   author: https://github.com/VincentH-Net
-  version: "1.1"
+  version: "1.1.1"
   framework: uno-platform
   category: update-model
   sources:
     - https://github.com/mtmattei/UnoPlatformSkills
-    - Microsoft Learn: C# partial members and partial properties
-    - Microsoft Learn: CommunityToolkit.Mvvm ObservableProperty partial-property generator diagnostics
+    - "Microsoft Learn: C# partial members and partial properties"
+    - "Microsoft Learn: CommunityToolkit.Mvvm ObservableProperty partial-property generator diagnostics"
     - Uno Extensions Navigation and Hosting patterns
 ---
 
