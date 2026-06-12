@@ -38,7 +38,7 @@ See:
 
 Enabling automatic approvals is probably the single most important tip to increase your productivity.
 
-- Use the `/permissions` command in Codex CLI to configure `Auto-review`
+- Use the `/permissions` command in Codex CLI to configure `Approve for me`
 - In Claude Code CLI, turn `auto mode` on (`shift+tab` to cycle)
 
 ## OS
