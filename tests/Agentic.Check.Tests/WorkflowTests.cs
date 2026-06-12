@@ -1,0 +1,52 @@
+﻿namespace Agentic.Check.Tests;
+
+public sealed class WorkflowTests
+{
+    [Fact]
+    public async Task DryRunDoesNotInstallOrUpdateSkills()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
+        tempDirectory.Write("App.csproj", "<Project />");
+        FakeCommandRunner commandRunner = new();
+        commandRunner.Enqueue(new CommandResult(0, "git version 2.50.0", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
+        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), new NullReporter());
+
+        var result = await workflow.RunAsync(
+            new AgenticCheckOptions(tempDirectory.Path, true, false, null, null, false),
+            CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains(result.Report.Actions, action => action.Contains("Would install", StringComparison.Ordinal));
+        Assert.DoesNotContain(commandRunner.Calls, call => call.Arguments.Contains("install"));
+        Assert.DoesNotContain(commandRunner.Calls, call => call.Arguments.Contains("update"));
+    }
+
+    [Fact]
+    public async Task InstallFailureProducesNonZeroExitCode()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write("App.csproj", "<Project />");
+        tempDirectory.Write(".agents/skills/ensure-directives/SKILL.md", "# Present");
+        tempDirectory.Write(".agents/skills/dotnet-livecharts2/SKILL.md", "# Present");
+        FakeCommandRunner commandRunner = new();
+        commandRunner.Enqueue(new CommandResult(0, "git version 2.50.0", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
+        commandRunner.Enqueue(new CommandResult(1, string.Empty, "skill not found"));
+        commandRunner.Enqueue(new CommandResult(0, "no updates", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "updated", string.Empty));
+        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), new NullReporter());
+
+        var result = await workflow.RunAsync(
+            new AgenticCheckOptions(tempDirectory.Path, false, true, null, null, false),
+            CancellationToken.None);
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains(result.Report.InstallResults, install => !install.Success && install.StandardError.Contains("skill not found", StringComparison.Ordinal));
+    }
+}
