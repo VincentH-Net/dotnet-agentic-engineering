@@ -6,10 +6,18 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>agentic-check</ToolCommandName>
     <PackageId>Agentic.Check</PackageId>
-    <Version>0.1.0</Version>
+    <Title>Agentic Check</Title>
+    <Version>0.1.0-preview</Version>
     <Authors>VincentH-Net</Authors>
+    <Copyright>Copyright © VincentH.NET</Copyright>
     <Description>Checks and installs recommended agentic engineering skills for local repositories.</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/VincentH-Net/dotnet-agentic-engineering</PackageProjectUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageTags>agentic-check;agentic;dotnet-tool;cli;skills;github-cli;doctor;check</PackageTags>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/VincentH-Net/dotnet-agentic-engineering</RepositoryUrl>
+    <PackageReleaseNotes>Initial phase 1 tool for detecting local repo stack and installing recommended repo-local agent skills.</PackageReleaseNotes>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
   <ItemGroup>
