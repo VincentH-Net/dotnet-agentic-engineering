@@ -26,20 +26,7 @@ sealed class SpectreUserPrompts(IAnsiConsole console) : IUserPrompts
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var choices = missingSkills.ToDictionary(skill => skill.Display, StringComparer.Ordinal);
-        var prompt = new MultiSelectionPrompt<string>()
-            .Title($"Found {missingSkills.Count} recommended skills missing, select skill(s) to install:")
-            .InstructionsText("[grey](Use arrows to move, space to select, enter to confirm.)[/]")
-            .PageSize(20)
-            .AddChoices(choices.Keys);
-
-        foreach (string choice in choices.Keys)
-        {
-            _ = prompt.Select(choice);
-        }
-
-        var selected = console.Prompt(prompt);
-        return Task.FromResult<IReadOnlyList<SkillManifestEntry>>([.. selected.Select(choice => choices[choice])]);
+        return new SkillSelectionPrompt(console).PromptAsync(missingSkills, cancellationToken);
     }
 }
 
