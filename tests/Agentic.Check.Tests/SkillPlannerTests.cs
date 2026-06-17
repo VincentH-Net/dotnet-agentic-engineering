@@ -16,7 +16,7 @@ public sealed class SkillPlannerTests
 
         var plan = SkillPlanner.Plan(StaticSkillManifest.All, stack);
 
-        Assert.Contains(plan, skill => skill.InstallArg == "ensure-directives");
+        Assert.DoesNotContain(plan, skill => skill.InstallArg == "ensure-directives");
         Assert.Contains(plan, skill => skill.InstallArg == "dotnet-livecharts2");
         Assert.DoesNotContain(plan, skill => skill.Technology == TechnologyNames.Uno);
     }

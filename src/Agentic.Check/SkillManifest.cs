@@ -20,7 +20,6 @@ static class StaticSkillManifest
 
     internal static IReadOnlyList<SkillManifestEntry> All { get; } =
     [
-        VincentDotnet("ensure-directives"),
         VincentDotnet("dotnet-livecharts2"),
         VincentDotnet("dotnet-modern-csharp-editorconfig"),
         VincentOrleans("orleans-result-pattern"),

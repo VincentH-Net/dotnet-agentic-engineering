@@ -22,6 +22,12 @@ sealed class AgenticCheckReport
 
     public List<string> Advisories { get; } = [];
 
+    public string AgentsFile { get; set; } = string.Empty;
+
+    public string ClaudeFile { get; set; } = string.Empty;
+
+    public List<DirectiveReportItem> Directives { get; } = [];
+
     public List<SkillReportItem> RecommendedSkills { get; } = [];
 
     public List<SkillReportItem> MissingSkills { get; } = [];

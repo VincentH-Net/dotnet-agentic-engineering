@@ -2,7 +2,11 @@
 
 namespace Agentic.Check;
 
-sealed class CheckWorkflow(ICommandRunner commandRunner, IUserPrompts prompts, IReporter reporter)
+sealed class CheckWorkflow(
+    ICommandRunner commandRunner,
+    IUserPrompts prompts,
+    IReporter reporter,
+    IDirectiveSource? directiveSource = null)
 {
     static readonly JsonSerializerOptions ReportSerializerOptions = new(JsonSerializerDefaults.Web)
     {
@@ -57,6 +61,19 @@ sealed class CheckWorkflow(ICommandRunner commandRunner, IUserPrompts prompts, I
         foreach (string warning in stack.Warnings)
         {
             reporter.Warning(warning);
+        }
+
+        var directiveResult = await new DirectiveInstaller(directiveSource ?? new GitHubDirectiveSource(), reporter)
+            .EnsureAsync(repoResolution.RepoRoot, stack, options.DryRun, cancellationToken)
+            .ConfigureAwait(false);
+        report.Directives.AddRange(directiveResult.Directives);
+        report.Actions.AddRange(directiveResult.Actions);
+        report.AgentsFile = directiveResult.AgentsFile;
+        report.ClaudeFile = directiveResult.ClaudeFile;
+        if (!directiveResult.Success)
+        {
+            await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
+            return new CheckRunResult(2, report);
         }
 
         IReadOnlyList<string> skillsDirectories;

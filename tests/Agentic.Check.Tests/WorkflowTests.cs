@@ -13,7 +13,7 @@ public sealed class WorkflowTests
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
-        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), new NullReporter());
+        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), new NullReporter(), new FakeDirectiveSource());
 
         var result = await workflow.RunAsync(
             new AgenticCheckOptions(tempDirectory.Path, true, false, null, null, null, false),
@@ -44,7 +44,7 @@ public sealed class WorkflowTests
         commandRunner.Enqueue(new CommandResult(0, "no updates", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "updated", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "updated", string.Empty));
-        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), new NullReporter());
+        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), new NullReporter(), new FakeDirectiveSource());
 
         var result = await workflow.RunAsync(
             new AgenticCheckOptions(tempDirectory.Path, false, true, null, null, null, false),
@@ -65,7 +65,7 @@ public sealed class WorkflowTests
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
-        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), new NullReporter());
+        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), new NullReporter(), new FakeDirectiveSource());
 
         var result = await workflow.RunAsync(
             new AgenticCheckOptions(tempDirectory.Path, true, false, null, null, "claude-code,trae,trae-cn", false),
@@ -105,7 +105,7 @@ public sealed class WorkflowTests
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
-        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), new NullReporter());
+        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), new NullReporter(), new FakeDirectiveSource());
 
         var result = await workflow.RunAsync(
             new AgenticCheckOptions(tempDirectory.Path, true, false, null, null, "codex,unknown-agent", false),
@@ -125,7 +125,7 @@ public sealed class WorkflowTests
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
-        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), new NullReporter());
+        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), new NullReporter(), new FakeDirectiveSource());
 
         var result = await workflow.RunAsync(
             new AgenticCheckOptions(tempDirectory.Path, true, false, null, null, "codex", false),
@@ -161,7 +161,7 @@ public sealed class WorkflowTests
         commandRunner.Enqueue(new CommandResult(0, "no updates", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "updated", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "updated", string.Empty));
-        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), new NullReporter());
+        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), new NullReporter(), new FakeDirectiveSource());
 
         var result = await workflow.RunAsync(
             new AgenticCheckOptions(tempDirectory.Path, false, true, null, null, null, false),
@@ -169,7 +169,6 @@ public sealed class WorkflowTests
 
         Assert.Equal(0, result.ExitCode);
         _ = Assert.Single(commandRunner.Calls, call => call.Arguments.Contains("install"));
-        Assert.True(File.Exists(Path.Combine(tempDirectory.Path, ".claude", "skills", "ensure-directives", "SKILL.md")));
         Assert.True(File.Exists(Path.Combine(tempDirectory.Path, ".claude", "skills", "dotnet-livecharts2", "SKILL.md")));
         Assert.True(File.Exists(Path.Combine(tempDirectory.Path, ".claude", "skills", "dotnet-modern-csharp-editorconfig", "SKILL.md")));
     }

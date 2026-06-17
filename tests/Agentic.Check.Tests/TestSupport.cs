@@ -83,3 +83,51 @@ sealed class FakePrompts : IUserPrompts
         return Task.FromResult(missingSkills);
     }
 }
+
+sealed class FakeDirectiveSource : IDirectiveSource
+{
+    readonly IReadOnlyList<DirectiveSourceFile> files;
+    readonly Dictionary<string, string> contents;
+
+    public FakeDirectiveSource(IReadOnlyDictionary<string, string>? directiveContents = null)
+    {
+        contents = directiveContents is null
+            ? new Dictionary<string, string>(DefaultDirectiveContents(), StringComparer.Ordinal)
+            : new Dictionary<string, string>(directiveContents, StringComparer.Ordinal);
+        files = [.. contents.Keys.Select(name => new DirectiveSourceFile(name, $"https://example.test/{name}"))];
+    }
+
+    public Task<IReadOnlyList<DirectiveSourceFile>> ListAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(files);
+    }
+
+    public Task<string> FetchAsync(DirectiveSourceFile sourceFile, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return contents.TryGetValue(sourceFile.FileName, out string? content)
+            ? Task.FromResult(content)
+            : throw new InvalidOperationException($"Missing fake directive content for {sourceFile.FileName}.");
+    }
+
+    public static Dictionary<string, string> DefaultDirectiveContents()
+        => new(StringComparer.Ordinal)
+        {
+            ["foundation-prompt-log.md"] = DirectiveFile("foundation-prompt-log"),
+            ["dotnet-cli-run.md"] = DirectiveFile("dotnet-cli-run"),
+            ["uno-build-and-run.md"] = DirectiveFile("uno-build-and-run")
+        };
+
+    public static string DirectiveFile(string directiveName)
+        => $"""
+            # {directiveName}
+
+            ~~~md
+            <!-- dotnet-agentic-engineering:{directiveName}:start -->
+            ## {directiveName}
+            Body for {directiveName}.
+            <!-- dotnet-agentic-engineering:{directiveName}:end -->
+            ~~~
+            """;
+}
