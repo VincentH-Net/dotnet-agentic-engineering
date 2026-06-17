@@ -18,7 +18,8 @@ static class AgenticCheckCli
         Option<bool> dryRunOption = new("--dry-run", "Report intended actions without changing files or running installs.");
         Option<bool> yesOption = new("--yes", "Approve fixes and select all recommended missing skills.");
         Option<FileInfo?> reportOption = new("--report", "Write a JSON report to this path.");
-        Option<DirectoryInfo?> skillsDirectoryOption = new("--skills-dir", "Repo-local skills directory. Defaults to <repo-root>/.agents/skills.");
+        Option<DirectoryInfo?> skillsDirectoryOption = new("--skills-dir", "Repo-local skills directory. Overrides --agents. Example: for Claude Code, use '.claude/skills'.");
+        Option<string?> agentsOption = new("--agents", $"Comma-separated gh skill agent values. Defaults to {AgentSkillRegistry.DefaultAgents}. Valid values: {AgentSkillRegistry.ValidAgentIds}.");
         Option<bool> verboseOption = new("--verbose", "Include detailed command and scan information.");
 
         RootCommand rootCommand = new("Check and install recommended agentic engineering skills.")
@@ -28,18 +29,27 @@ static class AgenticCheckCli
             yesOption,
             reportOption,
             skillsDirectoryOption,
+            agentsOption,
             verboseOption
         };
 
         rootCommand.SetHandler(
-            async (targetDirectory, dryRun, yes, report, skillsDirectory, verbose) =>
+            async (targetDirectory, dryRun, yes, report, skillsDirectory, agents, verbose) =>
             {
+                if (skillsDirectory is not null && !string.IsNullOrWhiteSpace(agents))
+                {
+                    AnsiConsole.MarkupLine("[red]Specify no more than one of --skills-dir and --agents.[/]");
+                    Environment.ExitCode = 2;
+                    return;
+                }
+
                 var options = new AgenticCheckOptions(
                     targetDirectory.FullName,
                     dryRun,
                     yes,
                     report?.FullName,
                     skillsDirectory?.FullName,
+                    agents,
                     verbose);
 
                 var workflow = new CheckWorkflow(
@@ -55,6 +65,7 @@ static class AgenticCheckCli
             yesOption,
             reportOption,
             skillsDirectoryOption,
+            agentsOption,
             verboseOption);
 
         int parseExitCode = await rootCommand.InvokeAsync(args).ConfigureAwait(false);

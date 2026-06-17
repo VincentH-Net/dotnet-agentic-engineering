@@ -131,16 +131,18 @@ sealed class SkillSelectionState(IReadOnlyList<SkillManifestEntry> skills)
 sealed class SkillSelectionPrompt(IAnsiConsole console)
 {
     const int PageSize = 20;
+    int previousRenderLineCount;
 
     public async Task<IReadOnlyList<SkillManifestEntry>> PromptAsync(
         IReadOnlyList<SkillManifestEntry> missingSkills,
+        SkillSelectionContext context,
         CancellationToken cancellationToken)
     {
         var state = new SkillSelectionState(missingSkills);
 
         while (true)
         {
-            Render(missingSkills.Count, state);
+            Render(missingSkills.Count, state, context);
             var key = await console.Input.ReadKeyAsync(true, cancellationToken).ConfigureAwait(false);
             if (key is null)
             {
@@ -171,20 +173,55 @@ sealed class SkillSelectionPrompt(IAnsiConsole console)
             _ => new(SkillSelectionCommand.Character, key.KeyChar)
         };
 
-    void Render(int missingSkillCount, SkillSelectionState state)
+    void Render(int missingSkillCount, SkillSelectionState state, SkillSelectionContext context)
     {
-        console.Clear(false);
+        if (previousRenderLineCount > 0 && !Console.IsOutputRedirected)
+        {
+            Console.SetCursorPosition(0, Math.Max(0, Console.CursorTop - previousRenderLineCount));
+        }
+
+        int lineCount = 0;
+        void MarkupLine(string value)
+        {
+            console.MarkupLine(value);
+            lineCount++;
+        }
+
+        void EmptyLine()
+        {
+            console.WriteLine();
+            lineCount++;
+        }
+
+        console.MarkupLineInterpolated($"Repository: [grey]{Markup.Escape(context.RepoRoot)}[/]");
+        lineCount++;
+        console.MarkupLineInterpolated($"Stack: [grey]{Markup.Escape(string.Join(", ", context.Technologies.Order(StringComparer.OrdinalIgnoreCase)))}[/]");
+        lineCount++;
+        console.MarkupLineInterpolated($"Install target: [grey]{Markup.Escape(context.Parameter)}[/]");
+        lineCount++;
+        MarkupLine("[grey]Skills directories:[/]");
+        foreach (string skillsDirectory in context.SkillsDirectories)
+        {
+            console.MarkupLineInterpolated($"[grey]- {Markup.Escape(skillsDirectory)}[/]");
+            lineCount++;
+        }
+
+        EmptyLine();
         console.MarkupLineInterpolated($"Found {missingSkillCount} recommended skills missing, select skill(s) to install:");
-        console.MarkupLine("[grey][[Use arrows to move, space to select, <right> to all, <left> to none, type to filter]][/]");
+        lineCount++;
+        MarkupLine("[grey][[Use arrows to move, space to select, <right> to all, <left> to none, type to filter]][/]");
 
         if (state.Filter.Length > 0)
         {
             console.MarkupLineInterpolated($"Filter: [yellow]{Markup.Escape(state.Filter)}[/]");
+            lineCount++;
         }
 
         if (state.FilteredSkills.Count == 0)
         {
-            console.MarkupLine("[grey]No skills match the current filter.[/]");
+            MarkupLine("[grey]No skills match the current filter.[/]");
+            ClearTrailingLines(lineCount);
+            previousRenderLineCount = lineCount;
             return;
         }
 
@@ -197,11 +234,30 @@ sealed class SkillSelectionPrompt(IAnsiConsole console)
             string check = state.IsSelected(skill) ? "[[x]]" : "[[ ]]";
             string display = Markup.Escape(skill.Display);
             console.MarkupLine($"{cursor} {check} {display}");
+            lineCount++;
         }
 
         if (state.FilteredSkills.Count > PageSize)
         {
             console.MarkupLineInterpolated($"[grey]Showing {PageSize} of {state.FilteredSkills.Count} matches.[/]");
+            lineCount++;
+        }
+
+        ClearTrailingLines(lineCount);
+        previousRenderLineCount = lineCount;
+    }
+
+    void ClearTrailingLines(int currentRenderLineCount)
+    {
+        if (Console.IsOutputRedirected)
+        {
+            return;
+        }
+
+        for (int index = currentRenderLineCount; index < previousRenderLineCount; index++)
+        {
+            Console.Write(new string(' ', Math.Max(0, Console.WindowWidth - 1)));
+            Console.WriteLine();
         }
     }
 }

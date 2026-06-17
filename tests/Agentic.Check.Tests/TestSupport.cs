@@ -41,6 +41,8 @@ sealed class FakeCommandRunner : ICommandRunner
 
     public List<CommandCall> Calls { get; } = [];
 
+    public Action<CommandCall>? OnRun { get; init; }
+
     public void Enqueue(CommandResult result)
         => results.Enqueue(result);
 
@@ -51,7 +53,9 @@ sealed class FakeCommandRunner : ICommandRunner
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        Calls.Add(new CommandCall(fileName, [.. arguments], workingDirectory));
+        CommandCall call = new(fileName, [.. arguments], workingDirectory);
+        Calls.Add(call);
+        OnRun?.Invoke(call);
         return results.Count == 0
             ? throw new InvalidOperationException($"No fake command result queued for {fileName} {string.Join(' ', arguments)}.")
             : Task.FromResult(results.Dequeue());
@@ -72,6 +76,7 @@ sealed class FakePrompts : IUserPrompts
 
     public Task<IReadOnlyList<SkillManifestEntry>> SelectSkillsAsync(
         IReadOnlyList<SkillManifestEntry> missingSkills,
+        SkillSelectionContext context,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();

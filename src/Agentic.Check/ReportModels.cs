@@ -10,6 +10,8 @@ sealed class AgenticCheckReport
 
     public string? SkillsDirectory { get; set; }
 
+    public List<string> SkillsDirectories { get; } = [];
+
     public List<PrerequisiteCheck> Prerequisites { get; } = [];
 
     public List<string> Technologies { get; } = [];
@@ -31,6 +33,12 @@ sealed class AgenticCheckReport
     public CommandReport? SkillUpdateDryRun { get; set; }
 
     public CommandReport? SkillUpdate { get; set; }
+
+    public List<SkillCopyResult> SkillCopyResults { get; } = [];
+
+    public List<CommandReport> SkillUpdateDryRuns { get; } = [];
+
+    public List<CommandReport> SkillUpdates { get; } = [];
 }
 
 sealed record CheckRunResult(int ExitCode, AgenticCheckReport Report);
@@ -48,3 +56,10 @@ sealed record CommandReport(int ExitCode, string StandardOutput, string Standard
     internal static CommandReport FromCommandResult(CommandResult result)
         => new(result.ExitCode, result.StandardOutput, result.StandardError);
 }
+
+sealed record SkillCopyResult(
+    string SourceDirectory,
+    string TargetDirectory,
+    string LocalFolder,
+    bool Success,
+    string? Error);
