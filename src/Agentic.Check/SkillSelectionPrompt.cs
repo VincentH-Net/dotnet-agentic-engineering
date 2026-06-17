@@ -193,19 +193,8 @@ sealed class SkillSelectionPrompt(IAnsiConsole console)
             lineCount++;
         }
 
-        console.MarkupLineInterpolated($"Repository: [grey]{Markup.Escape(context.RepoRoot)}[/]");
-        lineCount++;
-        console.MarkupLineInterpolated($"Stack: [grey]{Markup.Escape(string.Join(", ", context.Technologies.Order(StringComparer.OrdinalIgnoreCase)))}[/]");
-        lineCount++;
         console.MarkupLineInterpolated($"Install target: [grey]{Markup.Escape(context.Parameter)}[/]");
         lineCount++;
-        MarkupLine("[grey]Skills directories:[/]");
-        foreach (string skillsDirectory in context.SkillsDirectories)
-        {
-            console.MarkupLineInterpolated($"[grey]- {Markup.Escape(skillsDirectory)}[/]");
-            lineCount++;
-        }
-
         EmptyLine();
         console.MarkupLineInterpolated($"Found {missingSkillCount} recommended skills missing, select skill(s) to install:");
         lineCount++;
