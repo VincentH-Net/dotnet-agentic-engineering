@@ -19,7 +19,9 @@ static class AgenticCheckCli
         Option<bool> yesOption = new("--yes", "Approve fixes and select all recommended missing skills.");
         Option<FileInfo?> reportOption = new("--report", "Write a JSON report to this path.");
         Option<DirectoryInfo?> skillsDirectoryOption = new("--skills-dir", "Repo-local skills directory. Overrides --agents. Example: for Claude Code, use '.claude/skills'.");
-        Option<string?> agentsOption = new("--agents", $"Comma-separated gh skill agent values. Defaults to {AgentSkillRegistry.DefaultAgents}. Valid values: {AgentSkillRegistry.ValidAgentIds}.");
+        Option<string?> agentsOption = new(
+            "--agents",
+            $"Comma-separated additional agent values for non-standard skill folders. {AgentSkillRegistry.StandardProjectDirectory} is always installed. Defaults to {AgentSkillRegistry.DefaultAgents}. Standard-path agents: {AgentSkillRegistry.StandardAgentNames}. Additional agent values: {AgentSkillRegistry.AdditionalAgentIds}.");
         Option<bool> verboseOption = new("--verbose", "Include detailed command and scan information.");
 
         RootCommand rootCommand = new("Check and install recommended agentic engineering skills.")
