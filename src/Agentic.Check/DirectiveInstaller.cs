@@ -26,12 +26,57 @@ sealed record DirectiveResult(
 
 sealed record DirectiveReportItem(string Name, string Status);
 
+sealed record DirectivePlanResult(
+    bool Success,
+    string AgentsFile,
+    string ClaudeFile,
+    bool CreateAgentsFile,
+    bool CreateClaudeFile,
+    IReadOnlyList<DirectivePlanItem> Directives,
+    string AgentsContent,
+    string ClaudeContent,
+    string? Error)
+{
+    public int RecommendedCount => Directives.Count;
+
+    public int MissingCount => Directives.Count(directive => directive.Status == DirectiveStatuses.Missing);
+
+    public int OutdatedCount => Directives.Count(directive => directive.Status == DirectiveStatuses.Outdated);
+
+    public int SkippedCount => Directives.Count(directive => directive.Status == DirectiveStatuses.Skipped);
+
+    public IReadOnlyList<DirectivePlanItem> SelectableDirectives
+        => [.. Directives.Where(directive => directive.Status is DirectiveStatuses.Missing or DirectiveStatuses.Outdated)];
+}
+
+sealed record DirectivePlanItem(string Name, string Status, string Content);
+
+static class DirectiveStatuses
+{
+    public const string Missing = "missing";
+    public const string Outdated = "outdated";
+    public const string Skipped = "skipped";
+    public const string Current = "current";
+}
+
 sealed partial class DirectiveInstaller(IDirectiveSource source, IReporter reporter)
 {
     public async Task<DirectiveResult> EnsureAsync(
         string repoRoot,
         StackDetectionResult stack,
         bool dryRun,
+        CancellationToken cancellationToken)
+    {
+        var plan = await PlanAsync(repoRoot, stack, cancellationToken).ConfigureAwait(false);
+        return !plan.Success
+            ? new DirectiveResult(false, string.Empty, string.Empty, [], [], plan.Error)
+            : await ApplyAsync(plan, plan.SelectableDirectives.Select(directive => directive.Name), dryRun, cancellationToken)
+                .ConfigureAwait(false);
+    }
+
+    public async Task<DirectivePlanResult> PlanAsync(
+        string repoRoot,
+        StackDetectionResult stack,
         CancellationToken cancellationToken)
     {
         try
@@ -54,32 +99,74 @@ sealed partial class DirectiveInstaller(IDirectiveSource source, IReporter repor
                 ? await File.ReadAllTextAsync(claudeFile, cancellationToken).ConfigureAwait(false)
                 : string.Empty;
 
-            List<string> actions = [];
-            List<DirectiveReportItem> directiveReports = [];
-            string updatedAgentsContent = ApplyDirectiveBlocks(agentsContent, directiveBlocks, directiveReports, actions);
-            string updatedClaudeContent = EnsureClaudeImport(
-                claudeContent,
-                Path.GetFileName(agentsFile),
+            List<DirectivePlanItem> directivePlanItems = [];
+            foreach (var directive in directiveBlocks)
+            {
+                directivePlanItems.Add(PlanDirective(agentsContent, directive));
+            }
+
+            return new DirectivePlanResult(
+                true,
+                agentsFile,
                 claudeFile,
+                !File.Exists(agentsFile),
+                !File.Exists(claudeFile),
+                directivePlanItems,
+                agentsContent,
+                claudeContent,
+                null);
+        }
+        catch (DirectiveException exception)
+        {
+            reporter.Error(exception.Message);
+            return new DirectivePlanResult(false, string.Empty, string.Empty, false, false, [], string.Empty, string.Empty, exception.Message);
+        }
+    }
+
+    public async Task<DirectiveResult> ApplyAsync(
+        DirectivePlanResult plan,
+        IEnumerable<string> selectedDirectiveNames,
+        bool dryRun,
+        CancellationToken cancellationToken)
+    {
+        if (!plan.Success)
+        {
+            return new DirectiveResult(false, plan.AgentsFile, plan.ClaudeFile, [], [], plan.Error);
+        }
+
+        try
+        {
+            var selectedNames = selectedDirectiveNames.ToHashSet(StringComparer.Ordinal);
+            List<string> actions = [];
+            List<DirectiveReportItem> directiveReports = [.. plan.Directives.Select(directive => new DirectiveReportItem(directive.Name, directive.Status))];
+            IReadOnlyList<DirectiveBlock> selectedBlocks = [.. plan.Directives
+                .Where(directive => selectedNames.Contains(directive.Name))
+                .Select(directive => new DirectiveBlock(directive.Name, directive.Content))];
+            string updatedAgentsContent = ApplyDirectiveBlocks(plan.AgentsContent, selectedBlocks, actions, dryRun);
+            string updatedClaudeContent = EnsureClaudeImport(
+                plan.ClaudeContent,
+                Path.GetFileName(plan.AgentsFile),
+                plan.ClaudeFile,
+                dryRun,
                 actions);
 
             if (dryRun)
             {
-                if (!File.Exists(agentsFile))
+                if (plan.CreateAgentsFile)
                 {
-                    actions.Add($"Would create {agentsFile}.");
+                    actions.Add($"Would create {plan.AgentsFile}.");
                 }
 
-                if (!File.Exists(claudeFile))
+                if (plan.CreateClaudeFile)
                 {
-                    actions.Add($"Would create {claudeFile}.");
+                    actions.Add($"Would create {plan.ClaudeFile}.");
                 }
             }
             else
             {
-                await WriteIfChangedAsync(agentsFile, updatedAgentsContent, cancellationToken).ConfigureAwait(false);
-                await WriteIfChangedAsync(claudeFile, updatedClaudeContent, cancellationToken).ConfigureAwait(false);
-                await ValidateAsync(agentsFile, claudeFile, Path.GetFileName(agentsFile), directiveBlocks, cancellationToken)
+                await WriteIfChangedAsync(plan.AgentsFile, updatedAgentsContent, cancellationToken).ConfigureAwait(false);
+                await WriteIfChangedAsync(plan.ClaudeFile, updatedClaudeContent, cancellationToken).ConfigureAwait(false);
+                await ValidateAsync(plan.AgentsFile, plan.ClaudeFile, Path.GetFileName(plan.AgentsFile), selectedBlocks, cancellationToken)
                     .ConfigureAwait(false);
             }
 
@@ -88,12 +175,12 @@ sealed partial class DirectiveInstaller(IDirectiveSource source, IReporter repor
                 reporter.Info($"Directive {directive.Name}: {directive.Status}");
             }
 
-            return new DirectiveResult(true, agentsFile, claudeFile, directiveReports, actions, null);
+            return new DirectiveResult(true, plan.AgentsFile, plan.ClaudeFile, directiveReports, actions, null);
         }
         catch (DirectiveException exception)
         {
             reporter.Error(exception.Message);
-            return new DirectiveResult(false, string.Empty, string.Empty, [], [], exception.Message);
+            return new DirectiveResult(false, plan.AgentsFile, plan.ClaudeFile, [], [], exception.Message);
         }
     }
 
@@ -128,22 +215,46 @@ sealed partial class DirectiveInstaller(IDirectiveSource source, IReporter repor
         return new DirectiveBlock(directiveName, block);
     }
 
+    static DirectivePlanItem PlanDirective(string agentsContent, DirectiveBlock directive)
+    {
+        string content = NormalizeNewlines(agentsContent);
+        if (content.Contains(SkipMarker(directive.Name), StringComparison.Ordinal))
+        {
+            return new DirectivePlanItem(directive.Name, DirectiveStatuses.Skipped, directive.Content);
+        }
+
+        string startMarker = StartMarker(directive.Name);
+        string endMarker = EndMarker(directive.Name);
+        int startCount = CountOccurrences(content, startMarker);
+        int endCount = CountOccurrences(content, endMarker);
+        if (startCount != endCount || startCount > 1)
+        {
+            throw new DirectiveException($"Directive marker is inconsistent for {directive.Name}.");
+        }
+
+        if (startCount == 0)
+        {
+            return new DirectivePlanItem(directive.Name, DirectiveStatuses.Missing, directive.Content);
+        }
+
+        int startIndex = content.IndexOf(startMarker, StringComparison.Ordinal);
+        int endIndex = content.IndexOf(endMarker, StringComparison.Ordinal);
+        string existingBlock = content[startIndex..(endIndex + endMarker.Length)];
+        string status = existingBlock.Equals(directive.Content, StringComparison.Ordinal)
+            ? DirectiveStatuses.Current
+            : DirectiveStatuses.Outdated;
+        return new DirectivePlanItem(directive.Name, status, directive.Content);
+    }
+
     static string ApplyDirectiveBlocks(
         string agentsContent,
         IReadOnlyList<DirectiveBlock> directiveBlocks,
-        List<DirectiveReportItem> directiveReports,
-        List<string> actions)
+        List<string> actions,
+        bool dryRun)
     {
         string content = NormalizeNewlines(agentsContent);
         foreach (var directive in directiveBlocks)
         {
-            if (content.Contains(SkipMarker(directive.Name), StringComparison.Ordinal))
-            {
-                directiveReports.Add(new DirectiveReportItem(directive.Name, "skipped"));
-                actions.Add($"Skipped directive {directive.Name} because AGENTS contains a skip marker.");
-                continue;
-            }
-
             string startMarker = StartMarker(directive.Name);
             string endMarker = EndMarker(directive.Name);
             int startCount = CountOccurrences(content, startMarker);
@@ -160,19 +271,20 @@ sealed partial class DirectiveInstaller(IDirectiveSource source, IReporter repor
                 string existingBlock = content[startIndex..(endIndex + endMarker.Length)];
                 if (existingBlock.Equals(directive.Content, StringComparison.Ordinal))
                 {
-                    directiveReports.Add(new DirectiveReportItem(directive.Name, "unchanged"));
                     continue;
                 }
 
                 content = content[..startIndex] + directive.Content + content[(endIndex + endMarker.Length)..];
-                directiveReports.Add(new DirectiveReportItem(directive.Name, "updated"));
-                actions.Add($"Updated directive {directive.Name} in AGENTS.");
+                actions.Add(dryRun
+                    ? $"Would update directive {directive.Name} in AGENTS."
+                    : $"Updated directive {directive.Name} in AGENTS.");
                 continue;
             }
 
             content = AppendBlock(content, directive.Content);
-            directiveReports.Add(new DirectiveReportItem(directive.Name, "added"));
-            actions.Add($"Added directive {directive.Name} to AGENTS.");
+            actions.Add(dryRun
+                ? $"Would add directive {directive.Name} to AGENTS."
+                : $"Added directive {directive.Name} to AGENTS.");
         }
 
         return EnsureTrailingNewline(content);
@@ -182,6 +294,7 @@ sealed partial class DirectiveInstaller(IDirectiveSource source, IReporter repor
         string claudeContent,
         string agentsFileName,
         string claudeFile,
+        bool dryRun,
         List<string> actions)
     {
         string importLine = $"@{agentsFileName}";
@@ -225,7 +338,9 @@ sealed partial class DirectiveInstaller(IDirectiveSource source, IReporter repor
         string updated = EnsureTrailingNewline(string.Join('\n', updatedLines).TrimEnd('\n'));
         if (changed)
         {
-            actions.Add($"Updated {claudeFile} to import {agentsFileName}.");
+            actions.Add(dryRun
+                ? $"Would update {claudeFile} to import {agentsFileName}."
+                : $"Updated {claudeFile} to import {agentsFileName}.");
         }
 
         return updated;

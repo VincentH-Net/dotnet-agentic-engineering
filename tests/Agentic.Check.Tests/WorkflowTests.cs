@@ -135,6 +135,37 @@ public sealed class WorkflowTests
     }
 
     [Fact]
+    public async Task InteractiveSelectionOnlyAppliesSelectedDirectives()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
+        tempDirectory.Write("App.csproj", "<Project />");
+        FakeCommandRunner commandRunner = new();
+        commandRunner.Enqueue(new CommandResult(0, "git version 2.50.0", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "no updates", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "no updates", string.Empty));
+        FakePrompts prompts = new()
+        {
+            ConfirmResult = false,
+            SelectedDirectiveNames = ["foundation-prompt-log"],
+            SelectedSkillInstallArgs = []
+        };
+        CheckWorkflow workflow = new(commandRunner, prompts, new NullReporter(), new FakeDirectiveSource());
+
+        var result = await workflow.RunAsync(
+            new AgenticCheckOptions(tempDirectory.Path, false, false, null, null, null, false),
+            CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        string agents = await File.ReadAllTextAsync(Path.Combine(tempDirectory.Path, "AGENTS.md"), CancellationToken.None);
+        Assert.Contains("dotnet-agentic-engineering:foundation-prompt-log:start", agents, StringComparison.Ordinal);
+        Assert.DoesNotContain("dotnet-agentic-engineering:dotnet-cli-run:start", agents, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task InstallsIntoFirstAgentDirectoryAndCopiesToRemainingDirectories()
     {
         using TempDirectory tempDirectory = new();

@@ -63,18 +63,27 @@ sealed class CheckWorkflow(
             reporter.Warning(warning);
         }
 
-        var directiveResult = await new DirectiveInstaller(directiveSource ?? new GitHubDirectiveSource(), reporter)
-            .EnsureAsync(repoResolution.RepoRoot, stack, options.DryRun, cancellationToken)
+        DirectiveInstaller directiveInstaller = new(directiveSource ?? new GitHubDirectiveSource(), reporter);
+        var directivePlan = await directiveInstaller
+            .PlanAsync(repoResolution.RepoRoot, stack, cancellationToken)
             .ConfigureAwait(false);
-        report.Directives.AddRange(directiveResult.Directives);
-        report.Actions.AddRange(directiveResult.Actions);
-        report.AgentsFile = directiveResult.AgentsFile;
-        report.ClaudeFile = directiveResult.ClaudeFile;
-        if (!directiveResult.Success)
+        report.AgentsFile = directivePlan.AgentsFile;
+        report.ClaudeFile = directivePlan.ClaudeFile;
+        report.Directives.AddRange(directivePlan.Directives.Select(directive => new DirectiveReportItem(directive.Name, directive.Status)));
+        if (!directivePlan.Success)
         {
             await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
             return new CheckRunResult(2, report);
         }
+
+        DirectiveSummary directiveSummary = new(
+            directivePlan.CreateAgentsFile,
+            directivePlan.CreateClaudeFile,
+            directivePlan.RecommendedCount,
+            directivePlan.MissingCount,
+            directivePlan.OutdatedCount,
+            directivePlan.SkippedCount);
+        report.DirectiveSummary = directiveSummary;
 
         IReadOnlyList<string> skillsDirectories;
         if (options.SkillsDirectory is { Length: > 0 })
@@ -104,7 +113,7 @@ sealed class CheckWorkflow(
         var missing = SkillInstaller.FindMissing(recommended, skillsDirectories);
         report.MissingSkills.AddRange(missing.Select(SkillReportItem.FromManifestEntry));
 
-        reporter.Summary(repoResolution.RepoRoot, stack.Technologies, skillsDirectories, recommended.Count, missing.Count);
+        reporter.Summary(repoResolution.RepoRoot, stack.Technologies, skillsDirectories, directiveSummary, recommended.Count, missing.Count);
 
         if (stack.Technologies.Contains(TechnologyNames.Dotnet, StringComparer.OrdinalIgnoreCase))
         {
@@ -113,10 +122,12 @@ sealed class CheckWorkflow(
             reporter.Info(advisory);
         }
 
+        var recommendedDirectives = directivePlan.SelectableDirectives;
+        IReadOnlyList<DirectivePlanItem> selectedDirectives = [];
         IReadOnlyList<SkillManifestEntry> selectedSkills = [];
-        if (missing.Count > 0)
+        if (recommendedDirectives.Count > 0 || missing.Count > 0)
         {
-            SkillSelectionContext selectionContext = new(
+            RecommendationSelectionContext selectionContext = new(
                 repoResolution.RepoRoot,
                 stack.Technologies,
                 skillsDirectories,
@@ -124,11 +135,29 @@ sealed class CheckWorkflow(
                     ? $"--skills-dir {options.SkillsDirectory}"
                     : $"--agents {(!string.IsNullOrWhiteSpace(options.Agents) ? options.Agents : AgentSkillRegistry.DefaultAgents)}");
 
-            selectedSkills = options.DryRun
-                ? missing
-                : options.Yes
-                    ? missing
-                    : await prompts.SelectSkillsAsync(missing, selectionContext, cancellationToken).ConfigureAwait(false);
+            if (options.DryRun || options.Yes)
+            {
+                selectedDirectives = recommendedDirectives;
+                selectedSkills = missing;
+            }
+            else
+            {
+                var selection = await prompts
+                    .SelectRecommendationsAsync(recommendedDirectives, missing, selectionContext, cancellationToken)
+                    .ConfigureAwait(false);
+                selectedDirectives = selection.SelectedDirectives;
+                selectedSkills = selection.SelectedSkills;
+            }
+        }
+
+        var directiveResult = await directiveInstaller
+            .ApplyAsync(directivePlan, selectedDirectives.Select(directive => directive.Name), options.DryRun, cancellationToken)
+            .ConfigureAwait(false);
+        report.Actions.AddRange(directiveResult.Actions);
+        if (!directiveResult.Success)
+        {
+            await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
+            return new CheckRunResult(2, report);
         }
 
         if (options.DryRun)

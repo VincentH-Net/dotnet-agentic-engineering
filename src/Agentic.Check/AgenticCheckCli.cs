@@ -15,8 +15,8 @@ static class AgenticCheckCli
             Arity = ArgumentArity.ZeroOrOne
         };
 
-        Option<bool> dryRunOption = new("--dry-run", "Report intended actions without changing files or running installs.");
-        Option<bool> yesOption = new("--yes", "Approve fixes and select all recommended missing skills.");
+        Option<bool> dryRunOption = new("--dry-run", "Report intended directive and skill actions without changing files or running installs.");
+        Option<bool> yesOption = new("--yes", "Approve fixes and select all recommended directives and missing skills.");
         Option<FileInfo?> reportOption = new("--report", "Write a JSON report to this path.");
         Option<DirectoryInfo?> skillsDirectoryOption = new("--skills-dir", "Repo-local skills directory. Overrides --agents. Example: for Claude Code, use '.claude/skills'.");
         Option<string?> agentsOption = new(
@@ -24,7 +24,7 @@ static class AgenticCheckCli
             $"Comma-separated additional agent values for non-standard skill folders. {AgentSkillRegistry.StandardProjectDirectory} is always installed. Defaults to {AgentSkillRegistry.DefaultAgents}. Standard-path agents: {AgentSkillRegistry.StandardAgentNames}. Additional agent values: {AgentSkillRegistry.AdditionalAgentIds}.");
         Option<bool> verboseOption = new("--verbose", "Include detailed command and scan information.");
 
-        RootCommand rootCommand = new("Check and install recommended agentic engineering skills.")
+        RootCommand rootCommand = new("Check and install recommended agentic engineering directives and skills.")
         {
             targetDirectoryArgument,
             dryRunOption,

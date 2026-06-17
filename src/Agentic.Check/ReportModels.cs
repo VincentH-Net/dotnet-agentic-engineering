@@ -26,6 +26,8 @@ sealed class AgenticCheckReport
 
     public string ClaudeFile { get; set; } = string.Empty;
 
+    public DirectiveSummary? DirectiveSummary { get; set; }
+
     public List<DirectiveReportItem> Directives { get; } = [];
 
     public List<SkillReportItem> RecommendedSkills { get; } = [];
@@ -48,6 +50,14 @@ sealed class AgenticCheckReport
 }
 
 sealed record CheckRunResult(int ExitCode, AgenticCheckReport Report);
+
+sealed record DirectiveSummary(
+    bool CreateAgentsFile,
+    bool CreateClaudeFile,
+    int RecommendedCount,
+    int MissingCount,
+    int OutdatedCount,
+    int SkippedCount);
 
 sealed record SkillReportItem(string SourceRepo, string InstallArg, string LocalFolder)
 {

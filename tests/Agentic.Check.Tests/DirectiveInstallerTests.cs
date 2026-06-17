@@ -60,7 +60,7 @@ public sealed class DirectiveInstallerTests
         Assert.Contains("Keep this.", agents, StringComparison.Ordinal);
         Assert.Contains("Body for foundation-prompt-log.", agents, StringComparison.Ordinal);
         Assert.DoesNotContain("stale", agents, StringComparison.Ordinal);
-        Assert.Contains(result.Directives, directive => directive.Name == "foundation-prompt-log" && directive.Status == "updated");
+        Assert.Contains(result.Directives, directive => directive.Name == "foundation-prompt-log" && directive.Status == DirectiveStatuses.Outdated);
     }
 
     [Fact]
@@ -140,6 +140,62 @@ public sealed class DirectiveInstallerTests
         Assert.False(File.Exists(Path.Combine(tempDirectory.Path, "AGENTS.md")));
         Assert.False(File.Exists(Path.Combine(tempDirectory.Path, "CLAUDE.md")));
         Assert.Contains(result.Actions, action => action.Contains("Would create", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task PlanReportsDirectiveSummaryCounts()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write(
+            "AGENTS.md",
+            """
+            <!-- dotnet-agentic-engineering:foundation-prompt-log:skip -->
+
+            <!-- dotnet-agentic-engineering:dotnet-cli-run:start -->
+            stale
+            <!-- dotnet-agentic-engineering:dotnet-cli-run:end -->
+            """);
+        StackDetectionResult stack = new(
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                TechnologyNames.Foundation,
+                TechnologyNames.Dotnet
+            },
+            [],
+            []);
+        DirectiveInstaller installer = new(new FakeDirectiveSource(), new NullReporter());
+
+        var plan = await installer.PlanAsync(tempDirectory.Path, stack, CancellationToken.None);
+
+        Assert.True(plan.Success);
+        Assert.Equal(2, plan.RecommendedCount);
+        Assert.Equal(0, plan.MissingCount);
+        Assert.Equal(1, plan.OutdatedCount);
+        Assert.Equal(1, plan.SkippedCount);
+    }
+
+    [Fact]
+    public async Task ApplyOnlyInstallsSelectedDirectives()
+    {
+        using TempDirectory tempDirectory = new();
+        _ = tempDirectory.CreateDirectory(".");
+        StackDetectionResult stack = new(
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                TechnologyNames.Foundation,
+                TechnologyNames.Dotnet
+            },
+            [],
+            []);
+        DirectiveInstaller installer = new(new FakeDirectiveSource(), new NullReporter());
+        var plan = await installer.PlanAsync(tempDirectory.Path, stack, CancellationToken.None);
+
+        var result = await installer.ApplyAsync(plan, ["foundation-prompt-log"], false, CancellationToken.None);
+
+        Assert.True(result.Success);
+        string agents = await File.ReadAllTextAsync(Path.Combine(tempDirectory.Path, "AGENTS.md"), CancellationToken.None);
+        Assert.Contains("dotnet-agentic-engineering:foundation-prompt-log:start", agents, StringComparison.Ordinal);
+        Assert.DoesNotContain("dotnet-agentic-engineering:dotnet-cli-run:start", agents, StringComparison.Ordinal);
     }
 
     [Fact]

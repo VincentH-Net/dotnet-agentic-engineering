@@ -68,19 +68,30 @@ sealed class FakePrompts : IUserPrompts
 {
     public bool ConfirmResult { get; init; } = true;
 
+    public IReadOnlyList<string>? SelectedDirectiveNames { get; init; }
+
+    public IReadOnlyList<string>? SelectedSkillInstallArgs { get; init; }
+
     public Task<bool> ConfirmAsync(string prompt, bool defaultValue, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         return Task.FromResult(ConfirmResult);
     }
 
-    public Task<IReadOnlyList<SkillManifestEntry>> SelectSkillsAsync(
+    public Task<RecommendationSelectionResult> SelectRecommendationsAsync(
+        IReadOnlyList<DirectivePlanItem> recommendedDirectives,
         IReadOnlyList<SkillManifestEntry> missingSkills,
-        SkillSelectionContext context,
+        RecommendationSelectionContext context,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return Task.FromResult(missingSkills);
+        var selectedDirectives = SelectedDirectiveNames is null
+            ? recommendedDirectives
+            : [.. recommendedDirectives.Where(directive => SelectedDirectiveNames.Contains(directive.Name, StringComparer.Ordinal))];
+        var selectedSkills = SelectedSkillInstallArgs is null
+            ? missingSkills
+            : [.. missingSkills.Where(skill => SelectedSkillInstallArgs.Contains(skill.InstallArg, StringComparer.Ordinal))];
+        return Task.FromResult(new RecommendationSelectionResult(selectedDirectives, selectedSkills));
     }
 }
 

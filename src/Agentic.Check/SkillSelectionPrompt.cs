@@ -15,24 +15,46 @@ enum SkillSelectionCommand
     Character
 }
 
+enum RecommendationSelectionKind
+{
+    Directive,
+    Skill
+}
+
 readonly record struct SkillSelectionInput(SkillSelectionCommand Command, char Character = '\0');
 
-sealed class SkillSelectionState(IReadOnlyList<SkillManifestEntry> skills)
-{
-    readonly IReadOnlyList<SkillManifestEntry> skills = skills;
-    readonly HashSet<string> selectedDisplays = skills.Select(skill => skill.Display).ToHashSet(StringComparer.Ordinal);
+sealed record RecommendationSelectionItem(
+    string Key,
+    string Display,
+    RecommendationSelectionKind Kind,
+    DirectivePlanItem? Directive,
+    SkillManifestEntry? Skill);
 
-    public IReadOnlyList<SkillManifestEntry> FilteredSkills { get; private set; } = skills;
+sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionItem> items)
+{
+    readonly IReadOnlyList<RecommendationSelectionItem> items = items;
+    readonly HashSet<string> selectedKeys = items.Select(item => item.Key).ToHashSet(StringComparer.Ordinal);
+
+    public IReadOnlyList<RecommendationSelectionItem> FilteredItems { get; private set; } = items;
 
     public string Filter { get; private set; } = string.Empty;
 
     public int CursorIndex { get; private set; }
 
-    public IReadOnlyList<SkillManifestEntry> SelectedSkills
-        => [.. skills.Where(skill => selectedDisplays.Contains(skill.Display))];
+    public IReadOnlyList<DirectivePlanItem> SelectedDirectives
+        => [.. items
+            .Where(item => selectedKeys.Contains(item.Key))
+            .Select(item => item.Directive)
+            .OfType<DirectivePlanItem>()];
 
-    public bool IsSelected(SkillManifestEntry skill)
-        => selectedDisplays.Contains(skill.Display);
+    public IReadOnlyList<SkillManifestEntry> SelectedSkills
+        => [.. items
+            .Where(item => selectedKeys.Contains(item.Key))
+            .Select(item => item.Skill)
+            .OfType<SkillManifestEntry>()];
+
+    public bool IsSelected(RecommendationSelectionItem item)
+        => selectedKeys.Contains(item.Key);
 
     public void Apply(SkillSelectionInput input)
     {
@@ -71,34 +93,34 @@ sealed class SkillSelectionState(IReadOnlyList<SkillManifestEntry> skills)
 
     void Move(int delta)
     {
-        if (FilteredSkills.Count == 0)
+        if (FilteredItems.Count == 0)
         {
             CursorIndex = 0;
             return;
         }
 
-        CursorIndex = Math.Clamp(CursorIndex + delta, 0, FilteredSkills.Count - 1);
+        CursorIndex = Math.Clamp(CursorIndex + delta, 0, FilteredItems.Count - 1);
     }
 
     void ToggleCurrent()
     {
-        if (FilteredSkills.Count == 0)
+        if (FilteredItems.Count == 0)
         {
             return;
         }
 
-        string display = FilteredSkills[CursorIndex].Display;
-        if (!selectedDisplays.Remove(display))
+        string key = FilteredItems[CursorIndex].Key;
+        if (!selectedKeys.Remove(key))
         {
-            _ = selectedDisplays.Add(display);
+            _ = selectedKeys.Add(key);
         }
     }
 
     void SetAllSelection(bool selected)
     {
-        foreach (var skill in skills)
+        foreach (var item in items)
         {
-            _ = selected ? selectedDisplays.Add(skill.Display) : selectedDisplays.Remove(skill.Display);
+            _ = selected ? selectedKeys.Add(item.Key) : selectedKeys.Remove(item.Key);
         }
     }
 
@@ -121,28 +143,30 @@ sealed class SkillSelectionState(IReadOnlyList<SkillManifestEntry> skills)
     void SetFilter(string filter)
     {
         Filter = filter;
-        FilteredSkills = string.IsNullOrWhiteSpace(Filter)
-            ? skills
-            : [.. skills.Where(skill => skill.Display.Contains(Filter, StringComparison.OrdinalIgnoreCase))];
-        CursorIndex = Math.Min(CursorIndex, Math.Max(FilteredSkills.Count - 1, 0));
+        FilteredItems = string.IsNullOrWhiteSpace(Filter)
+            ? items
+            : [.. items.Where(item => item.Display.Contains(Filter, StringComparison.OrdinalIgnoreCase))];
+        CursorIndex = Math.Min(CursorIndex, Math.Max(FilteredItems.Count - 1, 0));
     }
 }
 
-sealed class SkillSelectionPrompt(IAnsiConsole console)
+sealed class RecommendationSelectionPrompt(IAnsiConsole console)
 {
     const int PageSize = 20;
     int previousRenderLineCount;
 
-    public async Task<IReadOnlyList<SkillManifestEntry>> PromptAsync(
+    public async Task<RecommendationSelectionResult> PromptAsync(
+        IReadOnlyList<DirectivePlanItem> recommendedDirectives,
         IReadOnlyList<SkillManifestEntry> missingSkills,
-        SkillSelectionContext context,
+        RecommendationSelectionContext context,
         CancellationToken cancellationToken)
     {
-        var state = new SkillSelectionState(missingSkills);
+        var items = BuildItems(recommendedDirectives, missingSkills);
+        RecommendationSelectionState state = new(items);
 
         while (true)
         {
-            Render(missingSkills.Count, state, context);
+            Render(items.Count, state, context);
             var key = await console.Input.ReadKeyAsync(true, cancellationToken).ConfigureAwait(false);
             if (key is null)
             {
@@ -152,11 +176,31 @@ sealed class SkillSelectionPrompt(IAnsiConsole console)
             var input = MapKey(key.Value);
             if (input.Command == SkillSelectionCommand.Confirm)
             {
-                return state.SelectedSkills;
+                return new RecommendationSelectionResult(state.SelectedDirectives, state.SelectedSkills);
             }
 
             state.Apply(input);
         }
+    }
+
+    static List<RecommendationSelectionItem> BuildItems(
+        IReadOnlyList<DirectivePlanItem> recommendedDirectives,
+        IReadOnlyList<SkillManifestEntry> missingSkills)
+    {
+        List<RecommendationSelectionItem> items = [];
+        items.AddRange(recommendedDirectives.Select(directive => new RecommendationSelectionItem(
+            $"directive:{directive.Name}",
+            $"{directive.Name} ({directive.Status})",
+            RecommendationSelectionKind.Directive,
+            directive,
+            null)));
+        items.AddRange(missingSkills.Select(skill => new RecommendationSelectionItem(
+            $"skill:{skill.SourceRepo}:{skill.InstallArg}",
+            skill.Display,
+            RecommendationSelectionKind.Skill,
+            null,
+            skill)));
+        return items;
     }
 
     static SkillSelectionInput MapKey(ConsoleKeyInfo key)
@@ -173,7 +217,7 @@ sealed class SkillSelectionPrompt(IAnsiConsole console)
             _ => new(SkillSelectionCommand.Character, key.KeyChar)
         };
 
-    void Render(int missingSkillCount, SkillSelectionState state, SkillSelectionContext context)
+    void Render(int itemCount, RecommendationSelectionState state, RecommendationSelectionContext context)
     {
         if (previousRenderLineCount > 0 && !Console.IsOutputRedirected)
         {
@@ -196,7 +240,7 @@ sealed class SkillSelectionPrompt(IAnsiConsole console)
         console.MarkupLineInterpolated($"Install target: [grey]{Markup.Escape(context.Parameter)}[/]");
         lineCount++;
         EmptyLine();
-        console.MarkupLineInterpolated($"Found {missingSkillCount} recommended skills missing, select skill(s) to install:");
+        console.MarkupLineInterpolated($"Found {itemCount} recommended item(s), select directive(s) and skill(s) to apply:");
         lineCount++;
         MarkupLine("[grey][[Use arrows to move, space to select, <right> to all, <left> to none, type to filter]][/]");
 
@@ -206,29 +250,36 @@ sealed class SkillSelectionPrompt(IAnsiConsole console)
             lineCount++;
         }
 
-        if (state.FilteredSkills.Count == 0)
+        if (state.FilteredItems.Count == 0)
         {
-            MarkupLine("[grey]No skills match the current filter.[/]");
+            MarkupLine("[grey]No recommendations match the current filter.[/]");
             ClearTrailingLines(lineCount);
             previousRenderLineCount = lineCount;
             return;
         }
 
-        int startIndex = Math.Max(0, Math.Min(state.CursorIndex - PageSize + 1, state.FilteredSkills.Count - PageSize));
-        IReadOnlyList<SkillManifestEntry> visibleSkills = [.. state.FilteredSkills.Skip(startIndex).Take(PageSize)];
-        for (int index = 0; index < visibleSkills.Count; index++)
+        int startIndex = Math.Max(0, Math.Min(state.CursorIndex - PageSize + 1, state.FilteredItems.Count - PageSize));
+        IReadOnlyList<RecommendationSelectionItem> visibleItems = [.. state.FilteredItems.Skip(startIndex).Take(PageSize)];
+        RecommendationSelectionKind? lastKind = null;
+        for (int index = 0; index < visibleItems.Count; index++)
         {
-            var skill = visibleSkills[index];
+            var item = visibleItems[index];
+            if (item.Kind != lastKind)
+            {
+                MarkupLine($"[bold]{(item.Kind == RecommendationSelectionKind.Directive ? "Directives" : "Skills")}[/]");
+                lastKind = item.Kind;
+            }
+
             string cursor = startIndex + index == state.CursorIndex ? ">" : " ";
-            string check = state.IsSelected(skill) ? "[[x]]" : "[[ ]]";
-            string display = Markup.Escape(skill.Display);
+            string check = state.IsSelected(item) ? "[[x]]" : "[[ ]]";
+            string display = Markup.Escape(item.Display);
             console.MarkupLine($"{cursor} {check} {display}");
             lineCount++;
         }
 
-        if (state.FilteredSkills.Count > PageSize)
+        if (state.FilteredItems.Count > PageSize)
         {
-            console.MarkupLineInterpolated($"[grey]Showing {PageSize} of {state.FilteredSkills.Count} matches.[/]");
+            console.MarkupLineInterpolated($"[grey]Showing {PageSize} of {state.FilteredItems.Count} matches.[/]");
             lineCount++;
         }
 

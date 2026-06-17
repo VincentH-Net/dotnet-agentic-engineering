@@ -3,57 +3,72 @@
 public sealed class SkillSelectionStateTests
 {
     [Fact]
-    public void StartsWithAllSkillsSelected()
+    public void StartsWithAllRecommendationsSelected()
     {
-        SkillSelectionState state = new(CreateSkills("alpha", "beta"));
+        RecommendationSelectionState state = new(CreateItems(["foundation-prompt-log"], ["alpha", "beta"]));
 
+        Assert.Equal(["foundation-prompt-log"], state.SelectedDirectives.Select(directive => directive.Name));
         Assert.Equal(["alpha", "beta"], state.SelectedSkills.Select(skill => skill.LocalFolder));
     }
 
     [Fact]
-    public void RightSelectsAllSkills()
+    public void RightSelectsAllRecommendations()
     {
-        SkillSelectionState state = new(CreateSkills("alpha", "beta", "gamma"));
+        RecommendationSelectionState state = new(CreateItems(["foundation-prompt-log"], ["alpha", "beta", "gamma"]));
         state.Apply(new SkillSelectionInput(SkillSelectionCommand.SelectNone));
         state.Apply(new SkillSelectionInput(SkillSelectionCommand.Character, 'g'));
         state.Apply(new SkillSelectionInput(SkillSelectionCommand.SelectAll));
 
+        Assert.Equal(["foundation-prompt-log"], state.SelectedDirectives.Select(directive => directive.Name));
         Assert.Equal(["alpha", "beta", "gamma"], state.SelectedSkills.Select(skill => skill.LocalFolder));
     }
 
     [Fact]
-    public void LeftClearsAllSkills()
+    public void LeftClearsAllRecommendations()
     {
-        SkillSelectionState state = new(CreateSkills("alpha", "beta", "gamma"));
+        RecommendationSelectionState state = new(CreateItems(["foundation-prompt-log"], ["alpha", "beta", "gamma"]));
         state.Apply(new SkillSelectionInput(SkillSelectionCommand.Character, 'g'));
         state.Apply(new SkillSelectionInput(SkillSelectionCommand.SelectNone));
 
+        Assert.Empty(state.SelectedDirectives);
         Assert.Empty(state.SelectedSkills);
     }
 
     [Fact]
     public void TypingFiltersByDisplay()
     {
-        SkillSelectionState state = new(CreateSkills("uno-mvvm", "dotnet-livecharts2"));
+        RecommendationSelectionState state = new(CreateItems([], ["uno-mvvm", "dotnet-livecharts2"]));
         state.Apply(new SkillSelectionInput(SkillSelectionCommand.Character, 'u'));
         state.Apply(new SkillSelectionInput(SkillSelectionCommand.Character, 'n'));
         state.Apply(new SkillSelectionInput(SkillSelectionCommand.Character, 'o'));
 
-        var filteredSkill = Assert.Single(state.FilteredSkills);
-        Assert.Equal("uno-mvvm", filteredSkill.LocalFolder);
+        var filteredItem = Assert.Single(state.FilteredItems);
+        Assert.Equal("uno-mvvm", filteredItem.Skill?.LocalFolder);
     }
 
     [Fact]
     public void BackspaceUpdatesFilter()
     {
-        SkillSelectionState state = new(CreateSkills("uno-mvvm", "dotnet-livecharts2"));
+        RecommendationSelectionState state = new(CreateItems([], ["uno-mvvm", "dotnet-livecharts2"]));
         state.Apply(new SkillSelectionInput(SkillSelectionCommand.Character, 'u'));
         state.Apply(new SkillSelectionInput(SkillSelectionCommand.Backspace));
 
         Assert.Equal(string.Empty, state.Filter);
-        Assert.Equal(2, state.FilteredSkills.Count);
+        Assert.Equal(2, state.FilteredItems.Count);
     }
 
-    static IReadOnlyList<SkillManifestEntry> CreateSkills(params string[] names)
-        => [.. names.Select(name => new SkillManifestEntry("owner/repo", name, name, TechnologyNames.Dotnet, []))];
+    static IReadOnlyList<RecommendationSelectionItem> CreateItems(string[] directiveNames, string[] skillNames)
+        => [.. directiveNames
+            .Select(name => new RecommendationSelectionItem(
+                $"directive:{name}",
+                $"{name} ({DirectiveStatuses.Missing})",
+                RecommendationSelectionKind.Directive,
+                new DirectivePlanItem(name, DirectiveStatuses.Missing, $"content {name}"),
+                null))
+            .Concat(skillNames.Select(name => new RecommendationSelectionItem(
+                $"skill:owner/repo:{name}",
+                $"owner/repo {name}",
+                RecommendationSelectionKind.Skill,
+                null,
+                new SkillManifestEntry("owner/repo", name, name, TechnologyNames.Dotnet, []))))];
 }
