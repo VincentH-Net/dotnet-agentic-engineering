@@ -64,7 +64,7 @@ public sealed class DirectiveInstallerTests
     }
 
     [Fact]
-    public async Task SkipMarkerPreventsDirectiveBlockChange()
+    public async Task SkipMarkerDoesNotPreventDirectiveBlockChange()
     {
         using TempDirectory tempDirectory = new();
         tempDirectory.Write(
@@ -87,8 +87,8 @@ public sealed class DirectiveInstallerTests
         Assert.True(result.Success);
         string agents = await File.ReadAllTextAsync(Path.Combine(tempDirectory.Path, "AGENTS.md"), CancellationToken.None);
         Assert.Contains("User owns this directive.", agents, StringComparison.Ordinal);
-        Assert.DoesNotContain("Body for foundation-prompt-log.", agents, StringComparison.Ordinal);
-        Assert.Contains(result.Directives, directive => directive.Name == "foundation-prompt-log" && directive.Status == "skipped");
+        Assert.Contains("Body for foundation-prompt-log.", agents, StringComparison.Ordinal);
+        Assert.Contains(result.Directives, directive => directive.Name == "foundation-prompt-log" && directive.Status == DirectiveStatuses.Missing);
     }
 
     [Fact]
@@ -169,9 +169,8 @@ public sealed class DirectiveInstallerTests
 
         Assert.True(plan.Success);
         Assert.Equal(2, plan.RecommendedCount);
-        Assert.Equal(0, plan.MissingCount);
+        Assert.Equal(1, plan.MissingCount);
         Assert.Equal(1, plan.OutdatedCount);
-        Assert.Equal(1, plan.SkippedCount);
     }
 
     [Fact]

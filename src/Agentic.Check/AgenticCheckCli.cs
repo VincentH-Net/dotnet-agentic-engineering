@@ -21,17 +21,17 @@ static class AgenticCheckCli
         Option<DirectoryInfo?> skillsDirectoryOption = new("--skills-dir", "Repo-local skills directory. Overrides --agents. Example: for Claude Code, use '.claude/skills'.");
         Option<string?> agentsOption = new(
             "--agents",
-            $"Comma-separated additional agent values for non-standard skill folders. {AgentSkillRegistry.StandardProjectDirectory} is always installed. Defaults to {AgentSkillRegistry.DefaultAgents}. Standard-path agents: {AgentSkillRegistry.StandardAgentNames}. Additional agent values: {AgentSkillRegistry.AdditionalAgentIds}.");
+            $"Comma-separated agent values to install. Defaults to {AgentSkillRegistry.DefaultAgents}. Use {AgentSkillRegistry.StandardAgentId} for {AgentSkillRegistry.StandardProjectDirectory}; standard-path agents: {AgentSkillRegistry.StandardAgentNames}. Other valid agent values: {AgentSkillRegistry.AgentIds}.");
         Option<bool> verboseOption = new("--verbose", "Include detailed command and scan information.");
 
         RootCommand rootCommand = new("Check and install recommended agentic engineering directives and skills.")
         {
             targetDirectoryArgument,
+            agentsOption,
+            skillsDirectoryOption,
             dryRunOption,
             yesOption,
             reportOption,
-            skillsDirectoryOption,
-            agentsOption,
             verboseOption
         };
 

@@ -68,7 +68,7 @@ public sealed class WorkflowTests
         CheckWorkflow workflow = new(commandRunner, new FakePrompts(), new NullReporter(), new FakeDirectiveSource());
 
         var result = await workflow.RunAsync(
-            new AgenticCheckOptions(tempDirectory.Path, true, false, null, null, "claude-code,trae,trae-cn", false),
+            new AgenticCheckOptions(tempDirectory.Path, true, false, null, null, "standard,claude-code,trae,trae-cn", false),
             CancellationToken.None);
 
         Assert.Equal(0, result.ExitCode);
@@ -115,7 +115,31 @@ public sealed class WorkflowTests
     }
 
     [Fact]
-    public async Task StandardPathAgentProducesValidationError()
+    public async Task StandardAgentOnlyUsesStandardDirectoryAndDoesNotManageClaude()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
+        tempDirectory.Write("App.csproj", "<Project />");
+        FakeCommandRunner commandRunner = new();
+        commandRunner.Enqueue(new CommandResult(0, "git version 2.50.0", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
+        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), new NullReporter(), new FakeDirectiveSource());
+
+        var result = await workflow.RunAsync(
+            new AgenticCheckOptions(tempDirectory.Path, true, false, null, null, "standard", false),
+            CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Equal([Path.Combine(tempDirectory.Path, ".agents", "skills")], result.Report.SkillsDirectories);
+        Assert.False(result.Report.DirectiveSummary?.CreateClaudeFile);
+        Assert.Equal(string.Empty, result.Report.ClaudeFile);
+        Assert.DoesNotContain(result.Report.Actions, action => action.Contains("CLAUDE", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task StandardPathAgentValueMapsToStandardDirectory()
     {
         using TempDirectory tempDirectory = new();
         tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
@@ -131,7 +155,35 @@ public sealed class WorkflowTests
             new AgenticCheckOptions(tempDirectory.Path, true, false, null, null, "codex", false),
             CancellationToken.None);
 
-        Assert.Equal(2, result.ExitCode);
+        Assert.Equal(0, result.ExitCode);
+        Assert.Equal([Path.Combine(tempDirectory.Path, ".agents", "skills")], result.Report.SkillsDirectories);
+        Assert.False(result.Report.DirectiveSummary?.CreateClaudeFile);
+    }
+
+    [Fact]
+    public async Task StandardAgentOnlyDoesNotCreateClaudeFile()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
+        FakeCommandRunner commandRunner = new();
+        commandRunner.Enqueue(new CommandResult(0, "git version 2.50.0", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "no updates", string.Empty));
+        CheckWorkflow workflow = new(
+            commandRunner,
+            new FakePrompts { ConfirmResult = false },
+            new NullReporter(),
+            new FakeDirectiveSource());
+
+        var result = await workflow.RunAsync(
+            new AgenticCheckOptions(tempDirectory.Path, false, false, null, null, "standard", false),
+            CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.True(File.Exists(Path.Combine(tempDirectory.Path, "AGENTS.md")));
+        Assert.False(File.Exists(Path.Combine(tempDirectory.Path, "CLAUDE.md")));
     }
 
     [Fact]

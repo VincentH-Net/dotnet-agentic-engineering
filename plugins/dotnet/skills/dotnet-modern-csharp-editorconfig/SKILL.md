@@ -117,9 +117,8 @@ dotnet new mcs-editorconfig -s
 ## 7. Build diagnostic handling
 
 Before building, check whether `AGENTS.md` or `AGENTS.MD` in the current working folder contains
-`<!-- dotnet-agentic-engineering:dotnet-build-errors-and-warnings:start -->` or
-`<!-- dotnet-agentic-engineering:dotnet-build-errors-and-warnings:skip -->`.
-If neither marker is present, use the `ensure-directives` skill first.
+`<!-- dotnet-agentic-engineering:dotnet-build-errors-and-warnings:start -->`.
+If the marker is not present, use the `ensure-directives` skill first.
 
 Use the installed `dotnet-build-errors-and-warnings` directive for build verification and diagnostic fixes.
 That directive governs when to run `dotnet format`, how to fix build errors and warnings, and when suppressions are allowed.

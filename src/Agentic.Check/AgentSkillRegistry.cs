@@ -4,13 +4,15 @@ sealed record AgentSkillHost(string Id, string Name, string ProjectDirectory);
 
 static class AgentSkillRegistry
 {
-    public const string DefaultAgents = "claude-code";
+    public const string DefaultAgents = "standard,claude-code";
+    public const string StandardAgentId = "standard";
     public const string StandardProjectDirectory = ".agents/skills";
+    public const string ClaudeCodeAgentId = "claude-code";
 
     static readonly IReadOnlyList<AgentSkillHost> Hosts =
     [
         new("github-copilot", "GitHub Copilot", StandardProjectDirectory),
-        new("claude-code", "Claude Code", ".claude/skills"),
+        new(ClaudeCodeAgentId, "Claude Code", ".claude/skills"),
         new("cursor", "Cursor", StandardProjectDirectory),
         new("codex", "Codex", StandardProjectDirectory),
         new("gemini-cli", "Gemini CLI", StandardProjectDirectory),
@@ -63,8 +65,7 @@ static class AgentSkillRegistry
         .Where(IsStandardPath)
         .Select(host => host.Name));
 
-    public static string AdditionalAgentIds => string.Join(", ", Hosts
-        .Where(IsAdditionalAgentPath)
+    public static string AgentIds => string.Join(", ", Hosts
         .Select(host => host.Id));
 
     public static AgentDirectoryResolution ResolveProjectDirectories(
@@ -75,43 +76,39 @@ static class AgentSkillRegistry
         string[] agentIds = [.. value
             .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
             .Distinct(StringComparer.OrdinalIgnoreCase)];
+        if (agentIds.Length == 0)
+        {
+            return AgentDirectoryResolution.Invalid(
+                $"No agent values were specified. Valid values: {StandardAgentId}, {AgentIds}.");
+        }
 
         List<string> unknownAgents = [];
-        List<string> standardAgents = [];
         List<string> directories = [];
         HashSet<string> seenDirectories = new(StringComparer.OrdinalIgnoreCase);
-        AddDirectory(Path.GetFullPath(Path.Combine(repoRoot, StandardProjectDirectory)));
+        bool manageClaude = false;
 
         foreach (string agentId in agentIds)
         {
+            if (agentId.Equals(StandardAgentId, StringComparison.OrdinalIgnoreCase))
+            {
+                AddDirectory(Path.GetFullPath(Path.Combine(repoRoot, StandardProjectDirectory)));
+                continue;
+            }
+
             if (!HostsById.TryGetValue(agentId, out var host))
             {
                 unknownAgents.Add(agentId);
                 continue;
             }
 
-            if (IsStandardPath(host))
-            {
-                standardAgents.Add(agentId);
-                continue;
-            }
-
             AddDirectory(Path.GetFullPath(Path.Combine(repoRoot, host.ProjectDirectory)));
+            manageClaude |= host.Id.Equals(ClaudeCodeAgentId, StringComparison.OrdinalIgnoreCase);
         }
 
-        if (unknownAgents.Count > 0)
-        {
-            return AgentDirectoryResolution.Invalid(
-                $"Unknown additional agent value(s): {string.Join(", ", unknownAgents)}. Valid values: {AdditionalAgentIds}.");
-        }
-
-        if (standardAgents.Count > 0)
-        {
-            return AgentDirectoryResolution.Invalid(
-                $"Agent value(s) already use {StandardProjectDirectory} and should not be specified with --agents: {string.Join(", ", standardAgents)}. Use --agents only for additional non-standard agent paths. Valid values: {AdditionalAgentIds}.");
-        }
-
-        return AgentDirectoryResolution.Valid(directories);
+        return unknownAgents.Count > 0
+            ? AgentDirectoryResolution.Invalid(
+                $"Unknown agent value(s): {string.Join(", ", unknownAgents)}. Valid values: {StandardAgentId}, {AgentIds}.")
+            : AgentDirectoryResolution.Valid(directories, manageClaude);
 
         void AddDirectory(string directory)
         {
@@ -124,19 +121,17 @@ static class AgentSkillRegistry
 
     static bool IsStandardPath(AgentSkillHost host)
         => host.ProjectDirectory.Equals(StandardProjectDirectory, StringComparison.OrdinalIgnoreCase);
-
-    static bool IsAdditionalAgentPath(AgentSkillHost host)
-        => !IsStandardPath(host);
 }
 
 sealed record AgentDirectoryResolution(
     bool Success,
     IReadOnlyList<string> Directories,
+    bool ManageClaude,
     string? Error)
 {
-    public static AgentDirectoryResolution Valid(IReadOnlyList<string> directories)
-        => new(true, directories, null);
+    public static AgentDirectoryResolution Valid(IReadOnlyList<string> directories, bool manageClaude)
+        => new(true, directories, manageClaude, null);
 
     public static AgentDirectoryResolution Invalid(string error)
-        => new(false, [], error);
+        => new(false, [], false, error);
 }

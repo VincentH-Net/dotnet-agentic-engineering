@@ -63,9 +63,31 @@ sealed class CheckWorkflow(
             reporter.Warning(warning);
         }
 
+        IReadOnlyList<string> skillsDirectories;
+        bool manageClaudeFile;
+        if (options.SkillsDirectory is { Length: > 0 })
+        {
+            string skillsDirectory = Path.GetFullPath(options.SkillsDirectory);
+            skillsDirectories = [skillsDirectory];
+            manageClaudeFile = IsClaudeSkillsDirectory(skillsDirectory);
+        }
+        else
+        {
+            var directoryResolution = AgentSkillRegistry.ResolveProjectDirectories(options.Agents, repoResolution.RepoRoot);
+            if (!directoryResolution.Success)
+            {
+                reporter.Error(directoryResolution.Error ?? "Could not resolve agent skill directories.");
+                await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
+                return new CheckRunResult(2, report);
+            }
+
+            skillsDirectories = directoryResolution.Directories;
+            manageClaudeFile = directoryResolution.ManageClaude;
+        }
+
         DirectiveInstaller directiveInstaller = new(directiveSource ?? new GitHubDirectiveSource(), reporter);
         var directivePlan = await directiveInstaller
-            .PlanAsync(repoResolution.RepoRoot, stack, cancellationToken)
+            .PlanAsync(repoResolution.RepoRoot, stack, manageClaudeFile, cancellationToken)
             .ConfigureAwait(false);
         report.AgentsFile = directivePlan.AgentsFile;
         report.ClaudeFile = directivePlan.ClaudeFile;
@@ -81,27 +103,8 @@ sealed class CheckWorkflow(
             directivePlan.CreateClaudeFile,
             directivePlan.RecommendedCount,
             directivePlan.MissingCount,
-            directivePlan.OutdatedCount,
-            directivePlan.SkippedCount);
+            directivePlan.OutdatedCount);
         report.DirectiveSummary = directiveSummary;
-
-        IReadOnlyList<string> skillsDirectories;
-        if (options.SkillsDirectory is { Length: > 0 })
-        {
-            skillsDirectories = [Path.GetFullPath(options.SkillsDirectory)];
-        }
-        else
-        {
-            var directoryResolution = AgentSkillRegistry.ResolveProjectDirectories(options.Agents, repoResolution.RepoRoot);
-            if (!directoryResolution.Success)
-            {
-                reporter.Error(directoryResolution.Error ?? "Could not resolve agent skill directories.");
-                await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
-                return new CheckRunResult(2, report);
-            }
-
-            skillsDirectories = directoryResolution.Directories;
-        }
 
         string firstSkillsDirectory = skillsDirectories[0];
         report.SkillsDirectory = firstSkillsDirectory;
@@ -275,5 +278,13 @@ sealed class CheckWorkflow(
 
         string json = JsonSerializer.Serialize(report, ReportSerializerOptions);
         await File.WriteAllTextAsync(fullPath, json, cancellationToken).ConfigureAwait(false);
+    }
+
+    static bool IsClaudeSkillsDirectory(string skillsDirectory)
+    {
+        string[] parts = skillsDirectory.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        return parts.Length >= 2
+            && parts[^2].Equals(".claude", StringComparison.OrdinalIgnoreCase)
+            && parts[^1].Equals("skills", StringComparison.OrdinalIgnoreCase);
     }
 }

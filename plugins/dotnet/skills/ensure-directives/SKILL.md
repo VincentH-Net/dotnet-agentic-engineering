@@ -11,7 +11,7 @@ metadata:
 
 # Ensure Directives
 
-Use this skill to prepare a working folder's CLAUDE.md and AGENTS.md. It ensures that CLAUDE.md refers to AGENTS.md, detects which directives from the public `dotnet-agentic-engineering` repository are relevant to the tech stack in the working folder, and inserts or refreshes them in `AGENTS.md`. The directives have stable markers so they can be updated without disrupting user content. You can also put skip markers in AGENTS.md to exclude specific directives if you do not want them.
+Use this skill to prepare a working folder's CLAUDE.md and AGENTS.md. It ensures that CLAUDE.md refers to AGENTS.md, detects which directives from the public `dotnet-agentic-engineering` repository are relevant to the tech stack in the working folder, and inserts or refreshes them in `AGENTS.md`. The directives have stable markers so they can be updated without disrupting user content.
 
 Run this skill from the target repository root. If the current working folder is a subfolder, first identify the repository root and use that as the working folder for all detection and file edits.
 
@@ -44,19 +44,19 @@ Start from the public directives folder listing via the GitHub Contents API:
    - Prefer an existing `AGENTS.md` or `AGENTS.MD`; otherwise create `AGENTS.md`.
    - Prefer an existing `CLAUDE.md` or `CLAUDE.MD`; otherwise create `CLAUDE.md`.
 8. Ensure the CLAUDE file has exactly one import line for the selected AGENTS file, for example `@AGENTS.md`. If the selected AGENTS file uses different casing, adapt the import line to that exact filename. If a matching AGENTS import already exists, update it if needed instead of adding a duplicate.
-9. For each extracted directive block: IF AGENTS does NOT contain `<!-- dotnet-agentic-engineering:<directive-name>:skip -->`, insert or refresh the block in AGENTS using the stable markers:
+9. For each extracted directive block, insert or refresh the block in AGENTS using the stable markers:
    - IF exactly one block with the same directive name already exists, replace it with the newly fetched block.
    - IF no block with the same directive name exists, append the new block to the end of the file.
    - IF multiple blocks with the same directive name exist, or only one of the start/end markers exists, stop and tell the user which directive marker is inconsistent.
 10. Preserve any user-authored content outside managed marker blocks.
-11. Report which directives were skipped / added / updated.
+11. Report which directives were added / updated.
 
 ## Validation
 
 After editing:
 
 - Confirm the AGENTS file exists.
-- Confirm it contains either a managed block or a skip marker for each extracted directive.
+- Confirm it contains a managed block for each extracted directive.
 - Confirm the Claude file exists.
 - Confirm the Claude file imports the selected AGENTS file.
 - Tell the user to restart the agent harness from the working folder so the updated startup instructions are loaded.

@@ -98,7 +98,6 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
         _ = table.AddRow("Recommended directives", directiveSummary.RecommendedCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
         _ = table.AddRow("Missing directives", directiveSummary.MissingCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
         _ = table.AddRow("Outdated directives", directiveSummary.OutdatedCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        _ = table.AddRow("Skipped directives", directiveSummary.SkippedCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
         _ = table.AddRow("Recommended skills", recommendedCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
         _ = table.AddRow("Missing skills", missingCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
         console.Write(table);

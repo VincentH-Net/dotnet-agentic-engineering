@@ -56,8 +56,7 @@ sealed record DirectiveSummary(
     bool CreateClaudeFile,
     int RecommendedCount,
     int MissingCount,
-    int OutdatedCount,
-    int SkippedCount);
+    int OutdatedCount);
 
 sealed record SkillReportItem(string SourceRepo, string InstallArg, string LocalFolder)
 {
