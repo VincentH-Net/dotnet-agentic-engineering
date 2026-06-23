@@ -62,8 +62,24 @@ public sealed class SkillSelectionStateTests
     {
         SkillManifestEntry skill = new("owner/repo", "missing-skill", "missing-skill", TechnologyNames.Dotnet, []);
 
-        Assert.Equal("missing-skill", RecommendationSelectionPrompt.FormatSkillListItem(skill));
+        Assert.Equal("missing-skill (install)", RecommendationSelectionPrompt.FormatSkillListItem(skill));
         Assert.Equal("owner/repo", RecommendationSelectionPrompt.FormatSkillSourceHeader(skill));
+    }
+
+    [Fact]
+    public void RecommendationPromptHeadingUsesActionWording()
+        => Assert.Equal(
+            "Recommend 3 action(s), select which to apply:",
+            RecommendationSelectionPrompt.FormatRecommendationPromptHeading(3));
+
+    [Fact]
+    public void DirectiveListItemUsesActionText()
+    {
+        DirectivePlanItem missing = new("dotnet-cli-run", DirectiveStatuses.Missing, "content");
+        DirectivePlanItem update = new("dotnet-build-errors-and-warnings", DirectiveStatuses.Outdated, "content");
+
+        Assert.Equal("dotnet-cli-run (install)", RecommendationSelectionPrompt.FormatDirectiveListItem(missing));
+        Assert.Equal("dotnet-build-errors-and-warnings (update)", RecommendationSelectionPrompt.FormatDirectiveListItem(update));
     }
 
     [Fact]

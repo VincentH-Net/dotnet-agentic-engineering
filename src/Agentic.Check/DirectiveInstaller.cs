@@ -182,14 +182,6 @@ sealed partial class DirectiveInstaller(IDirectiveSource source, IReporter repor
                     .ConfigureAwait(false);
             }
 
-            if (!dryRun)
-            {
-                foreach (var directive in directiveReports)
-                {
-                    reporter.Info($"Directive {directive.Name}: {FormatDirectiveStatus(directive.Status)}");
-                }
-            }
-
             return new DirectiveResult(true, plan.AgentsFile, plan.ClaudeFile, directiveReports, actions, null);
         }
         catch (DirectiveException exception)

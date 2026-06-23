@@ -255,7 +255,49 @@ public sealed class WorkflowTests
     }
 
     [Fact]
-    public async Task SkillUpdatePromptRunsScopedUpdateForEachSkillsDirectoryAndShowsOutput()
+    public async Task NormalRunReportsUpToDateItemsAsDisplayOnlySections()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
+        tempDirectory.Write("App.csproj", "<Project />");
+        tempDirectory.Write(
+            "AGENTS.md",
+            """
+            <!-- dotnet-agentic-engineering:foundation-prompt-log:start -->
+            ## foundation-prompt-log
+            Body for foundation-prompt-log.
+            <!-- dotnet-agentic-engineering:foundation-prompt-log:end -->
+            """);
+        tempDirectory.Write(".agents/skills/dotnet-livecharts2/SKILL.md", "# Present");
+        tempDirectory.Write(".agents/skills/dotnet-modern-csharp-editorconfig/SKILL.md", "# Present");
+        tempDirectory.Write(".claude/skills/dotnet-livecharts2/SKILL.md", "# Present");
+        tempDirectory.Write(".claude/skills/dotnet-modern-csharp-editorconfig/SKILL.md", "# Present");
+        FakeCommandRunner commandRunner = new();
+        commandRunner.Enqueue(new CommandResult(0, "git version 2.50.0", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "No updates available.", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "No updates available.", string.Empty));
+        RecordingReporter reporter = new();
+        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), reporter, new FakeDirectiveSource());
+
+        var result = await workflow.RunAsync(
+            new AgenticCheckOptions(tempDirectory.Path, false, false, null, null, null, false),
+            CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("Up to date directives:", reporter.Infos);
+        Assert.Contains("  ✓ foundation-prompt-log", reporter.Infos);
+        Assert.Contains("Up to date skills:", reporter.Infos);
+        Assert.Contains("  VincentH-Net/dotnet-agentic-engineering:", reporter.Infos);
+        Assert.Contains("    ✓ dotnet-livecharts2", reporter.Infos);
+        Assert.Contains("    ✓ dotnet-modern-csharp-editorconfig", reporter.Infos);
+        Assert.DoesNotContain(reporter.Infos, message => message.StartsWith("Directive ", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task SkillUpdatePromptRunsScopedUpdateForEachSkillsDirectoryAndShowsSummary()
     {
         using TempDirectory tempDirectory = new();
         tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
@@ -264,10 +306,22 @@ public sealed class WorkflowTests
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
-        commandRunner.Enqueue(new CommandResult(0, "Would update agents skill", string.Empty));
-        commandRunner.Enqueue(new CommandResult(0, "Would update claude skill", string.Empty));
-        commandRunner.Enqueue(new CommandResult(0, "agents updated", string.Empty));
-        commandRunner.Enqueue(new CommandResult(0, "claude updated", "claude warning"));
+        commandRunner.Enqueue(new CommandResult(
+            0,
+            """
+              • dotnet-livecharts2 (VincentH-Net/dotnet-agentic-engineering) 52b04c64 > c9fa2d43 [1.2.0]
+              1 update(s) available:
+            """,
+            string.Empty));
+        commandRunner.Enqueue(new CommandResult(
+            0,
+            """
+              • dotnet-livecharts2 (VincentH-Net/dotnet-agentic-engineering) 52b04c64 > c9fa2d43 [1.2.0]
+              1 update(s) available:
+            """,
+            string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, string.Empty, "1 update(s) available:"));
+        commandRunner.Enqueue(new CommandResult(0, string.Empty, "1 update(s) available:"));
         FakePrompts prompts = new() { ConfirmResult = true };
         RecordingReporter reporter = new();
         CheckWorkflow workflow = new(commandRunner, prompts, reporter, new FakeDirectiveSource());
@@ -277,24 +331,25 @@ public sealed class WorkflowTests
             CancellationToken.None);
 
         Assert.Equal(0, result.ExitCode);
-        Assert.Contains("Update these skills?", prompts.ConfirmPrompts);
+        Assert.Contains("Update these skill(s)?", prompts.ConfirmPrompts);
         string agentsSkillsDirectory = Path.Combine(tempDirectory.Path, ".agents", "skills");
         string claudeSkillsDirectory = Path.Combine(tempDirectory.Path, ".claude", "skills");
         Assert.Contains(commandRunner.Calls, call => call.Arguments.SequenceEqual(["skill", "update", "--dir", agentsSkillsDirectory, "--all", "--dry-run"]));
         Assert.Contains(commandRunner.Calls, call => call.Arguments.SequenceEqual(["skill", "update", "--dir", claudeSkillsDirectory, "--all", "--dry-run"]));
         Assert.Contains(commandRunner.Calls, call => call.Arguments.SequenceEqual(["skill", "update", "--dir", agentsSkillsDirectory, "--all"]));
         Assert.Contains(commandRunner.Calls, call => call.Arguments.SequenceEqual(["skill", "update", "--dir", claudeSkillsDirectory, "--all"]));
-        Assert.Contains(reporter.Infos, message => message.Contains("Skills in", StringComparison.Ordinal)
+        Assert.Contains("Found 1 skill update(s) available:", reporter.Infos);
+        Assert.Contains(string.Empty, reporter.Infos);
+        Assert.Contains("  VincentH-Net/dotnet-agentic-engineering:", reporter.Infos);
+        Assert.Contains("    dotnet-livecharts2", reporter.Infos);
+        Assert.Equal(1, reporter.OutdatedSkillCount);
+        Assert.DoesNotContain(reporter.Infos, message => message.Contains("Skills in", StringComparison.Ordinal)
             && message.Contains("with update available", StringComparison.Ordinal));
-        Assert.Contains(reporter.Infos, message => message.Contains("Would update agents skill", StringComparison.Ordinal));
-        Assert.Contains(reporter.Infos, message => message.Contains("Would update claude skill", StringComparison.Ordinal));
-        Assert.Equal(2, reporter.OutdatedSkillCount);
-        Assert.Contains(reporter.Infos, message => message.Contains(agentsSkillsDirectory, StringComparison.Ordinal));
-        Assert.Contains(reporter.Infos, message => message.Contains("agents updated", StringComparison.Ordinal));
-        Assert.Contains(reporter.Infos, message => message.Contains(claudeSkillsDirectory, StringComparison.Ordinal));
-        Assert.Contains(reporter.Infos, message => message.Contains("claude updated", StringComparison.Ordinal));
-        Assert.Contains(reporter.Infos, message => message.Contains("Updated repo-local skills", StringComparison.Ordinal));
-        Assert.Contains(reporter.Warnings, message => message.Contains("claude warning", StringComparison.Ordinal));
+        Assert.DoesNotContain(reporter.Infos, message => message.Contains(agentsSkillsDirectory, StringComparison.Ordinal));
+        Assert.DoesNotContain(reporter.Infos, message => message.Contains(claudeSkillsDirectory, StringComparison.Ordinal));
+        Assert.DoesNotContain(reporter.Infos, message => message.Contains("1 update(s) available", StringComparison.Ordinal));
+        Assert.Empty(reporter.Warnings);
+        Assert.Contains("Updated 1 skill(s) successfully.", reporter.Successes);
     }
 
     [Fact]
@@ -359,7 +414,7 @@ public sealed class WorkflowTests
             CancellationToken.None);
 
         Assert.Equal(0, result.ExitCode);
-        Assert.DoesNotContain("Update these skills?", prompts.ConfirmPrompts);
+        Assert.DoesNotContain("Update these skill(s)?", prompts.ConfirmPrompts);
         Assert.DoesNotContain(commandRunner.Calls, call => call.Arguments.SequenceEqual([
             "skill",
             "update",

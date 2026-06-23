@@ -193,7 +193,7 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
         List<RecommendationSelectionItem> items = [];
         items.AddRange(recommendedDirectives.Select(directive => new RecommendationSelectionItem(
             $"directive:{directive.Name}",
-            $"{directive.Name} ({DirectiveInstaller.FormatDirectiveStatus(directive.Status)})",
+            FormatDirectiveListItem(directive),
             RecommendationSelectionKind.Directive,
             directive,
             null)));
@@ -206,11 +206,25 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
         return items;
     }
 
+    internal static string FormatDirectiveListItem(DirectivePlanItem directive)
+        => $"{directive.Name} ({FormatDirectiveAction(directive.Status)})";
+
+    internal static string FormatDirectiveAction(string status)
+        => status switch
+        {
+            DirectiveStatuses.Missing => "install",
+            DirectiveStatuses.Outdated => "update",
+            _ => DirectiveInstaller.FormatDirectiveStatus(status)
+        };
+
     internal static string FormatSkillListItem(SkillManifestEntry skill)
-        => skill.InstallArg;
+        => $"{skill.InstallArg} (install)";
 
     internal static string FormatSkillSourceHeader(SkillManifestEntry skill)
         => skill.SourceRepo;
+
+    internal static string FormatRecommendationPromptHeading(int itemCount)
+        => string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Recommend {itemCount} action(s), select which to apply:");
 
     static SkillSelectionInput MapKey(ConsoleKeyInfo key)
         => key.Key switch
@@ -240,7 +254,9 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
             lineCount++;
         }
 
-        console.MarkupLineInterpolated($"Found {itemCount} recommended item(s), select which to apply:");
+        console.WriteLine();
+        lineCount++;
+        console.MarkupLineInterpolated($"{FormatRecommendationPromptHeading(itemCount)}");
         lineCount++;
         MarkupLine("[grey][[Use arrows to move, space to select, <right> to all, <left> to none, type to filter]][/]");
 
