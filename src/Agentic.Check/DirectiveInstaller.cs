@@ -186,7 +186,7 @@ sealed partial class DirectiveInstaller(IDirectiveSource source, IReporter repor
             {
                 foreach (var directive in directiveReports)
                 {
-                    reporter.Info($"Directive {directive.Name}: {directive.Status}");
+                    reporter.Info($"Directive {directive.Name}: {FormatDirectiveStatus(directive.Status)}");
                 }
             }
 
@@ -209,6 +209,14 @@ sealed partial class DirectiveInstaller(IDirectiveSource source, IReporter repor
             .Where(file => stack.Technologies.Contains(TechnologyNames.Uno, StringComparer.OrdinalIgnoreCase)
                 || !file.FileName.StartsWith("uno-", StringComparison.OrdinalIgnoreCase))
             .OrderBy(file => file.FileName, StringComparer.OrdinalIgnoreCase)];
+
+    internal static string FormatDirectiveStatus(string status)
+        => status switch
+        {
+            DirectiveStatuses.Current => "up to date",
+            DirectiveStatuses.Outdated => "update(s) available",
+            _ => status
+        };
 
     static DirectiveBlock ExtractDirectiveBlock(DirectiveSourceFile sourceFile, string content)
     {

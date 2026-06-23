@@ -145,9 +145,13 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
         Filter = filter;
         FilteredItems = string.IsNullOrWhiteSpace(Filter)
             ? items
-            : [.. items.Where(item => item.Display.Contains(Filter, StringComparison.OrdinalIgnoreCase))];
+            : [.. items.Where(item => MatchesFilter(item, Filter))];
         CursorIndex = Math.Min(CursorIndex, Math.Max(FilteredItems.Count - 1, 0));
     }
+
+    static bool MatchesFilter(RecommendationSelectionItem item, string filter)
+        => item.Display.Contains(filter, StringComparison.OrdinalIgnoreCase)
+            || item.Skill?.SourceRepo.Contains(filter, StringComparison.OrdinalIgnoreCase) == true;
 }
 
 sealed class RecommendationSelectionPrompt(IAnsiConsole console)
@@ -189,18 +193,24 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
         List<RecommendationSelectionItem> items = [];
         items.AddRange(recommendedDirectives.Select(directive => new RecommendationSelectionItem(
             $"directive:{directive.Name}",
-            $"{directive.Name} ({directive.Status})",
+            $"{directive.Name} ({DirectiveInstaller.FormatDirectiveStatus(directive.Status)})",
             RecommendationSelectionKind.Directive,
             directive,
             null)));
         items.AddRange(missingSkills.Select(skill => new RecommendationSelectionItem(
             $"skill:{skill.SourceRepo}:{skill.InstallArg}",
-            skill.Display,
+            FormatSkillListItem(skill),
             RecommendationSelectionKind.Skill,
             null,
             skill)));
         return items;
     }
+
+    internal static string FormatSkillListItem(SkillManifestEntry skill)
+        => skill.InstallArg;
+
+    internal static string FormatSkillSourceHeader(SkillManifestEntry skill)
+        => skill.SourceRepo;
 
     static SkillSelectionInput MapKey(ConsoleKeyInfo key)
         => key.Key switch
@@ -230,7 +240,7 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
             lineCount++;
         }
 
-        console.MarkupLineInterpolated($"Found {itemCount} recommended item(s), select directive(s) and skill(s) to apply:");
+        console.MarkupLineInterpolated($"Found {itemCount} recommended item(s), select which to apply:");
         lineCount++;
         MarkupLine("[grey][[Use arrows to move, space to select, <right> to all, <left> to none, type to filter]][/]");
 
@@ -251,6 +261,7 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
         int startIndex = Math.Max(0, Math.Min(state.CursorIndex - PageSize + 1, state.FilteredItems.Count - PageSize));
         IReadOnlyList<RecommendationSelectionItem> visibleItems = [.. state.FilteredItems.Skip(startIndex).Take(PageSize)];
         RecommendationSelectionKind? lastKind = null;
+        string? lastSkillSourceRepo = null;
         for (int index = 0; index < visibleItems.Count; index++)
         {
             var item = visibleItems[index];
@@ -258,12 +269,24 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
             {
                 MarkupLine($"[bold]{(item.Kind == RecommendationSelectionKind.Directive ? "Directives" : "Skills")}[/]");
                 lastKind = item.Kind;
+                lastSkillSourceRepo = null;
+            }
+
+            if (item.Skill is not null)
+            {
+                string skillSourceRepo = FormatSkillSourceHeader(item.Skill);
+                if (!skillSourceRepo.Equals(lastSkillSourceRepo, StringComparison.OrdinalIgnoreCase))
+                {
+                    MarkupLine($"  [bold]{Markup.Escape(skillSourceRepo)}[/]");
+                    lastSkillSourceRepo = skillSourceRepo;
+                }
             }
 
             string cursor = startIndex + index == state.CursorIndex ? ">" : " ";
             string check = state.IsSelected(item) ? "[[x]]" : "[[ ]]";
             string display = Markup.Escape(item.Display);
-            console.MarkupLine($"{cursor} {check} {display}");
+            string indent = item.Skill is null ? string.Empty : "  ";
+            console.MarkupLine($"{indent}{cursor} {check} {display}");
             lineCount++;
         }
 

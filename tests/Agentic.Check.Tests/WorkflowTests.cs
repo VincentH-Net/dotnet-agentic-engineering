@@ -42,12 +42,16 @@ public sealed class WorkflowTests
         Assert.DoesNotContain(commandRunner.Calls, call => call.Arguments.Contains("update") && call.Arguments.Contains("--all") && !call.Arguments.Contains("--dry-run"));
         Assert.Contains(result.Report.SkillUpdateDryRuns, update => update.StandardOutput.Contains("Would update dotnet-livecharts2", StringComparison.Ordinal));
         Assert.Contains(result.Report.SkillUpdateDryRuns, update => update.StandardOutput.Contains("Would update dotnet-modern-csharp-editorconfig", StringComparison.Ordinal));
-        Assert.Contains(reporter.Infos, message => message.Contains("Would install directive dotnet-cli-run into AGENTS.md.", StringComparison.Ordinal));
-        Assert.Contains(reporter.Infos, message => message.Contains("Would install directive foundation-prompt-log into AGENTS.md.", StringComparison.Ordinal));
-        Assert.Contains(reporter.Infos, message => message.Contains("Would install skill VincentH-Net/dotnet-agentic-engineering dotnet-livecharts2 into skills directories.", StringComparison.Ordinal));
-        Assert.Contains(reporter.Infos, message => message.Contains("Would install skill VincentH-Net/dotnet-agentic-engineering dotnet-modern-csharp-editorconfig into skills directories.", StringComparison.Ordinal));
-        Assert.Contains(reporter.Infos, message => message.Contains("Would update skill dotnet-livecharts2 in skills directories.", StringComparison.Ordinal));
-        Assert.Contains(reporter.Infos, message => message.Contains("Would update skill dotnet-modern-csharp-editorconfig in skills directories.", StringComparison.Ordinal));
+        Assert.Contains("Would install directives into AGENTS.md:", reporter.Infos);
+        Assert.Contains("  dotnet-cli-run", reporter.Infos);
+        Assert.Contains("  foundation-prompt-log", reporter.Infos);
+        Assert.Contains("Would install skills into repo skills directories:", reporter.Infos);
+        Assert.Contains("  VincentH-Net/dotnet-agentic-engineering:", reporter.Infos);
+        Assert.Contains("    dotnet-livecharts2", reporter.Infos);
+        Assert.Contains("    dotnet-modern-csharp-editorconfig", reporter.Infos);
+        Assert.Contains("Would update skills in repo skills directories:", reporter.Infos);
+        Assert.Contains("  dotnet-livecharts2", reporter.Infos);
+        Assert.Contains("  dotnet-modern-csharp-editorconfig", reporter.Infos);
         Assert.DoesNotContain(reporter.Infos, message => message.Contains("Would update repo-local skills", StringComparison.Ordinal));
         Assert.DoesNotContain(reporter.Infos, message => message.StartsWith("Directive ", StringComparison.Ordinal));
         Assert.Equal("standard,claude-code", reporter.TargetAgents);
@@ -80,7 +84,8 @@ public sealed class WorkflowTests
             CancellationToken.None);
 
         Assert.Equal(0, result.ExitCode);
-        Assert.Contains(reporter.Infos, message => message.Contains("Would update directive foundation-prompt-log in AGENTS.md.", StringComparison.Ordinal));
+        Assert.Contains("Would update directives in AGENTS.md:", reporter.Infos);
+        Assert.Contains("  foundation-prompt-log", reporter.Infos);
     }
 
     [Fact]
@@ -290,6 +295,49 @@ public sealed class WorkflowTests
         Assert.Contains(reporter.Infos, message => message.Contains("claude updated", StringComparison.Ordinal));
         Assert.Contains(reporter.Infos, message => message.Contains("Updated repo-local skills", StringComparison.Ordinal));
         Assert.Contains(reporter.Warnings, message => message.Contains("claude warning", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task OutdatedSkillSummaryCountsSameSkillOnceAcrossSkillDirectories()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
+        tempDirectory.Write("App.csproj", "<Project />");
+        tempDirectory.Write(".agents/skills/dotnet-livecharts2/SKILL.md", "# Present");
+        tempDirectory.Write(".agents/skills/dotnet-modern-csharp-editorconfig/SKILL.md", "# Present");
+        tempDirectory.Write(".claude/skills/dotnet-livecharts2/SKILL.md", "# Present");
+        tempDirectory.Write(".claude/skills/dotnet-modern-csharp-editorconfig/SKILL.md", "# Present");
+        FakeCommandRunner commandRunner = new();
+        commandRunner.Enqueue(new CommandResult(0, "git version 2.50.0", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
+        commandRunner.Enqueue(new CommandResult(
+            0,
+            """
+              • dotnet-livecharts2 (VincentH-Net/dotnet-agentic-engineering) 52b04c64 > c9fa2d43 [1.2.0]
+              1 update(s) available:
+            """,
+            string.Empty));
+        commandRunner.Enqueue(new CommandResult(
+            0,
+            """
+              • dotnet-livecharts2 (VincentH-Net/dotnet-agentic-engineering) 52b04c64 > c9fa2d43 [1.2.0]
+              1 update(s) available:
+            """,
+            string.Empty));
+        RecordingReporter reporter = new();
+        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), reporter, new FakeDirectiveSource());
+
+        var result = await workflow.RunAsync(
+            new AgenticCheckOptions(tempDirectory.Path, true, false, null, null, null, false),
+            CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Equal(1, result.Report.OutdatedSkills);
+        Assert.Equal(1, reporter.OutdatedSkillCount);
+        Assert.Contains("  dotnet-livecharts2", reporter.Infos);
+        Assert.DoesNotContain("  1 update(s) available:", reporter.Infos);
     }
 
     [Fact]

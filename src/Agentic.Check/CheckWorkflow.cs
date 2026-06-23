@@ -122,7 +122,7 @@ sealed class CheckWorkflow(
         report.MissingSkills.AddRange(missing.Select(SkillReportItem.FromManifestEntry));
 
         await RunSkillUpdateDryRunAsync(skillsDirectories, repoResolution.RepoRoot, report, cancellationToken).ConfigureAwait(false);
-        report.OutdatedSkills = report.SkillUpdateDryRuns.Sum(CountOutdatedSkills);
+        report.OutdatedSkills = CountDistinctOutdatedSkills(report.SkillUpdateDryRuns);
 
         reporter.Summary(repoResolution.RepoRoot, stack.Technologies, targetAgents, skillsDirectories, directiveSummary, recommended.Count, missing.Count, report.OutdatedSkills);
 
@@ -283,34 +283,61 @@ sealed class CheckWorkflow(
         string agentsFile)
     {
         string agentsFileName = Path.GetFileName(agentsFile);
-        foreach (var directive in selectedDirectives)
-        {
-            if (directive.Status == DirectiveStatuses.Missing)
-            {
-                reporter.Info($"Would install directive {directive.Name} into {agentsFileName}.");
-                continue;
-            }
+        ReportDirectiveDryRunGroup(
+            $"Would install directives into {agentsFileName}:",
+            selectedDirectives.Where(directive => directive.Status == DirectiveStatuses.Missing));
+        ReportDirectiveDryRunGroup(
+            $"Would update directives in {agentsFileName}:",
+            selectedDirectives.Where(directive => directive.Status == DirectiveStatuses.Outdated));
+    }
 
-            if (directive.Status == DirectiveStatuses.Outdated)
-            {
-                reporter.Info($"Would update directive {directive.Name} in {agentsFileName}.");
-            }
+    void ReportDirectiveDryRunGroup(string header, IEnumerable<DirectivePlanItem> directives)
+    {
+        string[] directiveNames = [.. directives.Select(directive => directive.Name)];
+        if (directiveNames.Length == 0)
+        {
+            return;
+        }
+
+        reporter.Info(header);
+        foreach (string directiveName in directiveNames)
+        {
+            reporter.Info($"  {directiveName}");
         }
     }
 
     void ReportSkillInstallDryRunActions(IReadOnlyList<SkillManifestEntry> selectedSkills)
     {
-        foreach (var skill in selectedSkills)
+        if (selectedSkills.Count == 0)
         {
-            reporter.Info($"Would install skill {skill.Display} into skills directories.");
+            return;
+        }
+
+        reporter.Info("Would install skills into repo skills directories:");
+        foreach (var group in selectedSkills.GroupBy(skill => skill.SourceRepo, StringComparer.OrdinalIgnoreCase))
+        {
+            reporter.Info($"  {group.Key}:");
+            foreach (var skill in group)
+            {
+                reporter.Info($"    {skill.InstallArg}");
+            }
         }
     }
 
     void ReportSkillUpdateDryRunActions(IReadOnlyList<CommandReport> dryRunReports)
     {
-        foreach (string skillName in dryRunReports.SelectMany(ExtractOutdatedSkillNames).Distinct(StringComparer.OrdinalIgnoreCase))
+        string[] skillNames = [.. dryRunReports
+            .SelectMany(ExtractOutdatedSkillNames)
+            .Distinct(StringComparer.OrdinalIgnoreCase)];
+        if (skillNames.Length == 0)
         {
-            reporter.Info($"Would update skill {skillName} in skills directories.");
+            return;
+        }
+
+        reporter.Info("Would update skills in repo skills directories:");
+        foreach (string skillName in skillNames)
+        {
+            reporter.Info($"  {skillName}");
         }
     }
 
@@ -358,6 +385,12 @@ sealed class CheckWorkflow(
 
     static bool ReportsAvailableSkillUpdates(CommandReport updateReport)
         => CountOutdatedSkills(updateReport) > 0;
+
+    static int CountDistinctOutdatedSkills(IReadOnlyList<CommandReport> updateReports)
+        => updateReports
+            .SelectMany(ExtractOutdatedSkillNames)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count();
 
     static int CountOutdatedSkills(CommandReport updateReport)
     {
@@ -432,15 +465,30 @@ sealed class CheckWorkflow(
         ];
         string[] updateLines = [.. normalized
             .Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-            .Where(line => !ignoredLineFragments.Any(fragment => line.Contains(fragment, StringComparison.OrdinalIgnoreCase)))
+            .Where(line => !IsIgnoredOutdatedSkillLine(line, ignoredLineFragments))
             .Select(NormalizeOutdatedSkillLine)
             .Where(line => !string.IsNullOrWhiteSpace(line))];
         return updateLines.Length == 0 ? [normalized] : updateLines;
     }
 
+    static bool IsIgnoredOutdatedSkillLine(string line, IReadOnlyList<string> ignoredLineFragments)
+    {
+        string normalized = TrimListMarker(line);
+        if (ignoredLineFragments.Any(fragment => normalized.Contains(fragment, StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        return normalized.Length > 0
+            && char.IsDigit(normalized[0])
+            && (normalized.Contains("update(s) available", StringComparison.OrdinalIgnoreCase)
+                || normalized.Contains("updates available", StringComparison.OrdinalIgnoreCase)
+                || normalized.Contains("update available", StringComparison.OrdinalIgnoreCase));
+    }
+
     static string NormalizeOutdatedSkillLine(string line)
     {
-        string normalized = line.Trim();
+        string normalized = TrimListMarker(line);
         string[] prefixes =
         [
             "Would update skill ",
@@ -455,11 +503,28 @@ sealed class CheckWorkflow(
         {
             if (normalized.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
             {
-                return normalized[prefix.Length..].Trim().TrimEnd('.');
+                return ExtractSkillNameFromUpdateLine(normalized[prefix.Length..]);
             }
         }
 
-        return normalized.TrimEnd('.');
+        return ExtractSkillNameFromUpdateLine(normalized);
+    }
+
+    static string ExtractSkillNameFromUpdateLine(string line)
+    {
+        string normalized = TrimListMarker(line).TrimEnd('.');
+        int metadataIndex = normalized.IndexOf(" (", StringComparison.Ordinal);
+        return metadataIndex > 0
+            ? normalized[..metadataIndex].Trim()
+            : normalized;
+    }
+
+    static string TrimListMarker(string line)
+    {
+        string normalized = line.Trim();
+        return normalized.Length > 0 && normalized[0] is '•' or '-' or '*'
+            ? normalized[1..].Trim()
+            : normalized;
     }
 
     enum SkillUpdateOutputKind

@@ -3,6 +3,14 @@
 public sealed class DirectiveInstallerTests
 {
     [Fact]
+    public void CurrentDirectiveStatusDisplaysAsUpToDate()
+        => Assert.Equal("up to date", DirectiveInstaller.FormatDirectiveStatus(DirectiveStatuses.Current));
+
+    [Fact]
+    public void OutdatedDirectiveStatusDisplaysAsUpdateAvailable()
+        => Assert.Equal("update(s) available", DirectiveInstaller.FormatDirectiveStatus(DirectiveStatuses.Outdated));
+
+    [Fact]
     public async Task CreatesAgentsAndClaudeWithRelevantDirectives()
     {
         using TempDirectory tempDirectory = new();

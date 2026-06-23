@@ -57,6 +57,41 @@ public sealed class SkillSelectionStateTests
         Assert.Equal(2, state.FilteredItems.Count);
     }
 
+    [Fact]
+    public void SkillListItemOmitsSourceRepo()
+    {
+        SkillManifestEntry skill = new("owner/repo", "missing-skill", "missing-skill", TechnologyNames.Dotnet, []);
+
+        Assert.Equal("missing-skill", RecommendationSelectionPrompt.FormatSkillListItem(skill));
+        Assert.Equal("owner/repo", RecommendationSelectionPrompt.FormatSkillSourceHeader(skill));
+    }
+
+    [Fact]
+    public void TypingFiltersBySourceRepo()
+    {
+        RecommendationSelectionState state = new([
+            new RecommendationSelectionItem(
+                "skill:owner/alpha:first",
+                "first",
+                RecommendationSelectionKind.Skill,
+                null,
+                new SkillManifestEntry("owner/alpha", "first", "first", TechnologyNames.Dotnet, [])),
+            new RecommendationSelectionItem(
+                "skill:owner/beta:second",
+                "second",
+                RecommendationSelectionKind.Skill,
+                null,
+                new SkillManifestEntry("owner/beta", "second", "second", TechnologyNames.Dotnet, []))
+        ]);
+        foreach (char character in "beta")
+        {
+            state.Apply(new SkillSelectionInput(SkillSelectionCommand.Character, character));
+        }
+
+        var filteredItem = Assert.Single(state.FilteredItems);
+        Assert.Equal("second", filteredItem.Skill?.LocalFolder);
+    }
+
     static IReadOnlyList<RecommendationSelectionItem> CreateItems(string[] directiveNames, string[] skillNames)
         => [.. directiveNames
             .Select(name => new RecommendationSelectionItem(
@@ -67,7 +102,7 @@ public sealed class SkillSelectionStateTests
                 null))
             .Concat(skillNames.Select(name => new RecommendationSelectionItem(
                 $"skill:owner/repo:{name}",
-                $"owner/repo {name}",
+                name,
                 RecommendationSelectionKind.Skill,
                 null,
                 new SkillManifestEntry("owner/repo", name, name, TechnologyNames.Dotnet, []))))];
