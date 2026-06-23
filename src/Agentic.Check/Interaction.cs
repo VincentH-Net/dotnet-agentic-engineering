@@ -61,6 +61,9 @@ interface IReporter
 
 sealed class SpectreReporter(IAnsiConsole console) : IReporter
 {
+    internal const string SummaryLabelColumnHeader = "Check";
+    internal const string SummaryValueColumnHeader = "Status";
+
     public void Info(string message)
         => console.MarkupLineInterpolated($"[grey]{message}[/]");
 
@@ -84,22 +87,28 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
         int outdatedCount)
     {
         Table table = new();
-        _ = table.AddColumn("Item");
-        _ = table.AddColumn("Value");
+        _ = table.AddColumn(SummaryLabelColumnHeader);
+        _ = table.AddColumn(SummaryValueColumnHeader);
         _ = table.AddRow("Repository", Markup.Escape(repoRoot));
         _ = table.AddRow("Stack", Markup.Escape(string.Join(", ", technologies.Order(StringComparer.OrdinalIgnoreCase))));
         _ = table.AddRow("Target agents", Markup.Escape(targetAgents));
         _ = table.AddRow("Skills directories", Markup.Escape(string.Join(Environment.NewLine, skillsDirectories)));
         _ = table.AddRow("Create AGENTS.md", directiveSummary.CreateAgentsFile ? "yes" : "no");
         _ = table.AddRow("Create CLAUDE.md", directiveSummary.CreateClaudeFile ? "yes" : "no");
-        _ = table.AddRow("Recommended directives", directiveSummary.RecommendedCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        _ = table.AddRow("Missing directives", directiveSummary.MissingCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        _ = table.AddRow("Outdated directives", directiveSummary.OutdatedCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        _ = table.AddRow("Recommended skills", recommendedCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        _ = table.AddRow("Missing skills", missingCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
-        _ = table.AddRow("Outdated skills", outdatedCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        _ = table.AddRow("Directives", Markup.Escape(FormatDirectiveSummary(directiveSummary)));
+        _ = table.AddRow("Skills", Markup.Escape(FormatSkillSummary(recommendedCount, missingCount, outdatedCount)));
         console.Write(table);
     }
+
+    internal static string FormatDirectiveSummary(DirectiveSummary directiveSummary)
+        => string.Create(
+            System.Globalization.CultureInfo.InvariantCulture,
+            $"recommended: {directiveSummary.RecommendedCount}, with {directiveSummary.MissingCount} missing and {directiveSummary.OutdatedCount} outdated");
+
+    internal static string FormatSkillSummary(int recommendedCount, int missingCount, int outdatedCount)
+        => string.Create(
+            System.Globalization.CultureInfo.InvariantCulture,
+            $"recommended: {recommendedCount}, with {missingCount} missing and {outdatedCount} outdated");
 }
 
 sealed class NullReporter : IReporter
