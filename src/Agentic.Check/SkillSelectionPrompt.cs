@@ -158,7 +158,6 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
     public async Task<RecommendationSelectionResult> PromptAsync(
         IReadOnlyList<DirectivePlanItem> recommendedDirectives,
         IReadOnlyList<SkillManifestEntry> missingSkills,
-        RecommendationSelectionContext context,
         CancellationToken cancellationToken)
     {
         var items = BuildItems(recommendedDirectives, missingSkills);
@@ -166,7 +165,7 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
 
         while (true)
         {
-            Render(items.Count, state, context);
+            Render(items.Count, state);
             var key = await console.Input.ReadKeyAsync(true, cancellationToken).ConfigureAwait(false);
             if (key is null)
             {
@@ -217,7 +216,7 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
             _ => new(SkillSelectionCommand.Character, key.KeyChar)
         };
 
-    void Render(int itemCount, RecommendationSelectionState state, RecommendationSelectionContext context)
+    void Render(int itemCount, RecommendationSelectionState state)
     {
         if (previousRenderLineCount > 0 && !Console.IsOutputRedirected)
         {
@@ -231,15 +230,6 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
             lineCount++;
         }
 
-        void EmptyLine()
-        {
-            console.WriteLine();
-            lineCount++;
-        }
-
-        console.MarkupLineInterpolated($"Install target: [grey]{Markup.Escape(context.Parameter)}[/]");
-        lineCount++;
-        EmptyLine();
         console.MarkupLineInterpolated($"Found {itemCount} recommended item(s), select directive(s) and skill(s) to apply:");
         lineCount++;
         MarkupLine("[grey][[Use arrows to move, space to select, <right> to all, <left> to none, type to filter]][/]");

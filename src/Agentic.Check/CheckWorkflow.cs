@@ -65,14 +65,19 @@ sealed class CheckWorkflow(
 
         IReadOnlyList<string> skillsDirectories;
         bool manageClaudeFile;
+        string targetAgents;
         if (options.SkillsDirectory is { Length: > 0 })
         {
             string skillsDirectory = Path.GetFullPath(options.SkillsDirectory);
             skillsDirectories = [skillsDirectory];
             manageClaudeFile = IsClaudeSkillsDirectory(skillsDirectory);
+            targetAgents = "custom skills directory";
         }
         else
         {
+            targetAgents = !string.IsNullOrWhiteSpace(options.Agents)
+                ? options.Agents
+                : AgentSkillRegistry.DefaultAgents;
             var directoryResolution = AgentSkillRegistry.ResolveProjectDirectories(options.Agents, repoResolution.RepoRoot);
             if (!directoryResolution.Success)
             {
@@ -116,7 +121,10 @@ sealed class CheckWorkflow(
         var missing = SkillInstaller.FindMissing(recommended, skillsDirectories);
         report.MissingSkills.AddRange(missing.Select(SkillReportItem.FromManifestEntry));
 
-        reporter.Summary(repoResolution.RepoRoot, stack.Technologies, skillsDirectories, directiveSummary, recommended.Count, missing.Count);
+        await RunSkillUpdateDryRunAsync(skillsDirectories, repoResolution.RepoRoot, report, cancellationToken).ConfigureAwait(false);
+        report.OutdatedSkills = report.SkillUpdateDryRuns.Sum(CountOutdatedSkills);
+
+        reporter.Summary(repoResolution.RepoRoot, stack.Technologies, targetAgents, skillsDirectories, directiveSummary, recommended.Count, missing.Count, report.OutdatedSkills);
 
         if (stack.Technologies.Contains(TechnologyNames.Dotnet, StringComparer.OrdinalIgnoreCase))
         {
@@ -130,14 +138,6 @@ sealed class CheckWorkflow(
         IReadOnlyList<SkillManifestEntry> selectedSkills = [];
         if (recommendedDirectives.Count > 0 || missing.Count > 0)
         {
-            RecommendationSelectionContext selectionContext = new(
-                repoResolution.RepoRoot,
-                stack.Technologies,
-                skillsDirectories,
-                options.SkillsDirectory is { Length: > 0 }
-                    ? $"--skills-dir {options.SkillsDirectory}"
-                    : $"--agents {(!string.IsNullOrWhiteSpace(options.Agents) ? options.Agents : AgentSkillRegistry.DefaultAgents)}");
-
             if (options.DryRun || options.Yes)
             {
                 selectedDirectives = recommendedDirectives;
@@ -146,7 +146,7 @@ sealed class CheckWorkflow(
             else
             {
                 var selection = await prompts
-                    .SelectRecommendationsAsync(recommendedDirectives, missing, selectionContext, cancellationToken)
+                    .SelectRecommendationsAsync(recommendedDirectives, missing, cancellationToken)
                     .ConfigureAwait(false);
                 selectedDirectives = selection.SelectedDirectives;
                 selectedSkills = selection.SelectedSkills;
@@ -165,6 +165,9 @@ sealed class CheckWorkflow(
 
         if (options.DryRun)
         {
+            ReportDirectiveDryRunActions(selectedDirectives, report.AgentsFile);
+            ReportSkillInstallDryRunActions(selectedSkills);
+
             foreach (var skill in selectedSkills)
             {
                 foreach (string skillsDirectory in skillsDirectories.Where(directory => SkillInstaller.IsMissing(skill, directory)))
@@ -173,10 +176,7 @@ sealed class CheckWorkflow(
                 }
             }
 
-            foreach (string skillsDirectory in skillsDirectories)
-            {
-                report.Actions.Add($"Would run gh skill update --dir {skillsDirectory} --dry-run.");
-            }
+            ReportSkillUpdateDryRunActions(report.SkillUpdateDryRuns);
 
             await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
             return new CheckRunResult(0, report);
@@ -214,36 +214,25 @@ sealed class CheckWorkflow(
         AgenticCheckReport report,
         CancellationToken cancellationToken)
     {
-        foreach (string skillsDirectory in skillsDirectories)
-        {
-            var dryRunResult = await commandRunner.RunAsync(
-                "gh",
-                ["skill", "update", "--dir", skillsDirectory, "--dry-run"],
-                repoRoot,
-                cancellationToken).ConfigureAwait(false);
-
-            report.Actions.Add($"Ran gh skill update --dir {skillsDirectory} --dry-run.");
-            var dryRunReport = CommandReport.FromCommandResult(dryRunResult);
-            report.SkillUpdateDryRuns.Add(dryRunReport);
-            report.SkillUpdateDryRun ??= dryRunReport;
-
-            if (!dryRunResult.Success)
-            {
-                reporter.Warning($"Could not check repo-local skills for updates in {skillsDirectory}.");
-            }
-        }
+        ReportSkillUpdateDryRunOutputs(skillsDirectories, report.SkillUpdateDryRuns, SkillUpdateOutputKind.Preflight);
 
         if (report.SkillUpdateDryRuns.All(result => !result.Success))
         {
             return;
         }
 
-        bool update = options.Yes || await prompts.ConfirmAsync("Update repo-local skills in target directories with gh skill update --all?", false, cancellationToken)
+        if (!report.SkillUpdateDryRuns.Any(ReportsAvailableSkillUpdates))
+        {
+            report.Actions.Add("No repo-local skill updates found.");
+            return;
+        }
+
+        bool update = options.Yes || await prompts.ConfirmAsync("Update these skills?", false, cancellationToken)
             .ConfigureAwait(false);
 
         if (!update)
         {
-            report.Actions.Add("Skipped gh skill update --all.");
+            report.Actions.Add("Skipped repo-local skill updates.");
             return;
         }
 
@@ -259,7 +248,224 @@ sealed class CheckWorkflow(
             var updateReport = CommandReport.FromCommandResult(updateResult);
             report.SkillUpdates.Add(updateReport);
             report.SkillUpdate ??= updateReport;
+            ReportSkillUpdateOutput(skillsDirectory, updateReport, SkillUpdateOutputKind.Update);
         }
+    }
+
+    async Task RunSkillUpdateDryRunAsync(
+        IReadOnlyList<string> skillsDirectories,
+        string repoRoot,
+        AgenticCheckReport report,
+        CancellationToken cancellationToken)
+    {
+        foreach (string skillsDirectory in skillsDirectories)
+        {
+            var dryRunResult = await commandRunner.RunAsync(
+                "gh",
+                ["skill", "update", "--dir", skillsDirectory, "--all", "--dry-run"],
+                repoRoot,
+                cancellationToken).ConfigureAwait(false);
+
+            report.Actions.Add($"Ran gh skill update --dir {skillsDirectory} --all --dry-run.");
+            var dryRunReport = CommandReport.FromCommandResult(dryRunResult);
+            report.SkillUpdateDryRuns.Add(dryRunReport);
+            report.SkillUpdateDryRun ??= dryRunReport;
+
+            if (!dryRunResult.Success)
+            {
+                reporter.Warning($"Could not check repo-local skills for updates in {skillsDirectory}.");
+            }
+        }
+    }
+
+    void ReportDirectiveDryRunActions(
+        IReadOnlyList<DirectivePlanItem> selectedDirectives,
+        string agentsFile)
+    {
+        string agentsFileName = Path.GetFileName(agentsFile);
+        foreach (var directive in selectedDirectives)
+        {
+            if (directive.Status == DirectiveStatuses.Missing)
+            {
+                reporter.Info($"Would install directive {directive.Name} into {agentsFileName}.");
+                continue;
+            }
+
+            if (directive.Status == DirectiveStatuses.Outdated)
+            {
+                reporter.Info($"Would update directive {directive.Name} in {agentsFileName}.");
+            }
+        }
+    }
+
+    void ReportSkillInstallDryRunActions(IReadOnlyList<SkillManifestEntry> selectedSkills)
+    {
+        foreach (var skill in selectedSkills)
+        {
+            reporter.Info($"Would install skill {skill.Display} into skills directories.");
+        }
+    }
+
+    void ReportSkillUpdateDryRunActions(IReadOnlyList<CommandReport> dryRunReports)
+    {
+        foreach (string skillName in dryRunReports.SelectMany(ExtractOutdatedSkillNames).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            reporter.Info($"Would update skill {skillName} in skills directories.");
+        }
+    }
+
+    void ReportSkillUpdateDryRunOutputs(
+        IReadOnlyList<string> skillsDirectories,
+        List<CommandReport> dryRunReports,
+        SkillUpdateOutputKind outputKind)
+    {
+        for (int index = 0; index < Math.Min(skillsDirectories.Count, dryRunReports.Count); index++)
+        {
+            var dryRunReport = dryRunReports[index];
+            if (dryRunReport.Success && CountOutdatedSkills(dryRunReport) == 0)
+            {
+                continue;
+            }
+
+            ReportSkillUpdateOutput(skillsDirectories[index], dryRunReport, outputKind);
+        }
+    }
+
+    void ReportSkillUpdateOutput(string skillsDirectory, CommandReport updateReport, SkillUpdateOutputKind outputKind)
+    {
+        reporter.Info(outputKind switch
+        {
+            SkillUpdateOutputKind.Preflight => $"Skills in {skillsDirectory} with update available:",
+            SkillUpdateOutputKind.Update => $"Updated repo-local skills in {skillsDirectory}:",
+            _ => throw new ArgumentOutOfRangeException(nameof(outputKind), outputKind, "Unsupported skill update output kind.")
+        });
+        if (string.IsNullOrWhiteSpace(updateReport.StandardOutput) && string.IsNullOrWhiteSpace(updateReport.StandardError))
+        {
+            reporter.Info("(no output)");
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(updateReport.StandardOutput))
+        {
+            reporter.Info(updateReport.StandardOutput.TrimEnd());
+        }
+
+        if (!string.IsNullOrWhiteSpace(updateReport.StandardError))
+        {
+            reporter.Warning(updateReport.StandardError.TrimEnd());
+        }
+    }
+
+    static bool ReportsAvailableSkillUpdates(CommandReport updateReport)
+        => CountOutdatedSkills(updateReport) > 0;
+
+    static int CountOutdatedSkills(CommandReport updateReport)
+    {
+        if (!updateReport.Success)
+        {
+            return 0;
+        }
+
+        string output = $"{updateReport.StandardOutput}\n{updateReport.StandardError}";
+        if (string.IsNullOrWhiteSpace(output))
+        {
+            return 0;
+        }
+
+        string normalized = output.Trim();
+        string[] noUpdateMarkers =
+        [
+            "No installed skills found.",
+            "No updates",
+            "No skill updates",
+            "No skills need updating",
+            "No updates available",
+            "already up to date",
+            "already up-to-date",
+            "up to date",
+            "up-to-date"
+        ];
+        if (noUpdateMarkers.Any(marker => normalized.Contains(marker, StringComparison.OrdinalIgnoreCase)))
+        {
+            return 0;
+        }
+
+        return ExtractOutdatedSkillNames(updateReport).Count;
+    }
+
+    static IReadOnlyList<string> ExtractOutdatedSkillNames(CommandReport updateReport)
+    {
+        if (!updateReport.Success)
+        {
+            return [];
+        }
+
+        string output = $"{updateReport.StandardOutput}\n{updateReport.StandardError}";
+        if (string.IsNullOrWhiteSpace(output))
+        {
+            return [];
+        }
+
+        string normalized = output.Trim();
+        string[] noUpdateMarkers =
+        [
+            "No installed skills found.",
+            "No updates",
+            "No skill updates",
+            "No skills need updating",
+            "No updates available",
+            "already up to date",
+            "already up-to-date",
+            "up to date",
+            "up-to-date"
+        ];
+        if (noUpdateMarkers.Any(marker => normalized.Contains(marker, StringComparison.OrdinalIgnoreCase)))
+        {
+            return [];
+        }
+
+        string[] ignoredLineFragments =
+        [
+            "checking",
+            "dry run",
+            "dry-run"
+        ];
+        string[] updateLines = [.. normalized
+            .Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Where(line => !ignoredLineFragments.Any(fragment => line.Contains(fragment, StringComparison.OrdinalIgnoreCase)))
+            .Select(NormalizeOutdatedSkillLine)
+            .Where(line => !string.IsNullOrWhiteSpace(line))];
+        return updateLines.Length == 0 ? [normalized] : updateLines;
+    }
+
+    static string NormalizeOutdatedSkillLine(string line)
+    {
+        string normalized = line.Trim();
+        string[] prefixes =
+        [
+            "Would update skill ",
+            "Would update ",
+            "Update available for skill ",
+            "Update available for ",
+            "Outdated skill ",
+            "Outdated "
+        ];
+
+        foreach (string prefix in prefixes)
+        {
+            if (normalized.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                return normalized[prefix.Length..].Trim().TrimEnd('.');
+            }
+        }
+
+        return normalized.TrimEnd('.');
+    }
+
+    enum SkillUpdateOutputKind
+    {
+        Preflight,
+        Update
     }
 
     static async Task WriteReportAsync(string? reportPath, AgenticCheckReport report, CancellationToken cancellationToken)

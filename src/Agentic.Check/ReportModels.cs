@@ -34,6 +34,8 @@ sealed class AgenticCheckReport
 
     public List<SkillReportItem> MissingSkills { get; } = [];
 
+    public int OutdatedSkills { get; set; }
+
     public List<SkillInstallResult> InstallResults { get; } = [];
 
     public List<string> Actions { get; } = [];

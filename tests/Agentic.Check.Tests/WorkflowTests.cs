@@ -3,7 +3,7 @@
 public sealed class WorkflowTests
 {
     [Fact]
-    public async Task DryRunDoesNotInstallOrUpdateSkills()
+    public async Task DryRunDoesNotInstallOrApplySkillUpdates()
     {
         using TempDirectory tempDirectory = new();
         tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
@@ -13,7 +13,10 @@ public sealed class WorkflowTests
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
-        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), new NullReporter(), new FakeDirectiveSource());
+        commandRunner.Enqueue(new CommandResult(0, "Would update dotnet-livecharts2", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "Would update dotnet-modern-csharp-editorconfig", string.Empty));
+        RecordingReporter reporter = new();
+        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), reporter, new FakeDirectiveSource());
 
         var result = await workflow.RunAsync(
             new AgenticCheckOptions(tempDirectory.Path, true, false, null, null, null, false),
@@ -22,7 +25,62 @@ public sealed class WorkflowTests
         Assert.Equal(0, result.ExitCode);
         Assert.Contains(result.Report.Actions, action => action.Contains("Would install", StringComparison.Ordinal));
         Assert.DoesNotContain(commandRunner.Calls, call => call.Arguments.Contains("install"));
-        Assert.DoesNotContain(commandRunner.Calls, call => call.Arguments.Contains("update"));
+        Assert.Contains(commandRunner.Calls, call => call.Arguments.SequenceEqual([
+            "skill",
+            "update",
+            "--dir",
+            Path.Combine(tempDirectory.Path, ".agents", "skills"),
+            "--all",
+            "--dry-run"]));
+        Assert.Contains(commandRunner.Calls, call => call.Arguments.SequenceEqual([
+            "skill",
+            "update",
+            "--dir",
+            Path.Combine(tempDirectory.Path, ".claude", "skills"),
+            "--all",
+            "--dry-run"]));
+        Assert.DoesNotContain(commandRunner.Calls, call => call.Arguments.Contains("update") && call.Arguments.Contains("--all") && !call.Arguments.Contains("--dry-run"));
+        Assert.Contains(result.Report.SkillUpdateDryRuns, update => update.StandardOutput.Contains("Would update dotnet-livecharts2", StringComparison.Ordinal));
+        Assert.Contains(result.Report.SkillUpdateDryRuns, update => update.StandardOutput.Contains("Would update dotnet-modern-csharp-editorconfig", StringComparison.Ordinal));
+        Assert.Contains(reporter.Infos, message => message.Contains("Would install directive dotnet-cli-run into AGENTS.md.", StringComparison.Ordinal));
+        Assert.Contains(reporter.Infos, message => message.Contains("Would install directive foundation-prompt-log into AGENTS.md.", StringComparison.Ordinal));
+        Assert.Contains(reporter.Infos, message => message.Contains("Would install skill VincentH-Net/dotnet-agentic-engineering dotnet-livecharts2 into skills directories.", StringComparison.Ordinal));
+        Assert.Contains(reporter.Infos, message => message.Contains("Would install skill VincentH-Net/dotnet-agentic-engineering dotnet-modern-csharp-editorconfig into skills directories.", StringComparison.Ordinal));
+        Assert.Contains(reporter.Infos, message => message.Contains("Would update skill dotnet-livecharts2 in skills directories.", StringComparison.Ordinal));
+        Assert.Contains(reporter.Infos, message => message.Contains("Would update skill dotnet-modern-csharp-editorconfig in skills directories.", StringComparison.Ordinal));
+        Assert.DoesNotContain(reporter.Infos, message => message.Contains("Would update repo-local skills", StringComparison.Ordinal));
+        Assert.DoesNotContain(reporter.Infos, message => message.StartsWith("Directive ", StringComparison.Ordinal));
+        Assert.Equal("standard,claude-code", reporter.TargetAgents);
+    }
+
+    [Fact]
+    public async Task DryRunReportsOutdatedDirectiveActions()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
+        tempDirectory.Write(
+            "AGENTS.md",
+            """
+            <!-- dotnet-agentic-engineering:foundation-prompt-log:start -->
+            ## foundation-prompt-log
+            Old content.
+            <!-- dotnet-agentic-engineering:foundation-prompt-log:end -->
+            """);
+        FakeCommandRunner commandRunner = new();
+        commandRunner.Enqueue(new CommandResult(0, "git version 2.50.0", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "No updates available.", string.Empty));
+        RecordingReporter reporter = new();
+        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), reporter, new FakeDirectiveSource());
+
+        var result = await workflow.RunAsync(
+            new AgenticCheckOptions(tempDirectory.Path, true, false, null, null, "standard", false),
+            CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains(reporter.Infos, message => message.Contains("Would update directive foundation-prompt-log in AGENTS.md.", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -37,14 +95,11 @@ public sealed class WorkflowTests
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
-        commandRunner.Enqueue(new CommandResult(1, string.Empty, "skill not found"));
-        commandRunner.Enqueue(new CommandResult(1, string.Empty, "skill not found"));
-        commandRunner.Enqueue(new CommandResult(1, string.Empty, "skill not found"));
         commandRunner.Enqueue(new CommandResult(0, "no updates", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "no updates", string.Empty));
-        commandRunner.Enqueue(new CommandResult(0, "updated", string.Empty));
-        commandRunner.Enqueue(new CommandResult(0, "updated", string.Empty));
-        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), new NullReporter(), new FakeDirectiveSource());
+        commandRunner.Enqueue(new CommandResult(1, string.Empty, "skill not found"));
+        RecordingReporter reporter = new();
+        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), reporter, new FakeDirectiveSource());
 
         var result = await workflow.RunAsync(
             new AgenticCheckOptions(tempDirectory.Path, false, true, null, null, null, false),
@@ -65,7 +120,11 @@ public sealed class WorkflowTests
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
-        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), new NullReporter(), new FakeDirectiveSource());
+        commandRunner.Enqueue(new CommandResult(0, "agents dry-run", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "claude dry-run", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "trae dry-run", string.Empty));
+        RecordingReporter reporter = new();
+        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), reporter, new FakeDirectiveSource());
 
         var result = await workflow.RunAsync(
             new AgenticCheckOptions(tempDirectory.Path, true, false, null, null, "standard,claude-code,trae,trae-cn", false),
@@ -79,6 +138,7 @@ public sealed class WorkflowTests
                 Path.Combine(tempDirectory.Path, ".trae", "skills")
             ],
             result.Report.SkillsDirectories);
+        Assert.Equal("standard,claude-code,trae,trae-cn", reporter.TargetAgents);
     }
 
     [Fact]
@@ -105,6 +165,7 @@ public sealed class WorkflowTests
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "agents dry-run", string.Empty));
         CheckWorkflow workflow = new(commandRunner, new FakePrompts(), new NullReporter(), new FakeDirectiveSource());
 
         var result = await workflow.RunAsync(
@@ -125,6 +186,7 @@ public sealed class WorkflowTests
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "agents dry-run", string.Empty));
         CheckWorkflow workflow = new(commandRunner, new FakePrompts(), new NullReporter(), new FakeDirectiveSource());
 
         var result = await workflow.RunAsync(
@@ -149,6 +211,7 @@ public sealed class WorkflowTests
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "agents dry-run", string.Empty));
         CheckWorkflow workflow = new(commandRunner, new FakePrompts(), new NullReporter(), new FakeDirectiveSource());
 
         var result = await workflow.RunAsync(
@@ -184,6 +247,78 @@ public sealed class WorkflowTests
         Assert.Equal(0, result.ExitCode);
         Assert.True(File.Exists(Path.Combine(tempDirectory.Path, "AGENTS.md")));
         Assert.False(File.Exists(Path.Combine(tempDirectory.Path, "CLAUDE.md")));
+    }
+
+    [Fact]
+    public async Task SkillUpdatePromptRunsScopedUpdateForEachSkillsDirectoryAndShowsOutput()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
+        FakeCommandRunner commandRunner = new();
+        commandRunner.Enqueue(new CommandResult(0, "git version 2.50.0", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "Would update agents skill", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "Would update claude skill", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "agents updated", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "claude updated", "claude warning"));
+        FakePrompts prompts = new() { ConfirmResult = true };
+        RecordingReporter reporter = new();
+        CheckWorkflow workflow = new(commandRunner, prompts, reporter, new FakeDirectiveSource());
+
+        var result = await workflow.RunAsync(
+            new AgenticCheckOptions(tempDirectory.Path, false, false, null, null, null, false),
+            CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("Update these skills?", prompts.ConfirmPrompts);
+        string agentsSkillsDirectory = Path.Combine(tempDirectory.Path, ".agents", "skills");
+        string claudeSkillsDirectory = Path.Combine(tempDirectory.Path, ".claude", "skills");
+        Assert.Contains(commandRunner.Calls, call => call.Arguments.SequenceEqual(["skill", "update", "--dir", agentsSkillsDirectory, "--all", "--dry-run"]));
+        Assert.Contains(commandRunner.Calls, call => call.Arguments.SequenceEqual(["skill", "update", "--dir", claudeSkillsDirectory, "--all", "--dry-run"]));
+        Assert.Contains(commandRunner.Calls, call => call.Arguments.SequenceEqual(["skill", "update", "--dir", agentsSkillsDirectory, "--all"]));
+        Assert.Contains(commandRunner.Calls, call => call.Arguments.SequenceEqual(["skill", "update", "--dir", claudeSkillsDirectory, "--all"]));
+        Assert.Contains(reporter.Infos, message => message.Contains("Skills in", StringComparison.Ordinal)
+            && message.Contains("with update available", StringComparison.Ordinal));
+        Assert.Contains(reporter.Infos, message => message.Contains("Would update agents skill", StringComparison.Ordinal));
+        Assert.Contains(reporter.Infos, message => message.Contains("Would update claude skill", StringComparison.Ordinal));
+        Assert.Equal(2, reporter.OutdatedSkillCount);
+        Assert.Contains(reporter.Infos, message => message.Contains(agentsSkillsDirectory, StringComparison.Ordinal));
+        Assert.Contains(reporter.Infos, message => message.Contains("agents updated", StringComparison.Ordinal));
+        Assert.Contains(reporter.Infos, message => message.Contains(claudeSkillsDirectory, StringComparison.Ordinal));
+        Assert.Contains(reporter.Infos, message => message.Contains("claude updated", StringComparison.Ordinal));
+        Assert.Contains(reporter.Infos, message => message.Contains("Updated repo-local skills", StringComparison.Ordinal));
+        Assert.Contains(reporter.Warnings, message => message.Contains("claude warning", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task SkillUpdateDoesNotPromptWhenDryRunReportsNoUpdates()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
+        FakeCommandRunner commandRunner = new();
+        commandRunner.Enqueue(new CommandResult(0, "git version 2.50.0", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "No updates available.", string.Empty));
+        FakePrompts prompts = new() { ConfirmResult = true };
+        CheckWorkflow workflow = new(commandRunner, prompts, new NullReporter(), new FakeDirectiveSource());
+
+        var result = await workflow.RunAsync(
+            new AgenticCheckOptions(tempDirectory.Path, false, false, null, null, "standard", false),
+            CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.DoesNotContain("Update these skills?", prompts.ConfirmPrompts);
+        Assert.DoesNotContain(commandRunner.Calls, call => call.Arguments.SequenceEqual([
+            "skill",
+            "update",
+            "--dir",
+            Path.Combine(tempDirectory.Path, ".agents", "skills"),
+            "--all"]));
+        Assert.Contains(result.Report.Actions, action => action.Equals("No repo-local skill updates found.", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -239,11 +374,9 @@ public sealed class WorkflowTests
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "no updates", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "no updates", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "installed", string.Empty));
-        commandRunner.Enqueue(new CommandResult(0, "no updates", string.Empty));
-        commandRunner.Enqueue(new CommandResult(0, "no updates", string.Empty));
-        commandRunner.Enqueue(new CommandResult(0, "updated", string.Empty));
-        commandRunner.Enqueue(new CommandResult(0, "updated", string.Empty));
         CheckWorkflow workflow = new(commandRunner, new FakePrompts(), new NullReporter(), new FakeDirectiveSource());
 
         var result = await workflow.RunAsync(

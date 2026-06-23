@@ -68,6 +68,8 @@ sealed class FakePrompts : IUserPrompts
 {
     public bool ConfirmResult { get; init; } = true;
 
+    public List<string> ConfirmPrompts { get; } = [];
+
     public IReadOnlyList<string>? SelectedDirectiveNames { get; init; }
 
     public IReadOnlyList<string>? SelectedSkillInstallArgs { get; init; }
@@ -75,13 +77,13 @@ sealed class FakePrompts : IUserPrompts
     public Task<bool> ConfirmAsync(string prompt, bool defaultValue, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        ConfirmPrompts.Add(prompt);
         return Task.FromResult(ConfirmResult);
     }
 
     public Task<RecommendationSelectionResult> SelectRecommendationsAsync(
         IReadOnlyList<DirectivePlanItem> recommendedDirectives,
         IReadOnlyList<SkillManifestEntry> missingSkills,
-        RecommendationSelectionContext context,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -92,6 +94,47 @@ sealed class FakePrompts : IUserPrompts
             ? missingSkills
             : [.. missingSkills.Where(skill => SelectedSkillInstallArgs.Contains(skill.InstallArg, StringComparer.Ordinal))];
         return Task.FromResult(new RecommendationSelectionResult(selectedDirectives, selectedSkills));
+    }
+}
+
+sealed class RecordingReporter : IReporter
+{
+    public List<string> Infos { get; } = [];
+
+    public List<string> Successes { get; } = [];
+
+    public List<string> Warnings { get; } = [];
+
+    public List<string> Errors { get; } = [];
+
+    public string? TargetAgents { get; private set; }
+
+    public int? OutdatedSkillCount { get; private set; }
+
+    public void Info(string message)
+        => Infos.Add(message);
+
+    public void Success(string message)
+        => Successes.Add(message);
+
+    public void Warning(string message)
+        => Warnings.Add(message);
+
+    public void Error(string message)
+        => Errors.Add(message);
+
+    public void Summary(
+        string repoRoot,
+        IReadOnlySet<string> technologies,
+        string targetAgents,
+        IReadOnlyList<string> skillsDirectories,
+        DirectiveSummary directiveSummary,
+        int recommendedCount,
+        int missingCount,
+        int outdatedCount)
+    {
+        TargetAgents = targetAgents;
+        OutdatedSkillCount = outdatedCount;
     }
 }
 

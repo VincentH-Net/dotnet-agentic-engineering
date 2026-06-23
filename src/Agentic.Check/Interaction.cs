@@ -9,15 +9,8 @@ interface IUserPrompts
     Task<RecommendationSelectionResult> SelectRecommendationsAsync(
         IReadOnlyList<DirectivePlanItem> recommendedDirectives,
         IReadOnlyList<SkillManifestEntry> missingSkills,
-        RecommendationSelectionContext context,
         CancellationToken cancellationToken);
 }
-
-sealed record RecommendationSelectionContext(
-    string RepoRoot,
-    IReadOnlySet<string> Technologies,
-    IReadOnlyList<string> SkillsDirectories,
-    string Parameter);
 
 sealed record RecommendationSelectionResult(
     IReadOnlyList<DirectivePlanItem> SelectedDirectives,
@@ -38,11 +31,10 @@ sealed class SpectreUserPrompts(IAnsiConsole console) : IUserPrompts
     public Task<RecommendationSelectionResult> SelectRecommendationsAsync(
         IReadOnlyList<DirectivePlanItem> recommendedDirectives,
         IReadOnlyList<SkillManifestEntry> missingSkills,
-        RecommendationSelectionContext context,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return new RecommendationSelectionPrompt(console).PromptAsync(recommendedDirectives, missingSkills, context, cancellationToken);
+        return new RecommendationSelectionPrompt(console).PromptAsync(recommendedDirectives, missingSkills, cancellationToken);
     }
 }
 
@@ -59,10 +51,12 @@ interface IReporter
     void Summary(
         string repoRoot,
         IReadOnlySet<string> technologies,
+        string targetAgents,
         IReadOnlyList<string> skillsDirectories,
         DirectiveSummary directiveSummary,
         int recommendedCount,
-        int missingCount);
+        int missingCount,
+        int outdatedCount);
 }
 
 sealed class SpectreReporter(IAnsiConsole console) : IReporter
@@ -82,16 +76,19 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
     public void Summary(
         string repoRoot,
         IReadOnlySet<string> technologies,
+        string targetAgents,
         IReadOnlyList<string> skillsDirectories,
         DirectiveSummary directiveSummary,
         int recommendedCount,
-        int missingCount)
+        int missingCount,
+        int outdatedCount)
     {
         Table table = new();
         _ = table.AddColumn("Item");
         _ = table.AddColumn("Value");
         _ = table.AddRow("Repository", Markup.Escape(repoRoot));
         _ = table.AddRow("Stack", Markup.Escape(string.Join(", ", technologies.Order(StringComparer.OrdinalIgnoreCase))));
+        _ = table.AddRow("Target agents", Markup.Escape(targetAgents));
         _ = table.AddRow("Skills directories", Markup.Escape(string.Join(Environment.NewLine, skillsDirectories)));
         _ = table.AddRow("Create AGENTS.md", directiveSummary.CreateAgentsFile ? "yes" : "no");
         _ = table.AddRow("Create CLAUDE.md", directiveSummary.CreateClaudeFile ? "yes" : "no");
@@ -100,6 +97,7 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
         _ = table.AddRow("Outdated directives", directiveSummary.OutdatedCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
         _ = table.AddRow("Recommended skills", recommendedCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
         _ = table.AddRow("Missing skills", missingCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        _ = table.AddRow("Outdated skills", outdatedCount.ToString(System.Globalization.CultureInfo.InvariantCulture));
         console.Write(table);
     }
 }
@@ -125,10 +123,12 @@ sealed class NullReporter : IReporter
     public void Summary(
         string repoRoot,
         IReadOnlySet<string> technologies,
+        string targetAgents,
         IReadOnlyList<string> skillsDirectories,
         DirectiveSummary directiveSummary,
         int recommendedCount,
-        int missingCount)
+        int missingCount,
+        int outdatedCount)
     {
     }
 }
