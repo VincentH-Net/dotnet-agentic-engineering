@@ -4,6 +4,8 @@ namespace Agentic.Check;
 
 sealed record SkillUpdateCandidate(string Name, string SourceRepo);
 
+sealed record SkillUpdateDisplayItem(string Name, string SourceRepo, string Plugin);
+
 sealed class CheckWorkflow(
     ICommandRunner commandRunner,
     IUserPrompts prompts,
@@ -124,17 +126,10 @@ sealed class CheckWorkflow(
         report.MissingSkills.AddRange(missing.Select(SkillReportItem.FromManifestEntry));
 
         await RunSkillUpdateDryRunAsync(skillsDirectories, repoResolution.RepoRoot, report, cancellationToken).ConfigureAwait(false);
-        var skillUpdates = ExtractDistinctSkillUpdates(report.SkillUpdateDryRuns);
+        var skillUpdates = ExtractDistinctSkillUpdates(report.SkillUpdateDryRuns, recommended);
         report.OutdatedSkills = skillUpdates.Count;
 
         reporter.Summary(repoResolution.RepoRoot, stack.Technologies, targetAgents, skillsDirectories, directiveSummary, recommended.Count, missing.Count, report.OutdatedSkills);
-
-        if (stack.Technologies.Contains(TechnologyNames.Dotnet, StringComparer.OrdinalIgnoreCase))
-        {
-            const string advisory = "Recommended official .NET skills can be installed manually with: gh skill install dotnet/skills";
-            report.Advisories.Add(advisory);
-            reporter.Info(advisory);
-        }
 
         var recommendedDirectives = directivePlan.SelectableDirectives;
         IReadOnlyList<DirectivePlanItem> selectedDirectives = [];
@@ -157,7 +152,7 @@ sealed class CheckWorkflow(
                     .SelectRecommendationsAsync(recommendedDirectives, missing, cancellationToken)
                     .ConfigureAwait(false);
                 selectedDirectives = selection.SelectedDirectives;
-                selectedSkills = selection.SelectedSkills;
+                selectedSkills = AddSelectedSkillDependencies(selection.SelectedSkills, missing);
             }
         }
 
@@ -184,7 +179,7 @@ sealed class CheckWorkflow(
                 }
             }
 
-            ReportSkillUpdateDryRunActions(report.SkillUpdateDryRuns);
+            ReportSkillUpdateDryRunActions(report.SkillUpdateDryRuns, recommended);
 
             await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
             return new CheckRunResult(0, report);
@@ -201,8 +196,10 @@ sealed class CheckWorkflow(
 
             if (skillsDirectories.Count > 1)
             {
+                SkillManifestEntry[] copyableSkills = [.. selectedSkills
+                    .Where(skill => !SkillInstaller.IsMissing(skill, firstSkillsDirectory))];
                 report.SkillCopyResults.AddRange(skillInstaller.CopyInstalledSkills(
-                    selectedSkills,
+                    copyableSkills,
                     firstSkillsDirectory,
                     [.. skillsDirectories.Skip(1)]));
             }
@@ -234,7 +231,7 @@ sealed class CheckWorkflow(
             return;
         }
 
-        ReportSkillUpdates(skillUpdates);
+        ReportSkillUpdates(skillUpdates, recommendedSkills: StaticSkillManifest.All);
 
         bool update = options.Yes || await prompts.ConfirmAsync("Update these skill(s)?", false, cancellationToken)
             .ConfigureAwait(false);
@@ -334,31 +331,21 @@ sealed class CheckWorkflow(
         }
 
         reporter.Info("Would install skills into repo skills directories:");
-        foreach (var group in selectedSkills.GroupBy(skill => skill.SourceRepo, StringComparer.OrdinalIgnoreCase))
-        {
-            reporter.Info($"  {group.Key}:");
-            foreach (var skill in group)
-            {
-                reporter.Info($"    {skill.InstallArg}");
-            }
-        }
+        ReportSkillGroups(selectedSkills, skill => $"      {skill.LocalFolder}");
     }
 
-    void ReportSkillUpdateDryRunActions(IReadOnlyList<CommandReport> dryRunReports)
+    void ReportSkillUpdateDryRunActions(
+        IReadOnlyList<CommandReport> dryRunReports,
+        IReadOnlyList<SkillManifestEntry> recommendedSkills)
     {
-        string[] skillNames = [.. dryRunReports
-            .SelectMany(ExtractOutdatedSkillNames)
-            .Distinct(StringComparer.OrdinalIgnoreCase)];
-        if (skillNames.Length == 0)
+        SkillUpdateCandidate[] skillUpdates = [.. ExtractDistinctSkillUpdates(dryRunReports, recommendedSkills)];
+        if (skillUpdates.Length == 0)
         {
             return;
         }
 
         reporter.Info("Would update skills in repo skills directories:");
-        foreach (string skillName in skillNames)
-        {
-            reporter.Info($"  {skillName}");
-        }
+        ReportSkillUpdateGroups(skillUpdates, recommendedSkills);
     }
 
     void ReportUpToDateItems(
@@ -383,11 +370,11 @@ sealed class CheckWorkflow(
             .Select(SkillKey)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var updateSkillKeys = skillUpdates
-            .Select(update => SkillKey(update.SourceRepo, update.Name))
+            .SelectMany(update => UpdateSkillKeys(update, recommendedSkills))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         SkillManifestEntry[] upToDateSkills = [.. recommendedSkills
             .Where(skill => !missingSkillKeys.Contains(SkillKey(skill))
-                && !updateSkillKeys.Contains(SkillKey(skill.SourceRepo, skill.InstallArg)))
+                && !updateSkillKeys.Contains(SkillKey(skill)))
         ];
         if (upToDateSkills.Length == 0)
         {
@@ -395,38 +382,63 @@ sealed class CheckWorkflow(
         }
 
         reporter.Info("Up to date skills:");
-        ReportSkillGroups(upToDateSkills, skill => $"    ✓ {skill.InstallArg}");
+        ReportSkillGroups(upToDateSkills, skill => $"      ✓ {skill.LocalFolder}");
     }
 
-    void ReportSkillUpdates(IReadOnlyList<SkillUpdateCandidate> skillUpdates)
+    void ReportSkillUpdates(
+        IReadOnlyList<SkillUpdateCandidate> skillUpdates,
+        IReadOnlyList<SkillManifestEntry> recommendedSkills)
     {
         reporter.Info(string.Empty);
         reporter.Info(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Found {skillUpdates.Count} skill update(s) available:"));
-        ReportSkillUpdateGroups(skillUpdates);
+        ReportSkillUpdateGroups(skillUpdates, recommendedSkills);
     }
 
     void ReportSkillGroups(
         IEnumerable<SkillManifestEntry> skills,
         Func<SkillManifestEntry, string> formatSkill)
     {
-        foreach (var group in skills.GroupBy(skill => skill.SourceRepo, StringComparer.OrdinalIgnoreCase))
+        foreach (var sourceGroup in skills
+            .GroupBy(skill => skill.SourceRepo, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(group => SkillOrdering.GetSourceRepoOrder(group.Key))
+            .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase))
         {
-            reporter.Info($"  {group.Key}:");
-            foreach (var skill in group)
+            reporter.Info($"  {sourceGroup.Key}:");
+            foreach (var pluginGroup in sourceGroup
+                .GroupBy(FormatSkillPluginHeader, StringComparer.OrdinalIgnoreCase)
+                .OrderBy(group => SkillOrdering.GetPluginOrder(sourceGroup.Key, group.Key))
+                .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase))
             {
-                reporter.Info(formatSkill(skill));
+                reporter.Info($"    {pluginGroup.Key}:");
+                foreach (var skill in pluginGroup)
+                {
+                    reporter.Info(formatSkill(skill));
+                }
             }
         }
     }
 
-    void ReportSkillUpdateGroups(IReadOnlyList<SkillUpdateCandidate> skillUpdates)
+    void ReportSkillUpdateGroups(
+        IReadOnlyList<SkillUpdateCandidate> skillUpdates,
+        IReadOnlyList<SkillManifestEntry> recommendedSkills)
     {
-        foreach (var group in skillUpdates.GroupBy(update => update.SourceRepo, StringComparer.OrdinalIgnoreCase))
+        var displayItems = skillUpdates.Select(update => ResolveSkillUpdateDisplayItem(update, recommendedSkills));
+        foreach (var sourceGroup in displayItems
+            .GroupBy(update => update.SourceRepo, StringComparer.OrdinalIgnoreCase)
+            .OrderBy(group => SkillOrdering.GetSourceRepoOrder(group.Key))
+            .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase))
         {
-            reporter.Info($"  {group.Key}:");
-            foreach (var update in group)
+            reporter.Info($"  {sourceGroup.Key}:");
+            foreach (var pluginGroup in sourceGroup
+                .GroupBy(update => update.Plugin, StringComparer.OrdinalIgnoreCase)
+                .OrderBy(group => SkillOrdering.GetPluginOrder(sourceGroup.Key, group.Key))
+                .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase))
             {
-                reporter.Info($"    {update.Name}");
+                reporter.Info($"    {pluginGroup.Key}:");
+                foreach (var update in pluginGroup)
+                {
+                    reporter.Info($"      {update.Name}");
+                }
             }
         }
     }
@@ -444,10 +456,12 @@ sealed class CheckWorkflow(
         }
     }
 
-    static IReadOnlyList<SkillUpdateCandidate> ExtractDistinctSkillUpdates(IReadOnlyList<CommandReport> updateReports)
+    static IReadOnlyList<SkillUpdateCandidate> ExtractDistinctSkillUpdates(
+        IReadOnlyList<CommandReport> updateReports,
+        IReadOnlyList<SkillManifestEntry> recommendedSkills)
         => [.. updateReports
             .SelectMany(ExtractSkillUpdates)
-            .GroupBy(update => SkillKey(update.SourceRepo, update.Name), StringComparer.OrdinalIgnoreCase)
+            .GroupBy(update => CanonicalUpdateKey(update, recommendedSkills), StringComparer.OrdinalIgnoreCase)
             .Select(group => group.First())];
 
     static string SkillKey(SkillManifestEntry skill)
@@ -456,8 +470,69 @@ sealed class CheckWorkflow(
     static string SkillKey(string sourceRepo, string skillName)
         => $"{sourceRepo}\n{skillName}";
 
-    static IReadOnlyList<string> ExtractOutdatedSkillNames(CommandReport updateReport)
-        => [.. ExtractSkillUpdates(updateReport).Select(update => update.Name)];
+    static IReadOnlyList<SkillManifestEntry> AddSelectedSkillDependencies(
+        IReadOnlyList<SkillManifestEntry> selectedSkills,
+        IReadOnlyList<SkillManifestEntry> selectableSkills)
+    {
+        var selectableByKey = selectableSkills.ToDictionary(skill => skill.Key, StringComparer.OrdinalIgnoreCase);
+        var selectedKeys = selectedSkills.Select(skill => skill.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var skill in selectedSkills)
+        {
+            AddDependencies(skill);
+        }
+
+        return [.. selectableSkills.Where(skill => selectedKeys.Contains(skill.Key))];
+
+        void AddDependencies(SkillManifestEntry skill)
+        {
+            foreach (var dependency in skill.Dependencies)
+            {
+                if (!selectableByKey.TryGetValue(dependency.Key, out var selectableDependency)
+                    || !selectedKeys.Add(selectableDependency.Key))
+                {
+                    continue;
+                }
+
+                AddDependencies(selectableDependency);
+            }
+        }
+    }
+
+    static IEnumerable<string> UpdateSkillKeys(
+        SkillUpdateCandidate update,
+        IReadOnlyList<SkillManifestEntry> recommendedSkills)
+    {
+        yield return SkillKey(update.SourceRepo, update.Name);
+        foreach (var skill in FindMatchingManifestEntries(update, recommendedSkills))
+        {
+            yield return SkillKey(skill);
+        }
+    }
+
+    static string CanonicalUpdateKey(
+        SkillUpdateCandidate update,
+        IReadOnlyList<SkillManifestEntry> recommendedSkills)
+        => FindMatchingManifestEntries(update, recommendedSkills).FirstOrDefault() is { } skill
+            ? SkillKey(skill)
+            : SkillKey(update.SourceRepo, update.Name);
+
+    static SkillUpdateDisplayItem ResolveSkillUpdateDisplayItem(
+        SkillUpdateCandidate update,
+        IReadOnlyList<SkillManifestEntry> recommendedSkills)
+        => FindMatchingManifestEntries(update, recommendedSkills).FirstOrDefault() is { } skill
+            ? new SkillUpdateDisplayItem(skill.LocalFolder, skill.SourceRepo, FormatSkillPluginHeader(skill))
+            : new SkillUpdateDisplayItem(update.Name, update.SourceRepo, "default");
+
+    static IEnumerable<SkillManifestEntry> FindMatchingManifestEntries(
+        SkillUpdateCandidate update,
+        IReadOnlyList<SkillManifestEntry> recommendedSkills)
+        => recommendedSkills.Where(skill =>
+            skill.SourceRepo.Equals(update.SourceRepo, StringComparison.OrdinalIgnoreCase)
+            && (skill.InstallArg.Equals(update.Name, StringComparison.OrdinalIgnoreCase)
+                || skill.LocalFolder.Equals(update.Name, StringComparison.OrdinalIgnoreCase)));
+
+    static string FormatSkillPluginHeader(SkillManifestEntry skill)
+        => string.IsNullOrWhiteSpace(skill.Plugin) ? "default" : skill.Plugin;
 
     static IReadOnlyList<SkillUpdateCandidate> ExtractSkillUpdates(CommandReport updateReport)
     {

@@ -60,10 +60,15 @@ sealed record DirectiveSummary(
     int MissingCount,
     int OutdatedCount);
 
-sealed record SkillReportItem(string SourceRepo, string InstallArg, string LocalFolder)
+sealed record SkillReportItem(
+    string SourceRepo,
+    string InstallArg,
+    string LocalFolder,
+    string Plugin,
+    IReadOnlyList<SkillDependency> Dependencies)
 {
     internal static SkillReportItem FromManifestEntry(SkillManifestEntry entry)
-        => new(entry.SourceRepo, entry.InstallArg, entry.LocalFolder);
+        => new(entry.SourceRepo, entry.InstallArg, entry.LocalFolder, entry.Plugin, entry.Dependencies);
 }
 
 sealed record CommandReport(int ExitCode, string StandardOutput, string StandardError)

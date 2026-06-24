@@ -36,6 +36,11 @@ static class StackDetector
             _ = technologies.Add(TechnologyNames.Orleans);
         }
 
+        if (projectFiles.Any(IsAspNetCoreProject))
+        {
+            _ = technologies.Add(TechnologyNames.AspNetCore);
+        }
+
         AddMultiValueWarnings(unoGateReports, warnings);
         return new StackDetectionResult(technologies, unoGateReports, warnings);
     }
@@ -132,6 +137,96 @@ static class StackDetector
         return PackageReferences(document).Any(package => package.StartsWith("Microsoft.Orleans.", StringComparison.OrdinalIgnoreCase));
     }
 
+    static bool IsAspNetCoreProject(string projectFile)
+    {
+        var document = TryParseProject(projectFile, File.ReadAllText(projectFile), []);
+        if (document is null || IsTestProject(projectFile, document))
+        {
+            return false;
+        }
+
+        if (UsesWebSdk(document))
+        {
+            return true;
+        }
+
+        return FrameworkReferences(document).Any(reference => reference.Equals("Microsoft.AspNetCore.App", StringComparison.OrdinalIgnoreCase))
+            && HasAspNetCoreCodeSignal(Path.GetDirectoryName(projectFile) ?? ".");
+    }
+
+    static bool IsTestProject(string projectFile, XDocument document)
+    {
+        string fileName = Path.GetFileNameWithoutExtension(projectFile);
+        string[] pathParts = projectFile.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        return fileName.EndsWith(".Tests", StringComparison.OrdinalIgnoreCase)
+            || fileName.EndsWith(".Test", StringComparison.OrdinalIgnoreCase)
+            || pathParts.Any(part => part.Equals("test", StringComparison.OrdinalIgnoreCase)
+                || part.Equals("tests", StringComparison.OrdinalIgnoreCase))
+            || PackageReferences(document).Any(IsTestPackageReference);
+    }
+
+    static bool IsTestPackageReference(string packageId)
+    {
+        string[] testPackages =
+        [
+            "Microsoft.NET.Test.Sdk",
+            "MSTest",
+            "MSTest.TestAdapter",
+            "MSTest.TestFramework",
+            "NUnit",
+            "NUnit3TestAdapter",
+            "TUnit",
+            "xunit",
+            "xunit.runner.visualstudio"
+        ];
+        return testPackages.Any(package => packageId.Equals(package, StringComparison.OrdinalIgnoreCase)
+            || packageId.StartsWith($"{package}.", StringComparison.OrdinalIgnoreCase));
+    }
+
+    static bool UsesWebSdk(XDocument document)
+    {
+        string? projectSdk = document.Root?.Attribute("Sdk")?.Value;
+        return ContainsSdk(projectSdk, "Microsoft.NET.Sdk.Web")
+            || document.Descendants()
+                .Where(element => element.Name.LocalName.Equals("Sdk", StringComparison.OrdinalIgnoreCase))
+                .Select(element => element.Attribute("Name")?.Value)
+                .OfType<string>()
+                .Any(sdk => sdk.Equals("Microsoft.NET.Sdk.Web", StringComparison.OrdinalIgnoreCase));
+    }
+
+    static bool ContainsSdk(string? value, string sdk)
+        => value?.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Any(part => part.Equals(sdk, StringComparison.OrdinalIgnoreCase)
+                || part.StartsWith($"{sdk}/", StringComparison.OrdinalIgnoreCase)) == true;
+
+    static bool HasAspNetCoreCodeSignal(string projectDirectory)
+    {
+        string[] signals =
+        [
+            "WebApplication.CreateBuilder",
+            ".MapGet(",
+            ".MapPost(",
+            ".MapPut(",
+            ".MapDelete(",
+            ".MapGroup(",
+            ".MapControllers(",
+            ".MapControllerRoute(",
+            ".MapRazorPages(",
+            ".UseRouting(",
+            ".UseEndpoints(",
+            ".AddControllers(",
+            ".AddControllersWithViews(",
+            "ControllerBase"
+        ];
+
+        return EnumerateFiles(projectDirectory, "*.cs")
+            .Any(file =>
+            {
+                string content = File.ReadAllText(file);
+                return signals.Any(signal => content.Contains(signal, StringComparison.Ordinal));
+            });
+    }
+
     static bool ContainsUnoFeature(XDocument? document, string value)
         => document?.Descendants()
             .Where(element => element.Name.LocalName.Equals("UnoFeatures", StringComparison.OrdinalIgnoreCase))
@@ -143,6 +238,12 @@ static class StackDetector
     static IEnumerable<string> PackageReferences(XDocument? document)
         => document?.Descendants()
             .Where(element => element.Name.LocalName.Equals("PackageReference", StringComparison.OrdinalIgnoreCase))
+            .Select(element => element.Attribute("Include")?.Value ?? element.Attribute("Update")?.Value)
+            .OfType<string>() ?? [];
+
+    static IEnumerable<string> FrameworkReferences(XDocument? document)
+        => document?.Descendants()
+            .Where(element => element.Name.LocalName.Equals("FrameworkReference", StringComparison.OrdinalIgnoreCase))
             .Select(element => element.Attribute("Include")?.Value ?? element.Attribute("Update")?.Value)
             .OfType<string>() ?? [];
 
@@ -221,6 +322,7 @@ static class TechnologyNames
 {
     public const string Foundation = "foundation";
     public const string Dotnet = "dotnet";
+    public const string AspNetCore = "aspnetcore";
     public const string Uno = "uno";
     public const string Orleans = "orleans";
 }

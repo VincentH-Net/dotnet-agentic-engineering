@@ -35,6 +35,71 @@ public sealed class StackDetectorTests
     }
 
     [Fact]
+    public void DetectsAspNetCoreFromWebSdk()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write(
+            "WebApp.csproj",
+            """
+            <Project Sdk="Microsoft.NET.Sdk.Web">
+              <PropertyGroup>
+                <TargetFramework>net8.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+
+        var result = StackDetector.Detect(tempDirectory.Path);
+
+        Assert.Contains(TechnologyNames.AspNetCore, result.Technologies);
+    }
+
+    [Fact]
+    public void DetectsAspNetCoreFromFrameworkReferenceAndHostingCode()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write(
+            "Host.csproj",
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <ItemGroup>
+                <FrameworkReference Include="Microsoft.AspNetCore.App" />
+              </ItemGroup>
+            </Project>
+            """);
+        tempDirectory.Write(
+            "Program.cs",
+            """
+            var builder = WebApplication.CreateBuilder(args);
+            var app = builder.Build();
+            app.MapGet("/", () => "ok");
+            app.Run();
+            """);
+
+        var result = StackDetector.Detect(tempDirectory.Path);
+
+        Assert.Contains(TechnologyNames.AspNetCore, result.Technologies);
+    }
+
+    [Fact]
+    public void DoesNotDetectAspNetCoreForTestProject()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write(
+            "tests/WebApp.Tests/WebApp.Tests.csproj",
+            """
+            <Project Sdk="Microsoft.NET.Sdk.Web">
+              <ItemGroup>
+                <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.0" />
+              </ItemGroup>
+            </Project>
+            """);
+
+        var result = StackDetector.Detect(tempDirectory.Path);
+
+        Assert.DoesNotContain(TechnologyNames.AspNetCore, result.Technologies);
+    }
+
+    [Fact]
     public void DetectsUnoGatesFromFeaturesAndPackages()
     {
         using TempDirectory tempDirectory = new();

@@ -33,6 +33,8 @@ sealed record RecommendationSelectionItem(
 sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionItem> items)
 {
     readonly IReadOnlyList<RecommendationSelectionItem> items = items;
+    readonly Dictionary<string, IReadOnlyList<string>> dependencyKeysByKey = BuildDependencyKeysByKey(items);
+    readonly Dictionary<string, IReadOnlyList<string>> dependentKeysByKey = BuildDependentKeysByKey(items);
     readonly HashSet<string> selectedKeys = items.Select(item => item.Key).ToHashSet(StringComparer.Ordinal);
 
     public IReadOnlyList<RecommendationSelectionItem> FilteredItems { get; private set; } = items;
@@ -110,17 +112,53 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
         }
 
         string key = FilteredItems[CursorIndex].Key;
-        if (!selectedKeys.Remove(key))
+        if (selectedKeys.Contains(key))
         {
-            _ = selectedKeys.Add(key);
+            DeselectWithDependents(key);
+        }
+        else
+        {
+            SelectWithDependencies(key);
         }
     }
 
     void SetAllSelection(bool selected)
     {
+        if (!selected)
+        {
+            selectedKeys.Clear();
+            return;
+        }
+
         foreach (var item in items)
         {
-            _ = selected ? selectedKeys.Add(item.Key) : selectedKeys.Remove(item.Key);
+            SelectWithDependencies(item.Key);
+        }
+    }
+
+    void SelectWithDependencies(string key)
+    {
+        if (!selectedKeys.Add(key))
+        {
+            return;
+        }
+
+        foreach (string dependencyKey in dependencyKeysByKey.GetValueOrDefault(key, []))
+        {
+            SelectWithDependencies(dependencyKey);
+        }
+    }
+
+    void DeselectWithDependents(string key)
+    {
+        if (!selectedKeys.Remove(key))
+        {
+            return;
+        }
+
+        foreach (string dependentKey in dependentKeysByKey.GetValueOrDefault(key, []))
+        {
+            DeselectWithDependents(dependentKey);
         }
     }
 
@@ -151,12 +189,55 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
 
     static bool MatchesFilter(RecommendationSelectionItem item, string filter)
         => item.Display.Contains(filter, StringComparison.OrdinalIgnoreCase)
-            || item.Skill?.SourceRepo.Contains(filter, StringComparison.OrdinalIgnoreCase) == true;
+            || item.Skill?.SourceRepo.Contains(filter, StringComparison.OrdinalIgnoreCase) == true
+            || item.Skill?.Plugin.Contains(filter, StringComparison.OrdinalIgnoreCase) == true;
+
+    static Dictionary<string, IReadOnlyList<string>> BuildDependencyKeysByKey(IReadOnlyList<RecommendationSelectionItem> items)
+    {
+        var selectableKeys = items.Select(item => item.Key).ToHashSet(StringComparer.Ordinal);
+        Dictionary<string, IReadOnlyList<string>> dependencyKeysByKey = new(StringComparer.Ordinal);
+        foreach (var item in items.Where(item => item.Skill is not null))
+        {
+            string[] dependencyKeys = [.. item.Skill!.Dependencies
+                .Select(dependency => FormatSkillKey(dependency.SourceRepo, dependency.InstallArg))
+                .Where(selectableKeys.Contains)
+                .Distinct(StringComparer.Ordinal)];
+            dependencyKeysByKey[item.Key] = dependencyKeys;
+        }
+
+        return dependencyKeysByKey;
+    }
+
+    static Dictionary<string, IReadOnlyList<string>> BuildDependentKeysByKey(IReadOnlyList<RecommendationSelectionItem> items)
+    {
+        var dependencyKeysByKey = BuildDependencyKeysByKey(items);
+        Dictionary<string, List<string>> mutable = new(StringComparer.Ordinal);
+        foreach (var item in items)
+        {
+            foreach (string dependencyKey in dependencyKeysByKey.GetValueOrDefault(item.Key, []))
+            {
+                if (!mutable.TryGetValue(dependencyKey, out var dependents))
+                {
+                    dependents = [];
+                    mutable[dependencyKey] = dependents;
+                }
+
+                dependents.Add(item.Key);
+            }
+        }
+
+        return mutable.ToDictionary(
+            pair => pair.Key,
+            pair => (IReadOnlyList<string>)[.. pair.Value.Distinct(StringComparer.Ordinal)],
+            StringComparer.Ordinal);
+    }
+
+    internal static string FormatSkillKey(string sourceRepo, string installArg)
+        => $"skill:{SkillDependency.CreateKey(sourceRepo, installArg)}";
 }
 
 sealed class RecommendationSelectionPrompt(IAnsiConsole console)
 {
-    const int PageSize = 20;
     int previousRenderLineCount;
 
     public async Task<RecommendationSelectionResult> PromptAsync(
@@ -198,7 +279,7 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
             directive,
             null)));
         items.AddRange(missingSkills.Select(skill => new RecommendationSelectionItem(
-            $"skill:{skill.SourceRepo}:{skill.InstallArg}",
+            RecommendationSelectionState.FormatSkillKey(skill.SourceRepo, skill.InstallArg),
             FormatSkillListItem(skill),
             RecommendationSelectionKind.Skill,
             null,
@@ -218,10 +299,13 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
         };
 
     internal static string FormatSkillListItem(SkillManifestEntry skill)
-        => $"{skill.InstallArg} (install)";
+        => $"{skill.LocalFolder} (install)";
 
     internal static string FormatSkillSourceHeader(SkillManifestEntry skill)
         => skill.SourceRepo;
+
+    internal static string FormatSkillPluginHeader(SkillManifestEntry skill)
+        => string.IsNullOrWhiteSpace(skill.Plugin) ? "default" : skill.Plugin;
 
     internal static string FormatRecommendationPromptHeading(int itemCount)
         => string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Recommend {itemCount} action(s), select which to apply:");
@@ -274,18 +358,18 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
             return;
         }
 
-        int startIndex = Math.Max(0, Math.Min(state.CursorIndex - PageSize + 1, state.FilteredItems.Count - PageSize));
-        IReadOnlyList<RecommendationSelectionItem> visibleItems = [.. state.FilteredItems.Skip(startIndex).Take(PageSize)];
         RecommendationSelectionKind? lastKind = null;
         string? lastSkillSourceRepo = null;
-        for (int index = 0; index < visibleItems.Count; index++)
+        string? lastSkillPlugin = null;
+        for (int index = 0; index < state.FilteredItems.Count; index++)
         {
-            var item = visibleItems[index];
+            var item = state.FilteredItems[index];
             if (item.Kind != lastKind)
             {
                 MarkupLine($"[bold]{(item.Kind == RecommendationSelectionKind.Directive ? "Directives" : "Skills")}[/]");
                 lastKind = item.Kind;
                 lastSkillSourceRepo = null;
+                lastSkillPlugin = null;
             }
 
             if (item.Skill is not null)
@@ -295,20 +379,22 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
                 {
                     MarkupLine($"  [bold]{Markup.Escape(skillSourceRepo)}[/]");
                     lastSkillSourceRepo = skillSourceRepo;
+                    lastSkillPlugin = null;
+                }
+
+                string skillPlugin = FormatSkillPluginHeader(item.Skill);
+                if (!skillPlugin.Equals(lastSkillPlugin, StringComparison.OrdinalIgnoreCase))
+                {
+                    MarkupLine($"    [bold]{Markup.Escape(skillPlugin)}[/]");
+                    lastSkillPlugin = skillPlugin;
                 }
             }
 
-            string cursor = startIndex + index == state.CursorIndex ? ">" : " ";
+            string cursor = index == state.CursorIndex ? ">" : " ";
             string check = state.IsSelected(item) ? "[[x]]" : "[[ ]]";
             string display = Markup.Escape(item.Display);
-            string indent = item.Skill is null ? string.Empty : "  ";
+            string indent = item.Skill is null ? string.Empty : "    ";
             console.MarkupLine($"{indent}{cursor} {check} {display}");
-            lineCount++;
-        }
-
-        if (state.FilteredItems.Count > PageSize)
-        {
-            console.MarkupLineInterpolated($"[grey]Showing {PageSize} of {state.FilteredItems.Count} matches.[/]");
             lineCount++;
         }
 

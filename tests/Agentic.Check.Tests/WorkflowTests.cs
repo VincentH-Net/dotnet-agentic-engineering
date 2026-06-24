@@ -13,10 +13,17 @@ public sealed class WorkflowTests
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
-        commandRunner.Enqueue(new CommandResult(0, "Would update dotnet-livecharts2", string.Empty));
-        commandRunner.Enqueue(new CommandResult(0, "Would update dotnet-modern-csharp-editorconfig", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "Would update dotnet-livecharts2 (VincentH-Net/dotnet-agentic-engineering)", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "Would update dotnet-modern-csharp-editorconfig (VincentH-Net/dotnet-agentic-engineering)", string.Empty));
         RecordingReporter reporter = new();
-        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), reporter, new FakeDirectiveSource());
+        CheckWorkflow workflow = new(
+            commandRunner,
+            new FakePrompts
+            {
+                SelectedSkillInstallArgs = []
+            },
+            reporter,
+            new FakeDirectiveSource());
 
         var result = await workflow.RunAsync(
             new AgenticCheckOptions(tempDirectory.Path, true, false, null, null, null, false),
@@ -47,11 +54,15 @@ public sealed class WorkflowTests
         Assert.Contains("  foundation-prompt-log", reporter.Infos);
         Assert.Contains("Would install skills into repo skills directories:", reporter.Infos);
         Assert.Contains("  VincentH-Net/dotnet-agentic-engineering:", reporter.Infos);
-        Assert.Contains("    dotnet-livecharts2", reporter.Infos);
-        Assert.Contains("    dotnet-modern-csharp-editorconfig", reporter.Infos);
+        Assert.Contains("    dotnet:", reporter.Infos);
+        Assert.Contains("      dotnet-livecharts2", reporter.Infos);
+        Assert.Contains("      dotnet-modern-csharp-editorconfig", reporter.Infos);
+        Assert.Contains("  dotnet/skills:", reporter.Infos);
+        Assert.Contains("    dotnet-test:", reporter.Infos);
+        Assert.Contains("      run-tests", reporter.Infos);
         Assert.Contains("Would update skills in repo skills directories:", reporter.Infos);
-        Assert.Contains("  dotnet-livecharts2", reporter.Infos);
-        Assert.Contains("  dotnet-modern-csharp-editorconfig", reporter.Infos);
+        Assert.Contains("      dotnet-livecharts2", reporter.Infos);
+        Assert.Contains("      dotnet-modern-csharp-editorconfig", reporter.Infos);
         Assert.DoesNotContain(reporter.Infos, message => message.Contains("Would update repo-local skills", StringComparison.Ordinal));
         Assert.DoesNotContain(reporter.Infos, message => message.StartsWith("Directive ", StringComparison.Ordinal));
         Assert.Equal("standard,claude-code", reporter.TargetAgents);
@@ -77,7 +88,14 @@ public sealed class WorkflowTests
         commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "No updates available.", string.Empty));
         RecordingReporter reporter = new();
-        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), reporter, new FakeDirectiveSource());
+        CheckWorkflow workflow = new(
+            commandRunner,
+            new FakePrompts
+            {
+                SelectedSkillInstallArgs = []
+            },
+            reporter,
+            new FakeDirectiveSource());
 
         var result = await workflow.RunAsync(
             new AgenticCheckOptions(tempDirectory.Path, true, false, null, null, "standard", false),
@@ -104,10 +122,17 @@ public sealed class WorkflowTests
         commandRunner.Enqueue(new CommandResult(0, "no updates", string.Empty));
         commandRunner.Enqueue(new CommandResult(1, string.Empty, "skill not found"));
         RecordingReporter reporter = new();
-        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), reporter, new FakeDirectiveSource());
+        CheckWorkflow workflow = new(
+            commandRunner,
+            new FakePrompts
+            {
+                SelectedSkillInstallArgs = ["dotnet-modern-csharp-editorconfig"]
+            },
+            reporter,
+            new FakeDirectiveSource());
 
         var result = await workflow.RunAsync(
-            new AgenticCheckOptions(tempDirectory.Path, false, true, null, null, null, false),
+            new AgenticCheckOptions(tempDirectory.Path, false, false, null, null, null, false),
             CancellationToken.None);
 
         Assert.Equal(1, result.ExitCode);
@@ -280,7 +305,14 @@ public sealed class WorkflowTests
         commandRunner.Enqueue(new CommandResult(0, "No updates available.", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "No updates available.", string.Empty));
         RecordingReporter reporter = new();
-        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), reporter, new FakeDirectiveSource());
+        CheckWorkflow workflow = new(
+            commandRunner,
+            new FakePrompts
+            {
+                SelectedSkillInstallArgs = []
+            },
+            reporter,
+            new FakeDirectiveSource());
 
         var result = await workflow.RunAsync(
             new AgenticCheckOptions(tempDirectory.Path, false, false, null, null, null, false),
@@ -291,8 +323,9 @@ public sealed class WorkflowTests
         Assert.Contains("  ✓ foundation-prompt-log", reporter.Infos);
         Assert.Contains("Up to date skills:", reporter.Infos);
         Assert.Contains("  VincentH-Net/dotnet-agentic-engineering:", reporter.Infos);
-        Assert.Contains("    ✓ dotnet-livecharts2", reporter.Infos);
-        Assert.Contains("    ✓ dotnet-modern-csharp-editorconfig", reporter.Infos);
+        Assert.Contains("    dotnet:", reporter.Infos);
+        Assert.Contains("      ✓ dotnet-livecharts2", reporter.Infos);
+        Assert.Contains("      ✓ dotnet-modern-csharp-editorconfig", reporter.Infos);
         Assert.DoesNotContain(reporter.Infos, message => message.StartsWith("Directive ", StringComparison.Ordinal));
     }
 
@@ -341,7 +374,8 @@ public sealed class WorkflowTests
         Assert.Contains("Found 1 skill update(s) available:", reporter.Infos);
         Assert.Contains(string.Empty, reporter.Infos);
         Assert.Contains("  VincentH-Net/dotnet-agentic-engineering:", reporter.Infos);
-        Assert.Contains("    dotnet-livecharts2", reporter.Infos);
+        Assert.Contains("    dotnet:", reporter.Infos);
+        Assert.Contains("      dotnet-livecharts2", reporter.Infos);
         Assert.Equal(1, reporter.OutdatedSkillCount);
         Assert.DoesNotContain(reporter.Infos, message => message.Contains("Skills in", StringComparison.Ordinal)
             && message.Contains("with update available", StringComparison.Ordinal));
@@ -391,7 +425,7 @@ public sealed class WorkflowTests
         Assert.Equal(0, result.ExitCode);
         Assert.Equal(1, result.Report.OutdatedSkills);
         Assert.Equal(1, reporter.OutdatedSkillCount);
-        Assert.Contains("  dotnet-livecharts2", reporter.Infos);
+        Assert.Contains("      dotnet-livecharts2", reporter.Infos);
         Assert.DoesNotContain("  1 update(s) available:", reporter.Infos);
     }
 
@@ -456,6 +490,72 @@ public sealed class WorkflowTests
     }
 
     [Fact]
+    public async Task InteractiveSelectionInstallsSelectedSkillDependencies()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
+        tempDirectory.Write("App.csproj", "<Project />");
+        FakeCommandRunner commandRunner = new()
+        {
+            OnRun = call =>
+            {
+                if (!call.Arguments.Contains("install"))
+                {
+                    return;
+                }
+
+                string localFolder = call.Arguments[3].Split('/')[^1];
+                tempDirectory.Write(Path.Combine(".agents", "skills", localFolder, "SKILL.md"), "# Installed");
+            }
+        };
+        commandRunner.Enqueue(new CommandResult(0, "git version 2.50.0", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "no updates", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "no updates", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "installed filter-syntax", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "installed platform-detection", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "installed run-tests", string.Empty));
+        CheckWorkflow workflow = new(
+            commandRunner,
+            new FakePrompts
+            {
+                SelectedDirectiveNames = [],
+                SelectedSkillInstallArgs = ["plugins/dotnet-test/skills/run-tests@main"]
+            },
+            new NullReporter(),
+            new FakeDirectiveSource());
+
+        var result = await workflow.RunAsync(
+            new AgenticCheckOptions(tempDirectory.Path, false, false, null, null, null, false),
+            CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains(commandRunner.Calls, call => call.Arguments.SequenceEqual([
+            "skill",
+            "install",
+            "dotnet/skills",
+            "plugins/dotnet-test/skills/filter-syntax@main",
+            "--dir",
+            Path.Combine(tempDirectory.Path, ".agents", "skills")]));
+        Assert.Contains(commandRunner.Calls, call => call.Arguments.SequenceEqual([
+            "skill",
+            "install",
+            "dotnet/skills",
+            "plugins/dotnet-test/skills/platform-detection@main",
+            "--dir",
+            Path.Combine(tempDirectory.Path, ".agents", "skills")]));
+        Assert.Contains(commandRunner.Calls, call => call.Arguments.SequenceEqual([
+            "skill",
+            "install",
+            "dotnet/skills",
+            "plugins/dotnet-test/skills/run-tests@main",
+            "--dir",
+            Path.Combine(tempDirectory.Path, ".agents", "skills")]));
+    }
+
+    [Fact]
     public async Task InstallsIntoFirstAgentDirectoryAndCopiesToRemainingDirectories()
     {
         using TempDirectory tempDirectory = new();
@@ -480,15 +580,21 @@ public sealed class WorkflowTests
         commandRunner.Enqueue(new CommandResult(0, "no updates", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "no updates", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "installed", string.Empty));
-        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), new NullReporter(), new FakeDirectiveSource());
+        CheckWorkflow workflow = new(
+            commandRunner,
+            new FakePrompts
+            {
+                SelectedSkillInstallArgs = ["dotnet-modern-csharp-editorconfig"]
+            },
+            new NullReporter(),
+            new FakeDirectiveSource());
 
         var result = await workflow.RunAsync(
-            new AgenticCheckOptions(tempDirectory.Path, false, true, null, null, null, false),
+            new AgenticCheckOptions(tempDirectory.Path, false, false, null, null, null, false),
             CancellationToken.None);
 
         Assert.Equal(0, result.ExitCode);
         _ = Assert.Single(commandRunner.Calls, call => call.Arguments.Contains("install"));
-        Assert.True(File.Exists(Path.Combine(tempDirectory.Path, ".claude", "skills", "dotnet-livecharts2", "SKILL.md")));
         Assert.True(File.Exists(Path.Combine(tempDirectory.Path, ".claude", "skills", "dotnet-modern-csharp-editorconfig", "SKILL.md")));
     }
 }

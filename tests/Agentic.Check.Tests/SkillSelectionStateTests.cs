@@ -64,6 +64,7 @@ public sealed class SkillSelectionStateTests
 
         Assert.Equal("missing-skill (install)", RecommendationSelectionPrompt.FormatSkillListItem(skill));
         Assert.Equal("owner/repo", RecommendationSelectionPrompt.FormatSkillSourceHeader(skill));
+        Assert.Equal("default", RecommendationSelectionPrompt.FormatSkillPluginHeader(skill));
     }
 
     [Fact]
@@ -108,6 +109,56 @@ public sealed class SkillSelectionStateTests
         Assert.Equal("second", filteredItem.Skill?.LocalFolder);
     }
 
+    [Fact]
+    public void SelectingSkillSelectsMissingDependencies()
+    {
+        RecommendationSelectionState state = new([
+            CreateSkillItem(new SkillManifestEntry(
+                "owner/repo",
+                "dependency",
+                "dependency",
+                TechnologyNames.Dotnet,
+                [])),
+            CreateSkillItem(new SkillManifestEntry(
+                "owner/repo",
+                "dependent",
+                "dependent",
+                TechnologyNames.Dotnet,
+                [],
+                dependencies: [new SkillDependency("owner/repo", "dependency")]))
+        ]);
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.SelectNone));
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Down));
+
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Toggle));
+
+        Assert.Equal(["dependency", "dependent"], state.SelectedSkills.Select(skill => skill.LocalFolder));
+    }
+
+    [Fact]
+    public void DeselectingDependencyDeselectsDependentSkills()
+    {
+        RecommendationSelectionState state = new([
+            CreateSkillItem(new SkillManifestEntry(
+                "owner/repo",
+                "dependency",
+                "dependency",
+                TechnologyNames.Dotnet,
+                [])),
+            CreateSkillItem(new SkillManifestEntry(
+                "owner/repo",
+                "dependent",
+                "dependent",
+                TechnologyNames.Dotnet,
+                [],
+                dependencies: [new SkillDependency("owner/repo", "dependency")]))
+        ]);
+
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Toggle));
+
+        Assert.Empty(state.SelectedSkills);
+    }
+
     static IReadOnlyList<RecommendationSelectionItem> CreateItems(string[] directiveNames, string[] skillNames)
         => [.. directiveNames
             .Select(name => new RecommendationSelectionItem(
@@ -117,9 +168,17 @@ public sealed class SkillSelectionStateTests
                 new DirectivePlanItem(name, DirectiveStatuses.Missing, $"content {name}"),
                 null))
             .Concat(skillNames.Select(name => new RecommendationSelectionItem(
-                $"skill:owner/repo:{name}",
+                RecommendationSelectionState.FormatSkillKey("owner/repo", name),
                 name,
                 RecommendationSelectionKind.Skill,
                 null,
                 new SkillManifestEntry("owner/repo", name, name, TechnologyNames.Dotnet, []))))];
+
+    static RecommendationSelectionItem CreateSkillItem(SkillManifestEntry skill)
+        => new(
+            RecommendationSelectionState.FormatSkillKey(skill.SourceRepo, skill.InstallArg),
+            skill.LocalFolder,
+            RecommendationSelectionKind.Skill,
+            null,
+            skill);
 }
