@@ -302,10 +302,16 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
         => $"{skill.LocalFolder} (install)";
 
     internal static string FormatSkillSourceHeader(SkillManifestEntry skill)
-        => skill.SourceRepo;
+        => FormatSkillSourceHeader(skill.SourceRepo);
+
+    internal static string FormatSkillSourceHeader(string sourceRepo)
+        => $"{sourceRepo} repo";
 
     internal static string FormatSkillPluginHeader(SkillManifestEntry skill)
-        => string.IsNullOrWhiteSpace(skill.Plugin) ? "default" : skill.Plugin;
+        => FormatSkillPluginHeader(skill.Plugin);
+
+    internal static string FormatSkillPluginHeader(string plugin)
+        => $"{(string.IsNullOrWhiteSpace(plugin) ? "default" : plugin)} plugin";
 
     internal static string FormatRecommendationPromptHeading(int itemCount)
         => string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Recommend {itemCount} action(s), select which to apply:");
@@ -374,18 +380,18 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
 
             if (item.Skill is not null)
             {
-                string skillSourceRepo = FormatSkillSourceHeader(item.Skill);
+                string skillSourceRepo = item.Skill.SourceRepo;
                 if (!skillSourceRepo.Equals(lastSkillSourceRepo, StringComparison.OrdinalIgnoreCase))
                 {
-                    MarkupLine($"  [bold]{Markup.Escape(skillSourceRepo)}[/]");
+                    MarkupLine($"  [bold]{Markup.Escape(FormatSkillSourceHeader(skillSourceRepo))}[/]");
                     lastSkillSourceRepo = skillSourceRepo;
                     lastSkillPlugin = null;
                 }
 
-                string skillPlugin = FormatSkillPluginHeader(item.Skill);
+                string skillPlugin = item.Skill.Plugin;
                 if (!skillPlugin.Equals(lastSkillPlugin, StringComparison.OrdinalIgnoreCase))
                 {
-                    MarkupLine($"    [bold]{Markup.Escape(skillPlugin)}[/]");
+                    MarkupLine($"    [bold]{Markup.Escape(FormatSkillPluginHeader(skillPlugin))}[/]");
                     lastSkillPlugin = skillPlugin;
                 }
             }

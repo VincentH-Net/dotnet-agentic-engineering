@@ -40,6 +40,8 @@ sealed class SpectreUserPrompts(IAnsiConsole console) : IUserPrompts
 
 interface IReporter
 {
+    void Plain(string message);
+
     void Info(string message);
 
     void Success(string message);
@@ -57,12 +59,21 @@ interface IReporter
         int recommendedCount,
         int missingCount,
         int outdatedCount);
+
+    Task RunProgressAsync(
+        string description,
+        int total,
+        Func<Action, Task> action,
+        CancellationToken cancellationToken);
 }
 
 sealed class SpectreReporter(IAnsiConsole console) : IReporter
 {
     internal const string SummaryLabelColumnHeader = "Check";
     internal const string SummaryValueColumnHeader = "Status";
+
+    public void Plain(string message)
+        => console.MarkupLine(Markup.Escape(message));
 
     public void Info(string message)
         => console.MarkupLineInterpolated($"[grey]{message}[/]");
@@ -99,6 +110,31 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
         _ = table.AddRow("Recommended skills", Markup.Escape(FormatSkillSummary(recommendedCount, missingCount, outdatedCount)));
         console.Write(table);
     }
+
+    public async Task RunProgressAsync(
+        string description,
+        int total,
+        Func<Action, Task> action,
+        CancellationToken cancellationToken)
+        => await console.Progress()
+            .AutoClear(false)
+            .Columns(
+            [
+                new TaskDescriptionColumn(),
+                new ProgressBarColumn(),
+                new PercentageColumn(),
+                new SpinnerColumn()
+            ])
+            .StartAsync(async context =>
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var task = context.AddTask(description, maxValue: Math.Max(total, 1));
+                await action(() => task.Increment(1)).ConfigureAwait(false);
+                if (!task.IsFinished)
+                {
+                    task.Value = task.MaxValue;
+                }
+            }).ConfigureAwait(false);
 
     internal static string FormatDirectiveSummary(DirectiveSummary directiveSummary)
         => FormatRecommendationStatus(
@@ -151,6 +187,10 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
 
 sealed class NullReporter : IReporter
 {
+    public void Plain(string message)
+    {
+    }
+
     public void Info(string message)
     {
     }
@@ -177,5 +217,15 @@ sealed class NullReporter : IReporter
         int missingCount,
         int outdatedCount)
     {
+    }
+
+    public async Task RunProgressAsync(
+        string description,
+        int total,
+        Func<Action, Task> action,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        await action(() => { }).ConfigureAwait(false);
     }
 }

@@ -63,8 +63,8 @@ public sealed class SkillSelectionStateTests
         SkillManifestEntry skill = new("owner/repo", "missing-skill", "missing-skill", TechnologyNames.Dotnet, []);
 
         Assert.Equal("missing-skill (install)", RecommendationSelectionPrompt.FormatSkillListItem(skill));
-        Assert.Equal("owner/repo", RecommendationSelectionPrompt.FormatSkillSourceHeader(skill));
-        Assert.Equal("default", RecommendationSelectionPrompt.FormatSkillPluginHeader(skill));
+        Assert.Equal("owner/repo repo", RecommendationSelectionPrompt.FormatSkillSourceHeader(skill));
+        Assert.Equal("default plugin", RecommendationSelectionPrompt.FormatSkillPluginHeader(skill));
     }
 
     [Fact]

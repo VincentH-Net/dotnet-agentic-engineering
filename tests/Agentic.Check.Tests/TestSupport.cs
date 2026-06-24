@@ -107,9 +107,18 @@ sealed class RecordingReporter : IReporter
 
     public List<string> Errors { get; } = [];
 
+    public List<string> ProgressDescriptions { get; } = [];
+
+    public Dictionary<string, int> ProgressTicksByDescription { get; } = new(StringComparer.Ordinal);
+
+    public int ProgressTicks { get; private set; }
+
     public string? TargetAgents { get; private set; }
 
     public int? OutdatedSkillCount { get; private set; }
+
+    public void Plain(string message)
+        => Infos.Add(message);
 
     public void Info(string message)
         => Infos.Add(message);
@@ -135,6 +144,22 @@ sealed class RecordingReporter : IReporter
     {
         TargetAgents = targetAgents;
         OutdatedSkillCount = outdatedCount;
+    }
+
+    public async Task RunProgressAsync(
+        string description,
+        int total,
+        Func<Action, Task> action,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        ProgressDescriptions.Add(description);
+        ProgressTicksByDescription[description] = 0;
+        await action(() =>
+        {
+            ProgressTicks++;
+            ProgressTicksByDescription[description]++;
+        }).ConfigureAwait(false);
     }
 }
 

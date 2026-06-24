@@ -57,16 +57,6 @@ sealed class CheckWorkflow(
             return new CheckRunResult(2, report);
         }
 
-        var stack = StackDetector.Detect(repoResolution.RepoRoot);
-        report.Technologies.AddRange(stack.Technologies.Order(StringComparer.OrdinalIgnoreCase));
-        report.UnoGates.AddRange(stack.UnoGates);
-        report.Warnings.AddRange(stack.Warnings);
-
-        foreach (string warning in stack.Warnings)
-        {
-            reporter.Warning(warning);
-        }
-
         IReadOnlyList<string> skillsDirectories;
         bool manageClaudeFile;
         string targetAgents;
@@ -94,10 +84,54 @@ sealed class CheckWorkflow(
             manageClaudeFile = directoryResolution.ManageClaude;
         }
 
+        StackDetectionResult? stack = null;
+        DirectivePlanResult? directivePlan = null;
+        IReadOnlyList<SkillManifestEntry> recommended = [];
+        IReadOnlyList<SkillManifestEntry> missing = [];
+        IReadOnlyList<SkillUpdateCandidate> skillUpdates = [];
         DirectiveInstaller directiveInstaller = new(directiveSource ?? new GitHubDirectiveSource(), reporter);
-        var directivePlan = await directiveInstaller
-            .PlanAsync(repoResolution.RepoRoot, stack, manageClaudeFile, cancellationToken)
-            .ConfigureAwait(false);
+        string firstSkillsDirectory = skillsDirectories[0];
+        report.SkillsDirectory = firstSkillsDirectory;
+        report.SkillsDirectories.AddRange(skillsDirectories);
+
+        await reporter.RunProgressAsync(
+            "Scanning repository (tech stack, directives, skills)",
+            3,
+            async advance =>
+            {
+                var detectedStack = StackDetector.Detect(repoResolution.RepoRoot);
+                stack = detectedStack;
+                report.Technologies.AddRange(detectedStack.Technologies.Order(StringComparer.OrdinalIgnoreCase));
+                report.UnoGates.AddRange(detectedStack.UnoGates);
+                report.Warnings.AddRange(detectedStack.Warnings);
+                advance();
+
+                directivePlan = await directiveInstaller
+                    .PlanAsync(repoResolution.RepoRoot, detectedStack, manageClaudeFile, cancellationToken)
+                    .ConfigureAwait(false);
+                advance();
+
+                recommended = SkillPlanner.Plan(StaticSkillManifest.All, detectedStack);
+                report.RecommendedSkills.AddRange(recommended.Select(SkillReportItem.FromManifestEntry));
+
+                missing = SkillInstaller.FindMissing(recommended, skillsDirectories);
+                report.MissingSkills.AddRange(missing.Select(SkillReportItem.FromManifestEntry));
+
+                await RunSkillUpdateDryRunAsync(skillsDirectories, repoResolution.RepoRoot, report, cancellationToken).ConfigureAwait(false);
+                skillUpdates = ExtractDistinctSkillUpdates(report.SkillUpdateDryRuns, recommended);
+                report.OutdatedSkills = skillUpdates.Count;
+                advance();
+            },
+            cancellationToken).ConfigureAwait(false);
+
+        stack = stack ?? throw new InvalidOperationException("Repository scan did not detect a stack.");
+        directivePlan = directivePlan ?? throw new InvalidOperationException("Repository scan did not plan directives.");
+
+        foreach (string warning in stack.Warnings)
+        {
+            reporter.Warning(warning);
+        }
+
         report.AgentsFile = directivePlan.AgentsFile;
         report.ClaudeFile = directivePlan.ClaudeFile;
         report.Directives.AddRange(directivePlan.Directives.Select(directive => new DirectiveReportItem(directive.Name, directive.Status)));
@@ -114,20 +148,6 @@ sealed class CheckWorkflow(
             directivePlan.MissingCount,
             directivePlan.OutdatedCount);
         report.DirectiveSummary = directiveSummary;
-
-        string firstSkillsDirectory = skillsDirectories[0];
-        report.SkillsDirectory = firstSkillsDirectory;
-        report.SkillsDirectories.AddRange(skillsDirectories);
-
-        var recommended = SkillPlanner.Plan(StaticSkillManifest.All, stack);
-        report.RecommendedSkills.AddRange(recommended.Select(SkillReportItem.FromManifestEntry));
-
-        var missing = SkillInstaller.FindMissing(recommended, skillsDirectories);
-        report.MissingSkills.AddRange(missing.Select(SkillReportItem.FromManifestEntry));
-
-        await RunSkillUpdateDryRunAsync(skillsDirectories, repoResolution.RepoRoot, report, cancellationToken).ConfigureAwait(false);
-        var skillUpdates = ExtractDistinctSkillUpdates(report.SkillUpdateDryRuns, recommended);
-        report.OutdatedSkills = skillUpdates.Count;
 
         reporter.Summary(repoResolution.RepoRoot, stack.Technologies, targetAgents, skillsDirectories, directiveSummary, recommended.Count, missing.Count, report.OutdatedSkills);
 
@@ -242,28 +262,41 @@ sealed class CheckWorkflow(
             return;
         }
 
-        bool hasErrors = false;
-        foreach (string skillsDirectory in skillsDirectories)
-        {
-            var updateResult = await commandRunner.RunAsync(
-                "gh",
-                ["skill", "update", "--dir", skillsDirectory, "--all"],
-                repoRoot,
-                cancellationToken).ConfigureAwait(false);
-
-            report.Actions.Add($"Ran gh skill update --dir {skillsDirectory} --all.");
-            var updateReport = CommandReport.FromCommandResult(updateResult);
-            report.SkillUpdates.Add(updateReport);
-            report.SkillUpdate ??= updateReport;
-            if (!updateReport.Success)
+        List<(string SkillsDirectory, CommandReport Report)> failures = [];
+        await reporter.RunProgressAsync(
+            "Updating skills",
+            skillsDirectories.Count,
+            async advance =>
             {
-                hasErrors = true;
-                reporter.Error($"Failed to update skills in {skillsDirectory}.");
-                ReportCommandOutput(updateReport);
-            }
+                foreach (string skillsDirectory in skillsDirectories)
+                {
+                    var updateResult = await commandRunner.RunAsync(
+                        "gh",
+                        ["skill", "update", "--dir", skillsDirectory, "--all"],
+                        repoRoot,
+                        cancellationToken).ConfigureAwait(false);
+
+                    report.Actions.Add($"Ran gh skill update --dir {skillsDirectory} --all.");
+                    var updateReport = CommandReport.FromCommandResult(updateResult);
+                    report.SkillUpdates.Add(updateReport);
+                    report.SkillUpdate ??= updateReport;
+                    if (!updateReport.Success)
+                    {
+                        failures.Add((skillsDirectory, updateReport));
+                    }
+
+                    advance();
+                }
+            },
+            cancellationToken).ConfigureAwait(false);
+
+        foreach (var (skillsDirectory, updateReport) in failures)
+        {
+            reporter.Error($"Failed to update skills in {skillsDirectory}.");
+            ReportCommandOutput(updateReport);
         }
 
-        if (!hasErrors)
+        if (failures.Count == 0)
         {
             reporter.Success(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Updated {skillUpdates.Count} skill(s) successfully."));
         }
@@ -359,10 +392,10 @@ sealed class CheckWorkflow(
         ];
         if (currentDirectives.Length > 0)
         {
-            reporter.Info("Up to date directives:");
+            reporter.Plain("Up to date directives:");
             foreach (var directive in currentDirectives)
             {
-                reporter.Info($"  ✓ {directive.Name}");
+                reporter.Success($"  ✓ {directive.Name}");
             }
         }
 
@@ -381,8 +414,12 @@ sealed class CheckWorkflow(
             return;
         }
 
-        reporter.Info("Up to date skills:");
-        ReportSkillGroups(upToDateSkills, skill => $"      ✓ {skill.LocalFolder}");
+        reporter.Plain("Up to date skills:");
+        ReportSkillGroups(
+            upToDateSkills,
+            skill => $"      ✓ {skill.LocalFolder}",
+            HeaderStyle.Plain,
+            ItemStyle.Success);
     }
 
     void ReportSkillUpdates(
@@ -394,28 +431,64 @@ sealed class CheckWorkflow(
         ReportSkillUpdateGroups(skillUpdates, recommendedSkills);
     }
 
+    enum HeaderStyle
+    {
+        Info,
+        Plain
+    }
+
+    enum ItemStyle
+    {
+        Info,
+        Success
+    }
+
     void ReportSkillGroups(
         IEnumerable<SkillManifestEntry> skills,
-        Func<SkillManifestEntry, string> formatSkill)
+        Func<SkillManifestEntry, string> formatSkill,
+        HeaderStyle headerStyle = HeaderStyle.Info,
+        ItemStyle itemStyle = ItemStyle.Info)
     {
         foreach (var sourceGroup in skills
             .GroupBy(skill => skill.SourceRepo, StringComparer.OrdinalIgnoreCase)
             .OrderBy(group => SkillOrdering.GetSourceRepoOrder(group.Key))
             .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase))
         {
-            reporter.Info($"  {sourceGroup.Key}:");
+            ReportHeader($"  {FormatSkillSourceHeader(sourceGroup.Key)}:", headerStyle);
             foreach (var pluginGroup in sourceGroup
                 .GroupBy(FormatSkillPluginHeader, StringComparer.OrdinalIgnoreCase)
                 .OrderBy(group => SkillOrdering.GetPluginOrder(sourceGroup.Key, group.Key))
                 .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase))
             {
-                reporter.Info($"    {pluginGroup.Key}:");
+                ReportHeader($"    {FormatSkillPluginHeader(pluginGroup.Key)}:", headerStyle);
                 foreach (var skill in pluginGroup)
                 {
-                    reporter.Info(formatSkill(skill));
+                    ReportItem(formatSkill(skill), itemStyle);
                 }
             }
         }
+    }
+
+    void ReportHeader(string message, HeaderStyle style)
+    {
+        if (style == HeaderStyle.Plain)
+        {
+            reporter.Plain(message);
+            return;
+        }
+
+        reporter.Info(message);
+    }
+
+    void ReportItem(string message, ItemStyle style)
+    {
+        if (style == ItemStyle.Success)
+        {
+            reporter.Success(message);
+            return;
+        }
+
+        reporter.Info(message);
     }
 
     void ReportSkillUpdateGroups(
@@ -428,13 +501,13 @@ sealed class CheckWorkflow(
             .OrderBy(group => SkillOrdering.GetSourceRepoOrder(group.Key))
             .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase))
         {
-            reporter.Info($"  {sourceGroup.Key}:");
+            reporter.Info($"  {FormatSkillSourceHeader(sourceGroup.Key)}:");
             foreach (var pluginGroup in sourceGroup
                 .GroupBy(update => update.Plugin, StringComparer.OrdinalIgnoreCase)
                 .OrderBy(group => SkillOrdering.GetPluginOrder(sourceGroup.Key, group.Key))
                 .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase))
             {
-                reporter.Info($"    {pluginGroup.Key}:");
+                reporter.Info($"    {FormatSkillPluginHeader(pluginGroup.Key)}:");
                 foreach (var update in pluginGroup)
                 {
                     reporter.Info($"      {update.Name}");
@@ -533,6 +606,12 @@ sealed class CheckWorkflow(
 
     static string FormatSkillPluginHeader(SkillManifestEntry skill)
         => string.IsNullOrWhiteSpace(skill.Plugin) ? "default" : skill.Plugin;
+
+    static string FormatSkillSourceHeader(string sourceRepo)
+        => $"{sourceRepo} repo";
+
+    static string FormatSkillPluginHeader(string plugin)
+        => $"{(string.IsNullOrWhiteSpace(plugin) ? "default" : plugin)} plugin";
 
     static IReadOnlyList<SkillUpdateCandidate> ExtractSkillUpdates(CommandReport updateReport)
     {

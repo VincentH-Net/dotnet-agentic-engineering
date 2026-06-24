@@ -53,12 +53,12 @@ public sealed class WorkflowTests
         Assert.Contains("  dotnet-cli-run", reporter.Infos);
         Assert.Contains("  foundation-prompt-log", reporter.Infos);
         Assert.Contains("Would install skills into repo skills directories:", reporter.Infos);
-        Assert.Contains("  VincentH-Net/dotnet-agentic-engineering:", reporter.Infos);
-        Assert.Contains("    dotnet:", reporter.Infos);
+        Assert.Contains("  VincentH-Net/dotnet-agentic-engineering repo:", reporter.Infos);
+        Assert.Contains("    dotnet plugin:", reporter.Infos);
         Assert.Contains("      dotnet-livecharts2", reporter.Infos);
         Assert.Contains("      dotnet-modern-csharp-editorconfig", reporter.Infos);
-        Assert.Contains("  dotnet/skills:", reporter.Infos);
-        Assert.Contains("    dotnet-test:", reporter.Infos);
+        Assert.Contains("  dotnet/skills repo:", reporter.Infos);
+        Assert.Contains("    dotnet-test plugin:", reporter.Infos);
         Assert.Contains("      run-tests", reporter.Infos);
         Assert.Contains("Would update skills in repo skills directories:", reporter.Infos);
         Assert.Contains("      dotnet-livecharts2", reporter.Infos);
@@ -66,6 +66,8 @@ public sealed class WorkflowTests
         Assert.DoesNotContain(reporter.Infos, message => message.Contains("Would update repo-local skills", StringComparison.Ordinal));
         Assert.DoesNotContain(reporter.Infos, message => message.StartsWith("Directive ", StringComparison.Ordinal));
         Assert.Equal("standard,claude-code", reporter.TargetAgents);
+        Assert.Contains("Scanning repository (tech stack, directives, skills)", reporter.ProgressDescriptions);
+        Assert.Equal(3, reporter.ProgressTicksByDescription["Scanning repository (tech stack, directives, skills)"]);
     }
 
     [Fact]
@@ -320,12 +322,12 @@ public sealed class WorkflowTests
 
         Assert.Equal(0, result.ExitCode);
         Assert.Contains("Up to date directives:", reporter.Infos);
-        Assert.Contains("  ✓ foundation-prompt-log", reporter.Infos);
+        Assert.Contains("  ✓ foundation-prompt-log", reporter.Successes);
         Assert.Contains("Up to date skills:", reporter.Infos);
-        Assert.Contains("  VincentH-Net/dotnet-agentic-engineering:", reporter.Infos);
-        Assert.Contains("    dotnet:", reporter.Infos);
-        Assert.Contains("      ✓ dotnet-livecharts2", reporter.Infos);
-        Assert.Contains("      ✓ dotnet-modern-csharp-editorconfig", reporter.Infos);
+        Assert.Contains("  VincentH-Net/dotnet-agentic-engineering repo:", reporter.Infos);
+        Assert.Contains("    dotnet plugin:", reporter.Infos);
+        Assert.Contains("      ✓ dotnet-livecharts2", reporter.Successes);
+        Assert.Contains("      ✓ dotnet-modern-csharp-editorconfig", reporter.Successes);
         Assert.DoesNotContain(reporter.Infos, message => message.StartsWith("Directive ", StringComparison.Ordinal));
     }
 
@@ -373,8 +375,8 @@ public sealed class WorkflowTests
         Assert.Contains(commandRunner.Calls, call => call.Arguments.SequenceEqual(["skill", "update", "--dir", claudeSkillsDirectory, "--all"]));
         Assert.Contains("Found 1 skill update(s) available:", reporter.Infos);
         Assert.Contains(string.Empty, reporter.Infos);
-        Assert.Contains("  VincentH-Net/dotnet-agentic-engineering:", reporter.Infos);
-        Assert.Contains("    dotnet:", reporter.Infos);
+        Assert.Contains("  VincentH-Net/dotnet-agentic-engineering repo:", reporter.Infos);
+        Assert.Contains("    dotnet plugin:", reporter.Infos);
         Assert.Contains("      dotnet-livecharts2", reporter.Infos);
         Assert.Equal(1, reporter.OutdatedSkillCount);
         Assert.DoesNotContain(reporter.Infos, message => message.Contains("Skills in", StringComparison.Ordinal)
@@ -383,6 +385,10 @@ public sealed class WorkflowTests
         Assert.DoesNotContain(reporter.Infos, message => message.Contains(claudeSkillsDirectory, StringComparison.Ordinal));
         Assert.DoesNotContain(reporter.Infos, message => message.Contains("1 update(s) available", StringComparison.Ordinal));
         Assert.Empty(reporter.Warnings);
+        Assert.Contains("Scanning repository (tech stack, directives, skills)", reporter.ProgressDescriptions);
+        Assert.Equal(3, reporter.ProgressTicksByDescription["Scanning repository (tech stack, directives, skills)"]);
+        Assert.Contains("Updating skills", reporter.ProgressDescriptions);
+        Assert.Equal(2, reporter.ProgressTicksByDescription["Updating skills"]);
         Assert.Contains("Updated 1 skill(s) successfully.", reporter.Successes);
     }
 
