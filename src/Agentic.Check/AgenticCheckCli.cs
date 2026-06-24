@@ -38,6 +38,9 @@ static class AgenticCheckCli
         rootCommand.SetHandler(
             async (targetDirectory, dryRun, yes, report, skillsDirectory, agents, verbose) =>
             {
+                SpectreReporter reporter = new(AnsiConsole.Console);
+                reporter.Header();
+
                 if (skillsDirectory is not null && !string.IsNullOrWhiteSpace(agents))
                 {
                     AnsiConsole.MarkupLine("[red]Specify no more than one of --skills-dir and --agents.[/]");
@@ -57,7 +60,7 @@ static class AgenticCheckCli
                 var workflow = new CheckWorkflow(
                     new ProcessCommandRunner(),
                     new SpectreUserPrompts(AnsiConsole.Console),
-                    new SpectreReporter(AnsiConsole.Console));
+                    reporter);
 
                 var result = await workflow.RunAsync(options, CancellationToken.None).ConfigureAwait(false);
                 Environment.ExitCode = result.ExitCode;

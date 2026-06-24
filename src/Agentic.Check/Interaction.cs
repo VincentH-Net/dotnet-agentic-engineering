@@ -72,6 +72,13 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
     internal const string SummaryLabelColumnHeader = "Check";
     internal const string SummaryValueColumnHeader = "Status";
 
+    public void Header()
+    {
+        console.MarkupLine($"[bold cyan]{Markup.Escape(ToolHeader.Art)}[/]");
+        console.MarkupLine(Markup.Escape(ToolHeader.Description));
+        console.WriteLine();
+    }
+
     public void Plain(string message)
         => console.MarkupLine(Markup.Escape(message));
 

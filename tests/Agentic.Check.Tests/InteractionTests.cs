@@ -3,6 +3,15 @@
 public sealed class InteractionTests
 {
     [Fact]
+    public void ToolHeaderIncludesPurposeAndLinks()
+    {
+        Assert.Contains("repo scanner", ToolHeader.Art, StringComparison.Ordinal);
+        Assert.Contains("Checks a repo for agentic directives and skills", ToolHeader.Description, StringComparison.Ordinal);
+        Assert.Contains(ToolHeader.RepositoryUrl, ToolHeader.Description, StringComparison.Ordinal);
+        Assert.Contains(ToolHeader.AuthorProfileUrl, ToolHeader.Description, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void SummaryColumnHeadersDescribeCheckAndStatus()
     {
         Assert.Equal("Check", SpectreReporter.SummaryLabelColumnHeader);
