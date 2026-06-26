@@ -71,6 +71,34 @@ public sealed class WorkflowTests
     }
 
     [Fact]
+    public async Task DryRunDoesNotAbortWhenGhSkillHelpFails()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
+        tempDirectory.Write("App.csproj", "<Project />");
+        FakeCommandRunner commandRunner = new();
+        commandRunner.Enqueue(new CommandResult(0, "git version 2.50.0", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
+        commandRunner.Enqueue(new CommandResult(1, string.Empty, "unknown command \"skill\""));
+        commandRunner.Enqueue(new CommandResult(1, string.Empty, "unknown command \"skills\""));
+        commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
+        commandRunner.Enqueue(new CommandResult(1, string.Empty, "unknown command \"skill\""));
+        commandRunner.Enqueue(new CommandResult(1, string.Empty, "unknown command \"skill\""));
+        RecordingReporter reporter = new();
+        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), reporter, new FakeDirectiveSource());
+
+        var result = await workflow.RunAsync(
+            new AgenticCheckOptions(tempDirectory.Path, true, false, null, null, null, false),
+            CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains(result.Report.Prerequisites, check => check.Name == "gh skill" && !check.Success);
+        Assert.DoesNotContain(reporter.Errors, error => error.Contains("Required tools are missing", StringComparison.Ordinal));
+        Assert.Contains("Would install skills into repo skills directories:", reporter.Infos);
+        Assert.Contains(reporter.Warnings, warning => warning.Contains("Could not check repo-local skills for updates", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task DryRunReportsOutdatedDirectiveActions()
     {
         using TempDirectory tempDirectory = new();
@@ -586,13 +614,14 @@ public sealed class WorkflowTests
         commandRunner.Enqueue(new CommandResult(0, "no updates", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "no updates", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "installed", string.Empty));
+        RecordingReporter reporter = new();
         CheckWorkflow workflow = new(
             commandRunner,
             new FakePrompts
             {
                 SelectedSkillInstallArgs = ["dotnet-modern-csharp-editorconfig"]
             },
-            new NullReporter(),
+            reporter,
             new FakeDirectiveSource());
 
         var result = await workflow.RunAsync(
@@ -602,5 +631,7 @@ public sealed class WorkflowTests
         Assert.Equal(0, result.ExitCode);
         _ = Assert.Single(commandRunner.Calls, call => call.Arguments.Contains("install"));
         Assert.True(File.Exists(Path.Combine(tempDirectory.Path, ".claude", "skills", "dotnet-modern-csharp-editorconfig", "SKILL.md")));
+        Assert.Contains("Installing skills", reporter.ProgressDescriptions);
+        Assert.Equal(2, reporter.ProgressTicksByDescription["Installing skills"]);
     }
 }

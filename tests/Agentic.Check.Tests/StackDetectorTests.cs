@@ -155,4 +155,54 @@ public sealed class StackDetectorTests
         Assert.Contains(result.Warnings, warning => warning.Contains("presentation", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(result.Warnings, warning => warning.Contains("theme", StringComparison.OrdinalIgnoreCase));
     }
+
+    [Fact]
+    public void DoesNotWarnWhenUnoMarkupHasXamlAndCSharp()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write(
+            "Markup.csproj",
+            """
+            <Project Sdk="Uno.Sdk">
+              <PropertyGroup>
+                <UnoFeatures>CSharpMarkup</UnoFeatures>
+              </PropertyGroup>
+            </Project>
+            """);
+
+        var result = StackDetector.Detect(tempDirectory.Path);
+
+        Assert.DoesNotContain(result.Warnings, warning => warning.Contains("markup", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void WarnsWhenUnoMarkupHasCSharpAndCSharp2WithoutListingXaml()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write(
+            "CSharpMarkup.csproj",
+            """
+            <Project Sdk="Uno.Sdk">
+              <PropertyGroup>
+                <UnoFeatures>CSharpMarkup</UnoFeatures>
+              </PropertyGroup>
+            </Project>
+            """);
+        tempDirectory.Write(
+            "CSharpMarkup2.csproj",
+            """
+            <Project Sdk="Uno.Sdk">
+              <ItemGroup>
+                <PackageReference Include="CSharpMarkup.WinUI" Version="1.0.0" />
+              </ItemGroup>
+            </Project>
+            """);
+
+        var result = StackDetector.Detect(tempDirectory.Path);
+
+        string warning = Assert.Single(result.Warnings, warning => warning.Contains("markup", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains("csharp", warning, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("csharp2", warning, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("xaml", warning, StringComparison.OrdinalIgnoreCase);
+    }
 }

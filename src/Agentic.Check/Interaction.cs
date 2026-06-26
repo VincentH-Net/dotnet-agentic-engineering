@@ -74,10 +74,24 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
 
     public void Header()
     {
-        console.MarkupLine($"[bold cyan]{Markup.Escape(ToolHeader.Art)}[/]");
+        foreach (var line in ToolHeader.Lines)
+        {
+            console.MarkupLine(
+                Styled(ToolHeader.AgenticColor, line.Agentic)
+                + Markup.Escape(line.Separator)
+                + Styled(ToolHeader.CheckColor, line.Check));
+        }
+
+        console.MarkupLine(Markup.Escape(ToolHeader.ProductLine));
         console.MarkupLine(Markup.Escape(ToolHeader.Description));
+        console.MarkupLine(ToolHeader.RepositoryLinkMarkup);
         console.WriteLine();
     }
+
+    static string Styled(string color, string value)
+        => string.IsNullOrEmpty(value)
+            ? string.Empty
+            : $"[bold {color}]{Markup.Escape(value)}[/]";
 
     public void Plain(string message)
         => console.MarkupLine(Markup.Escape(message));

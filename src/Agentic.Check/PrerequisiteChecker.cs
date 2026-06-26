@@ -17,10 +17,32 @@ sealed partial class PrerequisiteChecker(ICommandRunner commandRunner)
         var ghVersion = await commandRunner.RunAsync("gh", ["--version"], workingDirectory, cancellationToken).ConfigureAwait(false);
         checks.Add(CheckVersion("gh", ghVersion, MinimumGhVersion));
 
-        var ghSkillHelp = await commandRunner.RunAsync("gh", ["skill", "--help"], workingDirectory, cancellationToken).ConfigureAwait(false);
-        checks.Add(new PrerequisiteCheck("gh skill", ghSkillHelp.Success, null, null, ghSkillHelp.StandardOutput, ghSkillHelp.StandardError));
+        checks.Add(await CheckGhSkillAsync(workingDirectory, cancellationToken).ConfigureAwait(false));
 
         return new PrerequisiteResult(checks);
+    }
+
+    async Task<PrerequisiteCheck> CheckGhSkillAsync(string workingDirectory, CancellationToken cancellationToken)
+    {
+        var singularHelp = await commandRunner.RunAsync("gh", ["skill", "--help"], workingDirectory, cancellationToken).ConfigureAwait(false);
+        if (singularHelp.Success || LooksLikeGhSkillHelp(singularHelp))
+        {
+            return new PrerequisiteCheck("gh skill", true, null, null, singularHelp.StandardOutput, singularHelp.StandardError);
+        }
+
+        var pluralHelp = await commandRunner.RunAsync("gh", ["skills", "--help"], workingDirectory, cancellationToken).ConfigureAwait(false);
+        if (pluralHelp.Success || LooksLikeGhSkillHelp(pluralHelp))
+        {
+            return new PrerequisiteCheck("gh skill", true, null, null, pluralHelp.StandardOutput, pluralHelp.StandardError);
+        }
+
+        return new PrerequisiteCheck(
+            "gh skill",
+            false,
+            null,
+            null,
+            CombineCommandOutput(singularHelp.StandardOutput, pluralHelp.StandardOutput),
+            CombineCommandOutput(singularHelp.StandardError, pluralHelp.StandardError));
     }
 
     static PrerequisiteCheck CheckVersion(string name, CommandResult result, Version minimumVersion)
@@ -41,6 +63,22 @@ sealed partial class PrerequisiteChecker(ICommandRunner commandRunner)
             : null;
     }
 
+    static bool LooksLikeGhSkillHelp(CommandResult result)
+    {
+        string output = result.StandardOutput + result.StandardError;
+        return output.Contains("gh skill", StringComparison.OrdinalIgnoreCase)
+            && output.Contains("AVAILABLE COMMANDS", StringComparison.OrdinalIgnoreCase)
+            && output.Contains("install", StringComparison.OrdinalIgnoreCase)
+            && output.Contains("update", StringComparison.OrdinalIgnoreCase);
+    }
+
+    static string CombineCommandOutput(string first, string second)
+        => string.IsNullOrWhiteSpace(second)
+            ? first
+            : string.IsNullOrWhiteSpace(first)
+                ? second
+                : first.TrimEnd() + Environment.NewLine + second;
+
     [GeneratedRegex(@"(?<major>\d+)\.(?<minor>\d+)\.(?<patch>\d+)", RegexOptions.CultureInvariant)]
     private static partial Regex VersionRegex();
 }
@@ -48,6 +86,11 @@ sealed partial class PrerequisiteChecker(ICommandRunner commandRunner)
 sealed record PrerequisiteResult(IReadOnlyList<PrerequisiteCheck> Checks)
 {
     public bool Success => Checks.All(check => check.Success);
+
+    public bool IsSuccessful(bool dryRun)
+        => dryRun
+            ? Checks.Where(check => !check.Name.Equals("gh skill", StringComparison.OrdinalIgnoreCase)).All(check => check.Success)
+            : Success;
 }
 
 sealed record PrerequisiteCheck(

@@ -37,9 +37,9 @@ sealed class CheckWorkflow(
             .ConfigureAwait(false);
         report.Prerequisites.AddRange(prerequisites.Checks);
 
-        if (!prerequisites.Success)
+        if (!prerequisites.IsSuccessful(options.DryRun))
         {
-            reporter.Error("Required tools are missing or too old. Update git/GitHub CLI and confirm `gh skill --help` works.");
+            reporter.Error("Required tools are missing or too old. Update git/GitHub CLI and confirm `gh skill --help` or `gh skills --help` works.");
             await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
             return new CheckRunResult(2, report);
         }
@@ -209,20 +209,43 @@ sealed class CheckWorkflow(
         {
             SkillInstaller skillInstaller = new(commandRunner, reporter);
             IReadOnlyList<SkillManifestEntry> firstDirectoryMissingSkills = [.. selectedSkills.Where(skill => SkillInstaller.IsMissing(skill, firstSkillsDirectory))];
-            var installResults = await skillInstaller
-                .InstallAsync(firstDirectoryMissingSkills, firstSkillsDirectory, repoResolution.RepoRoot, cancellationToken)
-                .ConfigureAwait(false);
-            report.InstallResults.AddRange(installResults);
+            int installOperationCount = CountSkillInstallOperations(selectedSkills, firstDirectoryMissingSkills, [.. skillsDirectories.Skip(1)]);
+            await reporter.RunProgressAsync(
+                "Installing skills",
+                installOperationCount,
+                async advance =>
+                {
+                    var installResults = await skillInstaller
+                        .InstallAsync(firstDirectoryMissingSkills, firstSkillsDirectory, repoResolution.RepoRoot, cancellationToken, advance)
+                        .ConfigureAwait(false);
+                    report.InstallResults.AddRange(installResults);
 
-            if (skillsDirectories.Count > 1)
+                    if (skillsDirectories.Count > 1)
+                    {
+                        SkillManifestEntry[] copyableSkills = [.. selectedSkills
+                            .Where(skill => !SkillInstaller.IsMissing(skill, firstSkillsDirectory))];
+                        report.SkillCopyResults.AddRange(skillInstaller.CopyInstalledSkills(
+                            copyableSkills,
+                            firstSkillsDirectory,
+                            [.. skillsDirectories.Skip(1)],
+                            advance));
+                    }
+                },
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        static int CountSkillInstallOperations(
+            IReadOnlyList<SkillManifestEntry> selectedSkills,
+            IReadOnlyList<SkillManifestEntry> firstDirectoryMissingSkills,
+            IReadOnlyList<string> targetSkillsDirectories)
+        {
+            int copyOperations = 0;
+            foreach (string targetSkillsDirectory in targetSkillsDirectories)
             {
-                SkillManifestEntry[] copyableSkills = [.. selectedSkills
-                    .Where(skill => !SkillInstaller.IsMissing(skill, firstSkillsDirectory))];
-                report.SkillCopyResults.AddRange(skillInstaller.CopyInstalledSkills(
-                    copyableSkills,
-                    firstSkillsDirectory,
-                    [.. skillsDirectories.Skip(1)]));
+                copyOperations += selectedSkills.Count(skill => SkillInstaller.IsMissing(skill, targetSkillsDirectory));
             }
+
+            return firstDirectoryMissingSkills.Count + copyOperations;
         }
 
         await RunSkillUpdateAsync(options, skillsDirectories, repoResolution.RepoRoot, report, skillUpdates, cancellationToken).ConfigureAwait(false);

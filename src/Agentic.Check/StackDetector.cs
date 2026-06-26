@@ -113,8 +113,35 @@ static class StackDetector
     static void AddMultiValueWarnings(IReadOnlyList<UnoGateReport> reports, List<string> warnings)
     {
         AddMultiValueWarning("presentation", reports.SelectMany(report => report.Presentation), reports, warnings);
-        AddMultiValueWarning("markup", reports.SelectMany(report => report.Markup), reports, warnings);
+        AddMarkupMultiValueWarning(reports, warnings);
         AddMultiValueWarning("theme", reports.SelectMany(report => report.Theme), reports, warnings);
+    }
+
+    static void AddMarkupMultiValueWarning(IReadOnlyList<UnoGateReport> reports, List<string> warnings)
+    {
+        string[] conflictingValues = [.. reports
+            .SelectMany(report => report.Markup)
+            .Where(value => !value.Equals("xaml", StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)];
+        if (conflictingValues.Length <= 1)
+        {
+            return;
+        }
+
+        string projectValues = string.Join(
+            "; ",
+            reports
+                .Select(report => new
+                {
+                    report.ProjectPath,
+                    Values = report.Markup
+                        .Where(value => !value.Equals("xaml", StringComparison.OrdinalIgnoreCase))
+                        .ToArray()
+                })
+                .Where(report => report.Values.Length > 0)
+                .Select(report => $"{report.ProjectPath}: {string.Join(", ", report.Values)}"));
+        warnings.Add($"Multiple Uno markup gate values detected ({string.Join(", ", conflictingValues)}). Agents may become confused. {projectValues}");
     }
 
     static void AddMultiValueWarning(string gate, IEnumerable<string> values, IReadOnlyList<UnoGateReport> reports, List<string> warnings)

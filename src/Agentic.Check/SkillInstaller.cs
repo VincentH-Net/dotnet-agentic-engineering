@@ -15,7 +15,8 @@ sealed class SkillInstaller(ICommandRunner commandRunner, IReporter reporter)
         IReadOnlyList<SkillManifestEntry> skills,
         string skillsDirectory,
         string workingDirectory,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Action? progressAdvance = null)
     {
         _ = Directory.CreateDirectory(skillsDirectory);
         List<SkillInstallResult> results = [];
@@ -45,6 +46,8 @@ sealed class SkillInstaller(ICommandRunner commandRunner, IReporter reporter)
             {
                 reporter.Error($"Failed to install {skill.Display}: {result.StandardError.Trim()}");
             }
+
+            progressAdvance?.Invoke();
         }
 
         return results;
@@ -53,7 +56,8 @@ sealed class SkillInstaller(ICommandRunner commandRunner, IReporter reporter)
     public IReadOnlyList<SkillCopyResult> CopyInstalledSkills(
         IReadOnlyList<SkillManifestEntry> skills,
         string sourceSkillsDirectory,
-        IReadOnlyList<string> targetSkillsDirectories)
+        IReadOnlyList<string> targetSkillsDirectories,
+        Action? progressAdvance = null)
     {
         List<SkillCopyResult> results = [];
         foreach (string targetSkillsDirectory in targetSkillsDirectories)
@@ -74,6 +78,10 @@ sealed class SkillInstaller(ICommandRunner commandRunner, IReporter reporter)
                 {
                     results.Add(new SkillCopyResult(sourceDirectory, targetDirectory, skill.LocalFolder, false, exception.Message));
                     reporter.Error($"Failed to copy {skill.LocalFolder} to {targetSkillsDirectory}: {exception.Message}");
+                }
+                finally
+                {
+                    progressAdvance?.Invoke();
                 }
             }
         }

@@ -5,10 +5,19 @@ public sealed class InteractionTests
     [Fact]
     public void ToolHeaderIncludesPurposeAndLinks()
     {
-        Assert.Contains("repo scanner", ToolHeader.Art, StringComparison.Ordinal);
-        Assert.Contains("Checks a repo for agentic directives and skills", ToolHeader.Description, StringComparison.Ordinal);
-        Assert.Contains(ToolHeader.RepositoryUrl, ToolHeader.Description, StringComparison.Ordinal);
-        Assert.Contains(ToolHeader.AuthorProfileUrl, ToolHeader.Description, StringComparison.Ordinal);
+        Assert.Equal("agentic-check", ToolHeader.Name);
+        Assert.Equal("cyan", ToolHeader.AgenticColor);
+        Assert.Equal("green", ToolHeader.CheckColor);
+        Assert.Equal(6, ToolHeader.Lines.Count);
+        Assert.All(ToolHeader.Lines, line => Assert.NotEmpty(line.Agentic));
+        Assert.Contains(ToolHeader.Lines, line => line.Separator.Contains("_____", StringComparison.Ordinal));
+        Assert.All(ToolHeader.Lines, line => Assert.NotEmpty(line.Check));
+        Assert.StartsWith(".NET Agentic Engineering Check ", ToolHeader.ProductLine, StringComparison.Ordinal);
+        Assert.DoesNotContain("unknown", ToolHeader.ProductLine, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("agentic-check checks a repo for agentic directives and skills", ToolHeader.Description, StringComparison.Ordinal);
+        Assert.DoesNotContain(ToolHeader.RepositoryUrl, ToolHeader.Description, StringComparison.Ordinal);
+        Assert.Equal($"Tool repo: [link={ToolHeader.RepositoryUrl}]{ToolHeader.RepositoryUrl}[/]", ToolHeader.RepositoryLinkMarkup);
+        Assert.DoesNotContain("Author:", ToolHeader.Description, StringComparison.Ordinal);
     }
 
     [Fact]
