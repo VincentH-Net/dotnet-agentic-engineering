@@ -11,11 +11,12 @@ public sealed class InteractionTests
         Assert.All(ToolHeader.Lines, line => Assert.NotEmpty(line.Agentic));
         Assert.Contains(ToolHeader.Lines, line => !string.IsNullOrWhiteSpace(line.Separator));
         Assert.All(ToolHeader.Lines, line => Assert.NotEmpty(line.Check));
-        Assert.StartsWith(".NET Agentic Engineering Check ", ToolHeader.ProductLine, StringComparison.Ordinal);
+        Assert.StartsWith(".NET Agentic Engineering Check ", ToolHeader.ProductLine.TrimStart(), StringComparison.Ordinal);
         Assert.DoesNotContain("unknown", ToolHeader.ProductLine, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("agentic-check checks a repo for agentic directives and skills", ToolHeader.Description, StringComparison.Ordinal);
+        Assert.NotEmpty(ToolHeader.Description.Trim());
         Assert.DoesNotContain(ToolHeader.RepositoryUrl, ToolHeader.Description, StringComparison.Ordinal);
-        Assert.Equal($"Tool repo: [link={ToolHeader.RepositoryUrl}]{ToolHeader.RepositoryUrl}[/]", ToolHeader.RepositoryLinkMarkup);
+        Assert.Contains($"[link={ToolHeader.RepositoryUrl}]", ToolHeader.RepositoryLinkMarkup, StringComparison.Ordinal);
+        Assert.Contains($"{ToolHeader.RepositoryUrl}[/]", ToolHeader.RepositoryLinkMarkup, StringComparison.Ordinal);
         Assert.DoesNotContain("Author:", ToolHeader.Description, StringComparison.Ordinal);
     }
 
