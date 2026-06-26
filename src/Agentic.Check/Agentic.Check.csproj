@@ -7,7 +7,7 @@
     <ToolCommandName>agentic-check</ToolCommandName>
     <PackageId>Agentic.Check</PackageId>
     <Title>Agentic Check</Title>
-    <Version>0.1.0-preview</Version>
+    <Version>0.2.0-preview</Version>
     <Authors>VincentH-Net</Authors>
     <Copyright>Copyright © VincentH.NET</Copyright>
     <Description>Checks and installs recommended agentic engineering directives and skills for local repositories.</Description>
