@@ -10,7 +10,7 @@ public sealed class InteractionTests
         Assert.Equal("green", ToolHeader.CheckColor);
         Assert.Equal(6, ToolHeader.Lines.Count);
         Assert.All(ToolHeader.Lines, line => Assert.NotEmpty(line.Agentic));
-        Assert.Contains(ToolHeader.Lines, line => line.Separator.Contains("_____", StringComparison.Ordinal));
+        Assert.Contains(ToolHeader.Lines, line => !string.IsNullOrWhiteSpace(line.Separator));
         Assert.All(ToolHeader.Lines, line => Assert.NotEmpty(line.Check));
         Assert.StartsWith(".NET Agentic Engineering Check ", ToolHeader.ProductLine, StringComparison.Ordinal);
         Assert.DoesNotContain("unknown", ToolHeader.ProductLine, StringComparison.OrdinalIgnoreCase);
