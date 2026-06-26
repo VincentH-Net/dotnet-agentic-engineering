@@ -5,7 +5,6 @@ public sealed class InteractionTests
     [Fact]
     public void ToolHeaderIncludesPurposeAndLinks()
     {
-        Assert.Equal("agentic-check", ToolHeader.Name);
         Assert.Equal("cyan", ToolHeader.AgenticColor);
         Assert.Equal("green", ToolHeader.CheckColor);
         Assert.Equal(6, ToolHeader.Lines.Count);

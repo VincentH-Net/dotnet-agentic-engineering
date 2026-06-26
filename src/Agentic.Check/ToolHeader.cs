@@ -7,7 +7,6 @@ sealed record ToolHeaderLine(string Agentic, string Separator, string Check);
 
 static class ToolHeader
 {
-    public const string Name = "agentic-check";
     public const string AgenticColor = "cyan";
     public const string CheckColor = "green";
     public const string RepositoryUrl = "https://github.com/VincentH-Net/dotnet-agentic-engineering";
@@ -23,10 +22,15 @@ static class ToolHeader
     ];
 
     public static string Description
-        => $"{Name} checks a repo for agentic directives and skills, then installs or updates selected recommendations.";
+        => $"\nThis tool composes a repo-optimized set of agentic directives and skills from best-in-class github skill repo's, based on which .NET technologies and features are used.\n\n" +
+            "The skill composition minimizes context usage and avoids contradictions and ambiguities to reduce agent mistakes.\n\n" +
+            "The tool lets you select what to install or update; for skills it uses 'gh skill' to install / update directly from the source repo's.\n\n" +
+            "Currently supports foundational agentic habits, .NET, ASP.NET, Microsoft Orleans and Uno Platform.\n" +
+            "Uno Platform skills are selected depending on repo usage of MVVM or MVUX update pattern, pure XAML markup or combined with either Uno C# Markup or C# Markup 2, and Fluent / Material / Cupertino design system.\n";
+        //=> $"{Name} checks a repo for agentic directives and skills, then installs or updates selected recommendations.";
 
     public static string ProductLine
-        => $".NET Agentic Engineering Check {Version}";
+        => $"\n.NET Agentic Engineering Check {Version}";
 
     static string Version
     {
@@ -44,5 +48,5 @@ static class ToolHeader
     }
 
     public static string RepositoryLinkMarkup
-        => $"Tool repo: [link={RepositoryUrl}]{Markup.Escape(RepositoryUrl)}[/]";
+        => $"See: [link={RepositoryUrl}]{Markup.Escape(RepositoryUrl)}[/]";
 }
