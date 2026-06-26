@@ -152,8 +152,15 @@ public sealed class StackDetectorTests
 
         var result = StackDetector.Detect(tempDirectory.Path);
 
-        Assert.Contains(result.Warnings, warning => warning.Contains("presentation", StringComparison.OrdinalIgnoreCase));
-        Assert.Contains(result.Warnings, warning => warning.Contains("theme", StringComparison.OrdinalIgnoreCase));
+        string presentationWarning = Assert.Single(result.Warnings, warning => warning.Contains("presentation", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains($"{Path.DirectorySeparatorChar}Mvvm.csproj: mvvm", presentationWarning, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains($"{Path.DirectorySeparatorChar}Mvux.csproj: mvux", presentationWarning, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(Environment.NewLine, presentationWarning, StringComparison.Ordinal);
+
+        string themeWarning = Assert.Single(result.Warnings, warning => warning.Contains("theme", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains($"{Path.DirectorySeparatorChar}Mvvm.csproj: material", themeWarning, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains($"{Path.DirectorySeparatorChar}Mvux.csproj: simple", themeWarning, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(Environment.NewLine, themeWarning, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -204,5 +211,8 @@ public sealed class StackDetectorTests
         Assert.Contains("csharp", warning, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("csharp2", warning, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("xaml", warning, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains($"{Path.DirectorySeparatorChar}CSharpMarkup.csproj: csharp", warning, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains($"{Path.DirectorySeparatorChar}CSharpMarkup2.csproj: csharp2", warning, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(Environment.NewLine, warning, StringComparison.Ordinal);
     }
 }

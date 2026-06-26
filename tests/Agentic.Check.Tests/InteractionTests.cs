@@ -28,6 +28,39 @@ public sealed class InteractionTests
     }
 
     [Fact]
+    public void StackDisplayUsesLayerOrderAndUnoGateDetails()
+    {
+        HashSet<string> technologies = new(StringComparer.OrdinalIgnoreCase)
+        {
+            TechnologyNames.Foundation,
+            TechnologyNames.Dotnet,
+            TechnologyNames.AspNetCore,
+            TechnologyNames.Orleans,
+            TechnologyNames.Uno
+        };
+        UnoGateReport unoGate = new(
+            "App.csproj",
+            ["mvux"],
+            ["csharp2", "xaml"],
+            ["material"]);
+
+        Assert.Equal(
+            string.Join(
+                Environment.NewLine,
+                [
+                    "Uno Platform",
+                    "  UI update pattern: mvux",
+                    "  Markup type: csharp2, xaml",
+                    "  Design system: material",
+                    "Microsoft Orleans",
+                    "ASP.NET",
+                    ".NET",
+                    "Agentic Foundation"
+                ]),
+            SpectreReporter.FormatStack(technologies, [unoGate]));
+    }
+
+    [Fact]
     public void DirectiveSummaryCombinesRecommendedMissingAndOutdatedCounts()
     {
         DirectiveSummary summary = new(

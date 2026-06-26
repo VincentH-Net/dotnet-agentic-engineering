@@ -44,7 +44,7 @@ sealed class CheckWorkflow(
             return new CheckRunResult(2, report);
         }
 
-        var repoResolution = await new RepoResolver(commandRunner, prompts, reporter)
+        var repoResolution = await new RepoResolver(commandRunner, prompts)
             .ResolveAsync(report.TargetDirectory, options.DryRun, cancellationToken)
             .ConfigureAwait(false);
 
@@ -127,11 +127,6 @@ sealed class CheckWorkflow(
         stack = stack ?? throw new InvalidOperationException("Repository scan did not detect a stack.");
         directivePlan = directivePlan ?? throw new InvalidOperationException("Repository scan did not plan directives.");
 
-        foreach (string warning in stack.Warnings)
-        {
-            reporter.Warning(warning);
-        }
-
         report.AgentsFile = directivePlan.AgentsFile;
         report.ClaudeFile = directivePlan.ClaudeFile;
         report.Directives.AddRange(directivePlan.Directives.Select(directive => new DirectiveReportItem(directive.Name, directive.Status)));
@@ -149,7 +144,12 @@ sealed class CheckWorkflow(
             directivePlan.OutdatedCount);
         report.DirectiveSummary = directiveSummary;
 
-        reporter.Summary(repoResolution.RepoRoot, stack.Technologies, targetAgents, skillsDirectories, directiveSummary, recommended.Count, missing.Count, report.OutdatedSkills);
+        reporter.Summary(repoResolution.RepoRoot, stack.Technologies, stack.UnoGates, targetAgents, skillsDirectories, directiveSummary, recommended.Count, missing.Count, report.OutdatedSkills);
+
+        foreach (string warning in stack.Warnings)
+        {
+            reporter.Warning(warning);
+        }
 
         var recommendedDirectives = directivePlan.SelectableDirectives;
         IReadOnlyList<DirectivePlanItem> selectedDirectives = [];

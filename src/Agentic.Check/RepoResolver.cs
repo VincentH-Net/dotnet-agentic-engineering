@@ -1,6 +1,6 @@
 ﻿namespace Agentic.Check;
 
-sealed class RepoResolver(ICommandRunner commandRunner, IUserPrompts prompts, IReporter reporter)
+sealed class RepoResolver(ICommandRunner commandRunner, IUserPrompts prompts)
 {
     public async Task<RepoResolution> ResolveAsync(string targetDirectory, bool dryRun, CancellationToken cancellationToken)
     {
@@ -14,7 +14,6 @@ sealed class RepoResolver(ICommandRunner commandRunner, IUserPrompts prompts, IR
         if (rootResult.Success && !string.IsNullOrWhiteSpace(rootResult.StandardOutput))
         {
             string repoRoot = rootResult.StandardOutput.Trim();
-            reporter.Info($"Repository root: {repoRoot}");
             return new RepoResolution(repoRoot, true, []);
         }
 

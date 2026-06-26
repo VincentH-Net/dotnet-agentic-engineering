@@ -130,7 +130,7 @@ static class StackDetector
         }
 
         string projectValues = string.Join(
-            "; ",
+            Environment.NewLine,
             reports
                 .Select(report => new
                 {
@@ -140,8 +140,8 @@ static class StackDetector
                         .ToArray()
                 })
                 .Where(report => report.Values.Length > 0)
-                .Select(report => $"{report.ProjectPath}: {string.Join(", ", report.Values)}"));
-        warnings.Add($"Multiple Uno markup gate values detected ({string.Join(", ", conflictingValues)}). Agents may become confused. {projectValues}");
+                .SelectMany(report => report.Values.Select(value => $"  {report.ProjectPath}: {value}")));
+        warnings.Add($"Multiple Uno markup gate values detected ({string.Join(", ", conflictingValues)}). Agents may become confused.{Environment.NewLine}{projectValues}");
     }
 
     static void AddMultiValueWarning(string gate, IEnumerable<string> values, IReadOnlyList<UnoGateReport> reports, List<string> warnings)
@@ -153,9 +153,9 @@ static class StackDetector
         }
 
         string projectValues = string.Join(
-            "; ",
-            reports.Select(report => $"{report.ProjectPath}: {string.Join(", ", report.GetValues(gate))}"));
-        warnings.Add($"Multiple Uno {gate} gate values detected ({string.Join(", ", distinctValues)}). Agents may become confused. {projectValues}");
+            Environment.NewLine,
+            reports.SelectMany(report => report.GetValues(gate).Select(value => $"  {report.ProjectPath}: {value}")));
+        warnings.Add($"Multiple Uno {gate} gate values detected ({string.Join(", ", distinctValues)}). Agents may become confused.{Environment.NewLine}{projectValues}");
     }
 
     static bool HasOrleansReference(string projectFile)
