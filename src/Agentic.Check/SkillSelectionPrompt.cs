@@ -313,7 +313,7 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
         => FormatSkillPluginHeader(skill.Plugin);
 
     internal static string FormatSkillPluginHeader(string plugin)
-        => $"{(string.IsNullOrWhiteSpace(plugin) ? "default" : plugin)} plugin";
+        => string.IsNullOrWhiteSpace(plugin) ? "default" : plugin;
 
     internal static string FormatRecommendationPromptHeading(int itemCount)
         => string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Recommend {itemCount} action(s), select which to apply:");
@@ -377,6 +377,12 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
         RecommendationSelectionKind? lastKind = null;
         string? lastSkillSourceRepo = null;
         string? lastSkillPlugin = null;
+        string[] visibleSkillSourceReposWithoutPluginHeaders = [.. visibleItems
+            .Select(item => item.Skill)
+            .OfType<SkillManifestEntry>()
+            .GroupBy(skill => skill.SourceRepo, StringComparer.OrdinalIgnoreCase)
+            .Where(group => !SkillGroupHeaderPolicy.ShouldShowPluginHeaders(group.Key, group.Select(skill => skill.Plugin)))
+            .Select(group => group.Key)];
         for (int index = 0; index < visibleItems.Count; index++)
         {
             int itemIndex = visibleStartIndex + index;
@@ -392,6 +398,7 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
             if (item.Skill is not null)
             {
                 string skillSourceRepo = item.Skill.SourceRepo;
+                bool showPluginHeaders = !visibleSkillSourceReposWithoutPluginHeaders.Contains(skillSourceRepo, StringComparer.OrdinalIgnoreCase);
                 if (!skillSourceRepo.Equals(lastSkillSourceRepo, StringComparison.OrdinalIgnoreCase))
                 {
                     MarkupLine($"  [bold]{Markup.Escape(FormatSkillSourceHeader(skillSourceRepo))}[/]");
@@ -400,7 +407,7 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
                 }
 
                 string skillPlugin = item.Skill.Plugin;
-                if (!skillPlugin.Equals(lastSkillPlugin, StringComparison.OrdinalIgnoreCase))
+                if (showPluginHeaders && !skillPlugin.Equals(lastSkillPlugin, StringComparison.OrdinalIgnoreCase))
                 {
                     MarkupLine($"    [bold]{Markup.Escape(FormatSkillPluginHeader(skillPlugin))}[/]");
                     lastSkillPlugin = skillPlugin;
@@ -461,5 +468,20 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
             ClearCurrentLine();
             Console.WriteLine();
         }
+    }
+
+}
+
+static class SkillGroupHeaderPolicy
+{
+    internal static bool ShouldShowPluginHeaders(string sourceRepo, IEnumerable<string> pluginNames)
+    {
+        string[] names = [.. pluginNames.Where(name => !string.IsNullOrWhiteSpace(name)).Distinct(StringComparer.OrdinalIgnoreCase)];
+        if (names.Length != 1)
+        {
+            return true;
+        }
+
+        return !sourceRepo.EndsWith(names[0], StringComparison.OrdinalIgnoreCase);
     }
 }

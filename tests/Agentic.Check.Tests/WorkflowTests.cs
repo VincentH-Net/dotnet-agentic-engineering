@@ -54,11 +54,11 @@ public sealed class WorkflowTests
         Assert.Contains("  foundation-prompt-log", reporter.Infos);
         Assert.Contains("Would install skills into repo skills directories:", reporter.Infos);
         Assert.Contains("  VincentH-Net/dotnet-agentic-engineering repo:", reporter.Infos);
-        Assert.Contains("    dotnet plugin:", reporter.Infos);
+        Assert.Contains("    dotnet:", reporter.Infos);
         Assert.Contains("      dotnet-livecharts2", reporter.Infos);
         Assert.Contains("      dotnet-modern-csharp-editorconfig", reporter.Infos);
         Assert.Contains("  dotnet/skills repo:", reporter.Infos);
-        Assert.Contains("    dotnet-test plugin:", reporter.Infos);
+        Assert.Contains("    dotnet-test:", reporter.Infos);
         Assert.Contains("      run-tests", reporter.Infos);
         Assert.Contains("Would update skills in repo skills directories:", reporter.Infos);
         Assert.Contains("      dotnet-livecharts2", reporter.Infos);
@@ -356,7 +356,7 @@ public sealed class WorkflowTests
         Assert.Contains("  ✓ foundation-prompt-log", reporter.Successes);
         Assert.Contains("Up to date skills:", reporter.Infos);
         Assert.Contains("  VincentH-Net/dotnet-agentic-engineering repo:", reporter.Infos);
-        Assert.Contains("    dotnet plugin:", reporter.Infos);
+        Assert.Contains("    dotnet:", reporter.Infos);
         Assert.Contains("      ✓ dotnet-livecharts2", reporter.Successes);
         Assert.Contains("      ✓ dotnet-modern-csharp-editorconfig", reporter.Successes);
         Assert.DoesNotContain(reporter.Infos, message => message.StartsWith("Directive ", StringComparison.Ordinal));
@@ -407,7 +407,7 @@ public sealed class WorkflowTests
         Assert.Contains("Found 1 skill update(s) available:", reporter.Infos);
         Assert.Contains(string.Empty, reporter.Infos);
         Assert.Contains("  VincentH-Net/dotnet-agentic-engineering repo:", reporter.Infos);
-        Assert.Contains("    dotnet plugin:", reporter.Infos);
+        Assert.Contains("    dotnet:", reporter.Infos);
         Assert.Contains("      dotnet-livecharts2", reporter.Infos);
         Assert.Equal(1, reporter.OutdatedSkillCount);
         Assert.DoesNotContain(reporter.Infos, message => message.Contains("Skills in", StringComparison.Ordinal)

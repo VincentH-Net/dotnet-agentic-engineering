@@ -485,12 +485,15 @@ sealed class CheckWorkflow(
             .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase))
         {
             ReportHeader($"  {FormatSkillSourceHeader(sourceGroup.Key)}:", headerStyle);
-            foreach (var pluginGroup in sourceGroup
-                .GroupBy(FormatSkillPluginHeader, StringComparer.OrdinalIgnoreCase)
-                .OrderBy(group => SkillOrdering.GetPluginOrder(sourceGroup.Key, group.Key))
-                .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase))
+            var pluginGroups = OrderPluginGroups(sourceGroup.Key, sourceGroup.GroupBy(skill => skill.Plugin, StringComparer.OrdinalIgnoreCase));
+            bool showPluginHeaders = SkillGroupHeaderPolicy.ShouldShowPluginHeaders(sourceGroup.Key, pluginGroups.Select(group => group.Key));
+            foreach (var pluginGroup in pluginGroups)
             {
-                ReportHeader($"    {FormatSkillPluginHeader(pluginGroup.Key)}:", headerStyle);
+                if (showPluginHeaders)
+                {
+                    ReportHeader($"    {FormatSkillPluginHeader(pluginGroup.Key)}:", headerStyle);
+                }
+
                 foreach (var skill in pluginGroup)
                 {
                     ReportItem(formatSkill(skill), itemStyle);
@@ -532,12 +535,15 @@ sealed class CheckWorkflow(
             .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase))
         {
             reporter.Info($"  {FormatSkillSourceHeader(sourceGroup.Key)}:");
-            foreach (var pluginGroup in sourceGroup
-                .GroupBy(update => update.Plugin, StringComparer.OrdinalIgnoreCase)
-                .OrderBy(group => SkillOrdering.GetPluginOrder(sourceGroup.Key, group.Key))
-                .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase))
+            var pluginGroups = OrderPluginGroups(sourceGroup.Key, sourceGroup.GroupBy(update => update.Plugin, StringComparer.OrdinalIgnoreCase));
+            bool showPluginHeaders = SkillGroupHeaderPolicy.ShouldShowPluginHeaders(sourceGroup.Key, pluginGroups.Select(group => group.Key));
+            foreach (var pluginGroup in pluginGroups)
             {
-                reporter.Info($"    {FormatSkillPluginHeader(pluginGroup.Key)}:");
+                if (showPluginHeaders)
+                {
+                    reporter.Info($"    {FormatSkillPluginHeader(pluginGroup.Key)}:");
+                }
+
                 foreach (var update in pluginGroup)
                 {
                     reporter.Info($"      {update.Name}");
@@ -623,7 +629,7 @@ sealed class CheckWorkflow(
         SkillUpdateCandidate update,
         IReadOnlyList<SkillManifestEntry> recommendedSkills)
         => FindMatchingManifestEntries(update, recommendedSkills).FirstOrDefault() is { } skill
-            ? new SkillUpdateDisplayItem(skill.LocalFolder, skill.SourceRepo, FormatSkillPluginHeader(skill))
+            ? new SkillUpdateDisplayItem(skill.LocalFolder, skill.SourceRepo, skill.Plugin)
             : new SkillUpdateDisplayItem(update.Name, update.SourceRepo, "default");
 
     static IEnumerable<SkillManifestEntry> FindMatchingManifestEntries(
@@ -634,14 +640,16 @@ sealed class CheckWorkflow(
             && (skill.InstallArg.Equals(update.Name, StringComparison.OrdinalIgnoreCase)
                 || skill.LocalFolder.Equals(update.Name, StringComparison.OrdinalIgnoreCase)));
 
-    static string FormatSkillPluginHeader(SkillManifestEntry skill)
-        => string.IsNullOrWhiteSpace(skill.Plugin) ? "default" : skill.Plugin;
-
     static string FormatSkillSourceHeader(string sourceRepo)
         => $"{sourceRepo} repo";
 
     static string FormatSkillPluginHeader(string plugin)
-        => $"{(string.IsNullOrWhiteSpace(plugin) ? "default" : plugin)} plugin";
+        => string.IsNullOrWhiteSpace(plugin) ? "default" : plugin;
+
+    static IEnumerable<IGrouping<string, T>> OrderPluginGroups<T>(string sourceRepo, IEnumerable<IGrouping<string, T>> pluginGroups)
+        => pluginGroups
+            .OrderBy(group => SkillOrdering.GetPluginOrder(sourceRepo, group.Key))
+            .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase);
 
     static IReadOnlyList<SkillUpdateCandidate> ExtractSkillUpdates(CommandReport updateReport)
     {

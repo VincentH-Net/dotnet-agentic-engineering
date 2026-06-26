@@ -64,7 +64,22 @@ public sealed class SkillSelectionStateTests
 
         Assert.Equal("missing-skill (install)", RecommendationSelectionPrompt.FormatSkillListItem(skill));
         Assert.Equal("owner/repo repo", RecommendationSelectionPrompt.FormatSkillSourceHeader(skill));
-        Assert.Equal("default plugin", RecommendationSelectionPrompt.FormatSkillPluginHeader(skill));
+        Assert.Equal("default", RecommendationSelectionPrompt.FormatSkillPluginHeader(skill));
+    }
+
+    [Fact]
+    public void SinglePluginHeaderThatRepeatsRepoNameIsHidden()
+    {
+        Assert.False(SkillGroupHeaderPolicy.ShouldShowPluginHeaders("mtmattei/UnoPlatformSkills", ["UnoPlatformSkills"]));
+        Assert.False(SkillGroupHeaderPolicy.ShouldShowPluginHeaders("unoplatform/studio", ["studio"]));
+    }
+
+    [Fact]
+    public void PluginHeaderIsShownForDistinctOrMultiplePluginNames()
+    {
+        Assert.True(SkillGroupHeaderPolicy.ShouldShowPluginHeaders("VincentH-Net/dotnet-agentic-engineering", ["dotnet"]));
+        Assert.True(SkillGroupHeaderPolicy.ShouldShowPluginHeaders("dotnet/skills", ["dotnet-test"]));
+        Assert.True(SkillGroupHeaderPolicy.ShouldShowPluginHeaders("owner/repo", ["alpha", "beta"]));
     }
 
     [Fact]
