@@ -141,7 +141,7 @@ static class StackDetector
                 })
                 .Where(report => report.Values.Length > 0)
                 .SelectMany(report => report.Values.Select(value => $"  {report.ProjectPath}: {value}")));
-        warnings.Add($"Multiple Uno markup gate values detected ({string.Join(", ", conflictingValues)}). Agents may become confused.{Environment.NewLine}{projectValues}");
+        warnings.Add($"{Environment.NewLine}Warning: multiple Uno markup gate values detected ({string.Join(", ", conflictingValues)}) - agents may become confused:{Environment.NewLine}{projectValues}");
     }
 
     static void AddMultiValueWarning(string gate, IEnumerable<string> values, IReadOnlyList<UnoGateReport> reports, List<string> warnings)

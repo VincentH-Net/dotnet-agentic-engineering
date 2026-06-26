@@ -208,6 +208,10 @@ public sealed class StackDetectorTests
         var result = StackDetector.Detect(tempDirectory.Path);
 
         string warning = Assert.Single(result.Warnings, warning => warning.Contains("markup", StringComparison.OrdinalIgnoreCase));
+        Assert.StartsWith(
+            $"{Environment.NewLine}Warning: multiple Uno markup gate values detected (csharp, csharp2) - agents may become confused:",
+            warning,
+            StringComparison.Ordinal);
         Assert.Contains("csharp", warning, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("csharp2", warning, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("xaml", warning, StringComparison.OrdinalIgnoreCase);
