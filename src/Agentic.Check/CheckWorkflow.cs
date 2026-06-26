@@ -386,8 +386,9 @@ sealed class CheckWorkflow(
             return;
         }
 
-        reporter.Info("Would install skills into repo skills directories:");
-        ReportSkillGroups(selectedSkills, skill => $"      {skill.LocalFolder}");
+        reporter.Plain(string.Empty);
+        reporter.Bold("Would install skills into repo skills directories:");
+        ReportSkillGroups(selectedSkills, skill => $"      {skill.LocalFolder}", HeaderStyle.Plain, ItemStyle.Plain);
     }
 
     void ReportSkillUpdateDryRunActions(
@@ -470,6 +471,7 @@ sealed class CheckWorkflow(
     enum ItemStyle
     {
         Info,
+        Plain,
         Success
     }
 
@@ -515,6 +517,12 @@ sealed class CheckWorkflow(
 
     void ReportItem(string message, ItemStyle style)
     {
+        if (style == ItemStyle.Plain)
+        {
+            reporter.Plain(message);
+            return;
+        }
+
         if (style == ItemStyle.Success)
         {
             reporter.Success(message);

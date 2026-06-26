@@ -52,7 +52,9 @@ public sealed class WorkflowTests
         Assert.Contains("Would install directives into AGENTS.md:", reporter.Infos);
         Assert.Contains("  dotnet-cli-run", reporter.Infos);
         Assert.Contains("  foundation-prompt-log", reporter.Infos);
-        Assert.Contains("Would install skills into repo skills directories:", reporter.Infos);
+        Assert.Contains("Would install skills into repo skills directories:", reporter.BoldMessages);
+        int wouldInstallBlankLineIndex = reporter.Infos.IndexOf(string.Empty);
+        Assert.True(wouldInstallBlankLineIndex >= 0);
         Assert.Contains("  VincentH-Net/dotnet-agentic-engineering repo:", reporter.Infos);
         Assert.Contains("    dotnet:", reporter.Infos);
         Assert.Contains("      dotnet-livecharts2", reporter.Infos);
@@ -94,7 +96,7 @@ public sealed class WorkflowTests
         Assert.Equal(0, result.ExitCode);
         Assert.Contains(result.Report.Prerequisites, check => check.Name == "gh skill" && !check.Success);
         Assert.DoesNotContain(reporter.Errors, error => error.Contains("Required tools are missing", StringComparison.Ordinal));
-        Assert.Contains("Would install skills into repo skills directories:", reporter.Infos);
+        Assert.Contains("Would install skills into repo skills directories:", reporter.BoldMessages);
         Assert.Contains(reporter.Warnings, warning => warning.Contains("Could not check repo-local skills for updates", StringComparison.Ordinal));
     }
 

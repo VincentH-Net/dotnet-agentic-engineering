@@ -42,6 +42,8 @@ interface IReporter
 {
     void Plain(string message);
 
+    void Bold(string message);
+
     void Info(string message);
 
     void Success(string message);
@@ -96,6 +98,9 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
 
     public void Plain(string message)
         => console.MarkupLine(Markup.Escape(message));
+
+    public void Bold(string message)
+        => console.MarkupLine($"[bold]{Markup.Escape(message)}[/]");
 
     public void Info(string message)
         => console.MarkupLineInterpolated($"[grey]{message}[/]");
@@ -254,6 +259,10 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
 sealed class NullReporter : IReporter
 {
     public void Plain(string message)
+    {
+    }
+
+    public void Bold(string message)
     {
     }
 

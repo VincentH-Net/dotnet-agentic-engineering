@@ -101,6 +101,8 @@ sealed class RecordingReporter : IReporter
 {
     public List<string> Infos { get; } = [];
 
+    public List<string> BoldMessages { get; } = [];
+
     public List<string> Successes { get; } = [];
 
     public List<string> Warnings { get; } = [];
@@ -119,6 +121,9 @@ sealed class RecordingReporter : IReporter
 
     public void Plain(string message)
         => Infos.Add(message);
+
+    public void Bold(string message)
+        => BoldMessages.Add(message);
 
     public void Info(string message)
         => Infos.Add(message);
