@@ -413,15 +413,6 @@ sealed class CheckWorkflow(
         DirectivePlanItem[] currentDirectives = [.. directives
             .Where(directive => directive.Status == DirectiveStatuses.Current)
         ];
-        if (currentDirectives.Length > 0)
-        {
-            reporter.Plain("Up to date directives:");
-            foreach (var directive in currentDirectives)
-            {
-                reporter.Success($"  ✓ {directive.Name}");
-            }
-        }
-
         var missingSkillKeys = missingSkills
             .Select(SkillKey)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -432,6 +423,22 @@ sealed class CheckWorkflow(
             .Where(skill => !missingSkillKeys.Contains(SkillKey(skill))
                 && !updateSkillKeys.Contains(SkillKey(skill)))
         ];
+        if (currentDirectives.Length == 0 && upToDateSkills.Length == 0)
+        {
+            return;
+        }
+
+        reporter.Plain(string.Empty);
+
+        if (currentDirectives.Length > 0)
+        {
+            reporter.Plain("Up to date directives:");
+            foreach (var directive in currentDirectives)
+            {
+                reporter.Success($"  ✓ {directive.Name}");
+            }
+        }
+
         if (upToDateSkills.Length == 0)
         {
             return;

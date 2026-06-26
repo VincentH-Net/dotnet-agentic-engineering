@@ -349,6 +349,9 @@ public sealed class WorkflowTests
             CancellationToken.None);
 
         Assert.Equal(0, result.ExitCode);
+        int upToDateHeaderIndex = reporter.Infos.IndexOf("Up to date directives:");
+        Assert.True(upToDateHeaderIndex > 0);
+        Assert.Equal(string.Empty, reporter.Infos[upToDateHeaderIndex - 1]);
         Assert.Contains("Up to date directives:", reporter.Infos);
         Assert.Contains("  ✓ foundation-prompt-log", reporter.Successes);
         Assert.Contains("Up to date skills:", reporter.Infos);
