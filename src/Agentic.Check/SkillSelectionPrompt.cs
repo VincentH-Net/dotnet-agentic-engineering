@@ -238,6 +238,8 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
 
 sealed class RecommendationSelectionPrompt(IAnsiConsole console)
 {
+    internal const int MaxVisibleItems = 24;
+
     int previousRenderLineCount;
 
     public async Task<RecommendationSelectionResult> PromptAsync(
@@ -340,36 +342,45 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
         int lineCount = 0;
         void MarkupLine(string value)
         {
+            ClearCurrentLine();
             console.MarkupLine(value);
             lineCount++;
         }
 
+        ClearCurrentLine();
         console.WriteLine();
         lineCount++;
-        console.MarkupLineInterpolated($"{FormatRecommendationPromptHeading(itemCount)}");
-        lineCount++;
+        MarkupLine(Markup.Escape(FormatRecommendationPromptHeading(itemCount)));
         MarkupLine("[grey][[Use arrows to move, space to select, <right> to all, <left> to none, type to filter]][/]");
 
         if (state.Filter.Length > 0)
         {
-            console.MarkupLineInterpolated($"Filter: [yellow]{Markup.Escape(state.Filter)}[/]");
-            lineCount++;
+            MarkupLine($"Filter: [yellow]{Markup.Escape(state.Filter)}[/]");
         }
 
         if (state.FilteredItems.Count == 0)
         {
             MarkupLine("[grey]No recommendations match the current filter.[/]");
-            ClearTrailingLines(lineCount);
-            previousRenderLineCount = lineCount;
+            FinishRender(lineCount);
             return;
+        }
+
+        var (visibleStartIndex, visibleItems) = GetVisibleItems(state.FilteredItems, state.CursorIndex);
+        if (visibleItems.Count < state.FilteredItems.Count)
+        {
+            int visibleEndIndex = visibleStartIndex + visibleItems.Count;
+            MarkupLine(string.Create(
+                System.Globalization.CultureInfo.InvariantCulture,
+                $"[grey]Showing {visibleStartIndex + 1}-{visibleEndIndex} of {state.FilteredItems.Count} matches[/]"));
         }
 
         RecommendationSelectionKind? lastKind = null;
         string? lastSkillSourceRepo = null;
         string? lastSkillPlugin = null;
-        for (int index = 0; index < state.FilteredItems.Count; index++)
+        for (int index = 0; index < visibleItems.Count; index++)
         {
-            var item = state.FilteredItems[index];
+            int itemIndex = visibleStartIndex + index;
+            var item = visibleItems[index];
             if (item.Kind != lastKind)
             {
                 MarkupLine($"[bold]{(item.Kind == RecommendationSelectionKind.Directive ? "Directives" : "Skills")}[/]");
@@ -396,28 +407,58 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
                 }
             }
 
-            string cursor = index == state.CursorIndex ? ">" : " ";
+            string cursor = itemIndex == state.CursorIndex ? ">" : " ";
             string check = state.IsSelected(item) ? "[[x]]" : "[[ ]]";
             string display = Markup.Escape(item.Display);
             string indent = item.Skill is null ? string.Empty : "    ";
-            console.MarkupLine($"{indent}{cursor} {check} {display}");
-            lineCount++;
+            MarkupLine($"{indent}{cursor} {check} {display}");
         }
 
-        ClearTrailingLines(lineCount);
-        previousRenderLineCount = lineCount;
+        FinishRender(lineCount);
     }
 
-    void ClearTrailingLines(int currentRenderLineCount)
+    internal static (int StartIndex, IReadOnlyList<RecommendationSelectionItem> Items) GetVisibleItems(
+        IReadOnlyList<RecommendationSelectionItem> items,
+        int cursorIndex)
+    {
+        if (items.Count <= MaxVisibleItems)
+        {
+            return (0, items);
+        }
+
+        int startIndex = Math.Clamp(cursorIndex - (MaxVisibleItems / 2), 0, items.Count - MaxVisibleItems);
+        return (startIndex, [.. items.Skip(startIndex).Take(MaxVisibleItems)]);
+    }
+
+    void FinishRender(int currentRenderLineCount)
+    {
+        int renderRegionLineCount = Math.Max(currentRenderLineCount, previousRenderLineCount);
+        ClearTrailingLines(currentRenderLineCount, renderRegionLineCount);
+        previousRenderLineCount = renderRegionLineCount;
+    }
+
+    static void ClearCurrentLine()
     {
         if (Console.IsOutputRedirected)
         {
             return;
         }
 
-        for (int index = currentRenderLineCount; index < previousRenderLineCount; index++)
+        Console.Write('\r');
+        Console.Write(new string(' ', Math.Max(0, Console.WindowWidth - 1)));
+        Console.Write('\r');
+    }
+
+    static void ClearTrailingLines(int currentRenderLineCount, int renderRegionLineCount)
+    {
+        if (Console.IsOutputRedirected)
         {
-            Console.Write(new string(' ', Math.Max(0, Console.WindowWidth - 1)));
+            return;
+        }
+
+        for (int index = currentRenderLineCount; index < renderRegionLineCount; index++)
+        {
+            ClearCurrentLine();
             Console.WriteLine();
         }
     }

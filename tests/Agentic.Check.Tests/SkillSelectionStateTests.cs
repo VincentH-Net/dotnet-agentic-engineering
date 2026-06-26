@@ -84,6 +84,30 @@ public sealed class SkillSelectionStateTests
     }
 
     [Fact]
+    public void VisibleItemsAreBoundedAroundCursor()
+    {
+        var items = CreateItems([], [.. Enumerable.Range(1, 30).Select(index => $"skill-{index}")]);
+
+        var (startIndex, visibleItems) = RecommendationSelectionPrompt.GetVisibleItems(items, 20);
+
+        Assert.Equal(6, startIndex);
+        Assert.Equal(RecommendationSelectionPrompt.MaxVisibleItems, visibleItems.Count);
+        Assert.Equal("skill-7", visibleItems[0].Skill?.LocalFolder);
+        Assert.Equal("skill-30", visibleItems[^1].Skill?.LocalFolder);
+    }
+
+    [Fact]
+    public void VisibleItemsDoNotScrollWhenAllItemsFit()
+    {
+        var items = CreateItems([], ["alpha", "beta"]);
+
+        var (startIndex, visibleItems) = RecommendationSelectionPrompt.GetVisibleItems(items, 1);
+
+        Assert.Equal(0, startIndex);
+        Assert.Same(items, visibleItems);
+    }
+
+    [Fact]
     public void TypingFiltersBySourceRepo()
     {
         RecommendationSelectionState state = new([
