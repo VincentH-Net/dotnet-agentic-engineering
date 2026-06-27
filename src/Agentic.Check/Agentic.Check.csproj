@@ -10,14 +10,14 @@
     <Version>0.2.0-preview</Version>
     <Authors>VincentH-Net</Authors>
     <Copyright>Copyright © VincentH.NET</Copyright>
-    <Description>Checks and installs recommended agentic engineering directives and skills for local repositories.</Description>
+    <Description>Optimizes your repo for agentic engineering with .NET - based technologies.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/VincentH-Net/dotnet-agentic-engineering</PackageProjectUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageTags>agentic-check;agentic;dotnet-tool;cli;skills;github-cli;doctor;check</PackageTags>
+    <PackageTags>agentic-check;agentic;dotnet-tool;dotnet;cli;skills;directives;github;repo;doctor;check;codex;claude-code;gh skills</PackageTags>
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/VincentH-Net/dotnet-agentic-engineering</RepositoryUrl>
-    <PackageReleaseNotes>Detect local repo stack and install recommended repo-local agent directives and skills.</PackageReleaseNotes>
+    <PackageReleaseNotes>Silently building in public phase - not listed / posted yet...</PackageReleaseNotes>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
   <ItemGroup>

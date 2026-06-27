@@ -1,11 +1,23 @@
 # Agentic.Check
 
-`agentic-check` checks a local repository for recommended agentic engineering directives and skills.
+The `agentic-check` .NET tool optimizes your repo for agentic engineering with .NET - based technologies.
 
-It can create or update `AGENTS.md` with stack-specific directives, ensure `CLAUDE.md` imports `AGENTS.md` when `claude-code` is selected, and install missing repo-local skills with `gh skill`.
+- Detects which .NET based technologies and features you use
+- Recommends an optimal set of agentic directives and skills for those
+- You select which to apply
+- Directives are installed / updated in AGENTS.md, directly from the
+    dotnet-agentic-engineering GitHub repo
+- Skills are installed / updated directly from source GitHub skill repo's with 
+    'gh skill'
 
-Recommended directive updates and missing skills are shown in one selection list. The directive section appears first, followed by skills. All recommended items start selected; `<right>` selects every directive and skill, and `<left>` clears every directive and skill.
+The skills available for composition are carefully selected and tested from 
+best-in-class GitHub repo's. The composition minimizes context usage and avoids
+contradictions and ambiguities, reducing agent mistakes.
 
-Use `--yes` to apply all recommended directive updates and missing skills without prompting. Use `--dry-run` to report intended directive and skill actions without writing files or running installs.
+Currently supports foundational agentic habits, .NET, ASP.NET, Microsoft Orleans
+and Uno Platform
 
-By default, `--agents` is `claude-code,codex`: `claude-code` installs into `.claude/skills` and enables `CLAUDE.md` import management, while `codex` installs into `.agents/skills`. Each `--agents` value maps directly to the skill path supported by that agent.
+Uno Platform skills are selected depending on detected:
+- MVVM or MVUX update pattern
+- Pure XAML markup or XAML combined with either Uno C# Markup or C# Markup 2
+- Fluent / Material / Cupertino design system
