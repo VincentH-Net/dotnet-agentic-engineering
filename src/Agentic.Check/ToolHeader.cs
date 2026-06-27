@@ -9,6 +9,7 @@ static class ToolHeader
 {
     public const string AgenticColor = "cyan";
     public const string CheckColor = "green";
+    public const string DotNetColor = "#b197fc";
     public const string RepositoryUrl = "https://github.com/VincentH-Net/dotnet-agentic-engineering";
 
     public static IReadOnlyList<ToolHeaderLine> Lines { get; } =
@@ -30,7 +31,16 @@ static class ToolHeader
         //=> $"{Name} checks a repo for agentic directives and skills, then installs or updates selected recommendations.";
 
     public static string ProductLine
-        => $"\n.NET Agentic Engineering Check {Version}";
+        => $"\n✓ .NET Agentic Engineering Check {Version}";
+
+    public static string ProductLineMarkup
+        => "\n"
+            + Styled($"{CheckColor}", "✓ ")
+            + Styled($"underline {DotNetColor}", ".NET ")
+            + Styled($"underline {AgenticColor}", "Agentic")
+            + Styled($"underline {DotNetColor}", " Engineering ")
+            + Styled($"underline {CheckColor}", "Check")
+            + Subdued($" {Version}");
 
     static string Version
     {
@@ -49,4 +59,13 @@ static class ToolHeader
 
     public static string RepositoryLinkMarkup
         => $"See: [link={RepositoryUrl}]{Markup.Escape(RepositoryUrl)}[/]";
+
+    public static string SeparatorMarkup(int width)
+        => $"[bold]{Markup.Escape(new string('─', Math.Max(1, width)))}[/]";
+
+    static string Styled(string style, string value)
+        => $"[bold {style}]{Markup.Escape(value)}[/]";
+
+    static string Subdued(string value)
+        => $"[grey]{Markup.Escape(value)}[/]";
 }

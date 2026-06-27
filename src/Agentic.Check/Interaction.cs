@@ -85,9 +85,11 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
                 + Styled(ToolHeader.CheckColor, line.Check));
         }
 
-        console.MarkupLine(Markup.Escape(ToolHeader.ProductLine));
+        console.MarkupLine(ToolHeader.ProductLineMarkup);
+        console.MarkupLine(ToolHeader.SeparatorMarkup(console.Profile.Width));
         console.MarkupLine(Markup.Escape(ToolHeader.Description));
         console.MarkupLine(ToolHeader.RepositoryLinkMarkup);
+        console.MarkupLine(ToolHeader.SeparatorMarkup(console.Profile.Width));
         console.WriteLine();
     }
 

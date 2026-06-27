@@ -7,16 +7,25 @@ public sealed class InteractionTests
     {
         Assert.Equal("cyan", ToolHeader.AgenticColor);
         Assert.Equal("green", ToolHeader.CheckColor);
+        Assert.Equal("#b197fc", ToolHeader.DotNetColor);
         Assert.Equal(6, ToolHeader.Lines.Count);
         Assert.All(ToolHeader.Lines, line => Assert.NotEmpty(line.Agentic));
         Assert.Contains(ToolHeader.Lines, line => !string.IsNullOrWhiteSpace(line.Separator));
         Assert.All(ToolHeader.Lines, line => Assert.NotEmpty(line.Check));
-        Assert.StartsWith(".NET Agentic Engineering Check ", ToolHeader.ProductLine.TrimStart(), StringComparison.Ordinal);
+        Assert.StartsWith("✓ .NET Agentic Engineering Check ", ToolHeader.ProductLine.TrimStart(), StringComparison.Ordinal);
         Assert.DoesNotContain("unknown", ToolHeader.ProductLine, StringComparison.OrdinalIgnoreCase);
+        Assert.StartsWith($"\n[bold {ToolHeader.CheckColor}]✓ [/]", ToolHeader.ProductLineMarkup, StringComparison.Ordinal);
+        Assert.Contains($"[bold underline {ToolHeader.DotNetColor}].NET [/]", ToolHeader.ProductLineMarkup, StringComparison.Ordinal);
+        Assert.Contains($"[bold underline {ToolHeader.AgenticColor}]Agentic[/]", ToolHeader.ProductLineMarkup, StringComparison.Ordinal);
+        Assert.Contains($"[bold underline {ToolHeader.DotNetColor}] Engineering [/]", ToolHeader.ProductLineMarkup, StringComparison.Ordinal);
+        Assert.Contains($"[bold underline {ToolHeader.CheckColor}]Check[/]", ToolHeader.ProductLineMarkup, StringComparison.Ordinal);
+        Assert.Contains("[grey] ", ToolHeader.ProductLineMarkup, StringComparison.Ordinal);
         Assert.NotEmpty(ToolHeader.Description.Trim());
         Assert.DoesNotContain(ToolHeader.RepositoryUrl, ToolHeader.Description, StringComparison.Ordinal);
         Assert.Contains($"[link={ToolHeader.RepositoryUrl}]", ToolHeader.RepositoryLinkMarkup, StringComparison.Ordinal);
         Assert.Contains($"{ToolHeader.RepositoryUrl}[/]", ToolHeader.RepositoryLinkMarkup, StringComparison.Ordinal);
+        Assert.Equal($"[bold]{new string('─', 12)}[/]", ToolHeader.SeparatorMarkup(12));
+        Assert.Equal("[bold]─[/]", ToolHeader.SeparatorMarkup(0));
         Assert.DoesNotContain("Author:", ToolHeader.Description, StringComparison.Ordinal);
     }
 
