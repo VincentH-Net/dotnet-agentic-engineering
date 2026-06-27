@@ -69,31 +69,38 @@ static class AgenticCheckCli
             async (targetDirectory, dryRun, yes, report, skillsDirectory, agents, verbose) =>
             {
                 SpectreReporter reporter = new(AnsiConsole.Console);
-                reporter.Header();
-
-                if (skillsDirectory is not null && !string.IsNullOrWhiteSpace(agents))
+                try
                 {
-                    AnsiConsole.MarkupLine("[red]Specify no more than one of --skills-dir and --agents.[/]");
-                    Environment.ExitCode = 2;
-                    return;
+                    reporter.Header();
+
+                    if (skillsDirectory is not null && !string.IsNullOrWhiteSpace(agents))
+                    {
+                        AnsiConsole.MarkupLine("[red]Specify no more than one of --skills-dir and --agents.[/]");
+                        Environment.ExitCode = 2;
+                        return;
+                    }
+
+                    var options = new AgenticCheckOptions(
+                        targetDirectory.FullName,
+                        dryRun,
+                        yes,
+                        report?.FullName,
+                        skillsDirectory?.FullName,
+                        agents,
+                        verbose);
+
+                    var workflow = new CheckWorkflow(
+                        new ProcessCommandRunner(),
+                        new SpectreUserPrompts(AnsiConsole.Console),
+                        reporter);
+
+                    var result = await workflow.RunAsync(options, CancellationToken.None).ConfigureAwait(false);
+                    Environment.ExitCode = result.ExitCode;
                 }
-
-                var options = new AgenticCheckOptions(
-                    targetDirectory.FullName,
-                    dryRun,
-                    yes,
-                    report?.FullName,
-                    skillsDirectory?.FullName,
-                    agents,
-                    verbose);
-
-                var workflow = new CheckWorkflow(
-                    new ProcessCommandRunner(),
-                    new SpectreUserPrompts(AnsiConsole.Console),
-                    reporter);
-
-                var result = await workflow.RunAsync(options, CancellationToken.None).ConfigureAwait(false);
-                Environment.ExitCode = result.ExitCode;
+                finally
+                {
+                    AnsiConsole.WriteLine();
+                }
             },
             targetDirectoryArgument,
             dryRunOption,
