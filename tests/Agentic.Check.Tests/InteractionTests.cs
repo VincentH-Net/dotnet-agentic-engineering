@@ -36,6 +36,7 @@ public sealed class InteractionTests
     {
         Assert.Equal("Check", SpectreReporter.SummaryLabelColumnHeader);
         Assert.Equal("Status", SpectreReporter.SummaryValueColumnHeader);
+        Assert.Equal("grey", SpectreReporter.InfoColor);
         Assert.Equal("[bold green]Check[/]", SpectreReporter.SummaryHeaderMarkup(SpectreReporter.SummaryLabelColumnHeader, ToolHeader.CheckColor));
         Assert.Equal("[bold cyan]Status[/]", SpectreReporter.SummaryHeaderMarkup(SpectreReporter.SummaryValueColumnHeader, ToolHeader.AgenticColor));
     }
@@ -56,6 +57,7 @@ public sealed class InteractionTests
 
         Assert.True(table.ShowRowSeparators);
         Assert.Same(TableBorder.HeavyHead, table.Border);
+        Assert.Equal(Style.Parse(SpectreReporter.InfoColor), table.BorderStyle);
     }
 
     [Fact]

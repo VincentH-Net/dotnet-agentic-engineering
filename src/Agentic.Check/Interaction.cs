@@ -74,6 +74,7 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
 {
     internal const string SummaryLabelColumnHeader = "Check";
     internal const string SummaryValueColumnHeader = "Status";
+    internal const string InfoColor = "grey";
 
     public void Header()
     {
@@ -105,7 +106,7 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
         => console.MarkupLine($"[bold]{Markup.Escape(message)}[/]");
 
     public void Info(string message)
-        => console.MarkupLineInterpolated($"[grey]{message}[/]");
+        => console.MarkupLineInterpolated($"[{InfoColor}]{message}[/]");
 
     public void Success(string message)
         => console.MarkupLineInterpolated($"[green]{message}[/]");
@@ -151,6 +152,7 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
         Table table = new()
         {
             Border = TableBorder.HeavyHead,
+            BorderStyle = Style.Parse(InfoColor),
             ShowRowSeparators = true
         };
         _ = table.AddColumn(new TableColumn(new Markup(SummaryHeaderMarkup(SummaryLabelColumnHeader, ToolHeader.CheckColor))));
