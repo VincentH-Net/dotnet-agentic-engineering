@@ -95,7 +95,7 @@ sealed class CheckWorkflow(
         report.SkillsDirectories.AddRange(skillsDirectories);
 
         await reporter.RunProgressAsync(
-            "Scanning repository (tech stack, directives, skills)",
+            "Scanning repository",
             3,
             async advance =>
             {

@@ -10,6 +10,7 @@ public sealed class InteractionTests
         Assert.Equal("cyan", ToolHeader.AgenticColor);
         Assert.Equal("green", ToolHeader.CheckColor);
         Assert.Equal("#b197fc", ToolHeader.DotNetColor);
+        Assert.Equal(75, ToolHeader.MaxSeparatorWidth);
         Assert.Equal(6, ToolHeader.Lines.Count);
         Assert.All(ToolHeader.Lines, line => Assert.NotEmpty(line.Agentic));
         Assert.Contains(ToolHeader.Lines, line => !string.IsNullOrWhiteSpace(line.Separator));
@@ -28,6 +29,7 @@ public sealed class InteractionTests
         Assert.Contains($"{ToolHeader.RepositoryUrl}[/]", ToolHeader.RepositoryLinkMarkup, StringComparison.Ordinal);
         Assert.Equal($"[bold]{new string('─', 12)}[/]", ToolHeader.SeparatorMarkup(12));
         Assert.Equal("[bold]─[/]", ToolHeader.SeparatorMarkup(0));
+        Assert.Equal($"[bold]{new string('─', ToolHeader.MaxSeparatorWidth)}[/]", ToolHeader.SeparatorMarkup(120));
         Assert.DoesNotContain("Author:", ToolHeader.Description, StringComparison.Ordinal);
     }
 

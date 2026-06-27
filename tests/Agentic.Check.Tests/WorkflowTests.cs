@@ -72,8 +72,8 @@ public sealed class WorkflowTests
         Assert.DoesNotContain(reporter.Infos, message => message.Contains("Would update repo-local skills", StringComparison.Ordinal));
         Assert.DoesNotContain(reporter.Infos, message => message.StartsWith("Directive ", StringComparison.Ordinal));
         Assert.Equal("standard,claude-code", reporter.TargetAgents);
-        Assert.Contains("Scanning repository (tech stack, directives, skills)", reporter.ProgressDescriptions);
-        Assert.Equal(3, reporter.ProgressTicksByDescription["Scanning repository (tech stack, directives, skills)"]);
+        Assert.Contains("Scanning repository", reporter.ProgressDescriptions);
+        Assert.Equal(3, reporter.ProgressTicksByDescription["Scanning repository"]);
     }
 
     [Fact]
@@ -426,8 +426,8 @@ public sealed class WorkflowTests
         Assert.DoesNotContain(reporter.Infos, message => message.Contains(claudeSkillsDirectory, StringComparison.Ordinal));
         Assert.DoesNotContain(reporter.Infos, message => message.Contains("1 update(s) available", StringComparison.Ordinal));
         Assert.Empty(reporter.Warnings);
-        Assert.Contains("Scanning repository (tech stack, directives, skills)", reporter.ProgressDescriptions);
-        Assert.Equal(3, reporter.ProgressTicksByDescription["Scanning repository (tech stack, directives, skills)"]);
+        Assert.Contains("Scanning repository", reporter.ProgressDescriptions);
+        Assert.Equal(3, reporter.ProgressTicksByDescription["Scanning repository"]);
         Assert.Contains("Updating skills", reporter.ProgressDescriptions);
         Assert.Equal(2, reporter.ProgressTicksByDescription["Updating skills"]);
         Assert.Contains("Updated 1 skill(s) successfully.", reporter.Successes);

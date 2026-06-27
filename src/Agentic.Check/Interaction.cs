@@ -178,13 +178,7 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
         CancellationToken cancellationToken)
         => await console.Progress()
             .AutoClear(false)
-            .Columns(
-            [
-                new TaskDescriptionColumn(),
-                new ProgressBarColumn(),
-                new PercentageColumn(),
-                new SpinnerColumn()
-            ])
+            .Columns(CreateProgressColumns())
             .StartAsync(async context =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -195,6 +189,9 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
                     task.Value = task.MaxValue;
                 }
             }).ConfigureAwait(false);
+
+    internal static ProgressColumn[] CreateProgressColumns()
+        => [new TaskDescriptionColumn(), new ProgressBarColumn(), new PercentageColumn(), new SpinnerColumn()];
 
     internal static string FormatDirectiveSummary(DirectiveSummary directiveSummary)
         => FormatRecommendationStatus(

@@ -10,6 +10,7 @@ static class ToolHeader
     public const string AgenticColor = "cyan";
     public const string CheckColor = "green";
     public const string DotNetColor = "#b197fc";
+    public const int MaxSeparatorWidth = 75;
     public const string RepositoryUrl = "https://github.com/VincentH-Net/dotnet-agentic-engineering";
 
     public static IReadOnlyList<ToolHeaderLine> Lines { get; } =
@@ -22,13 +23,12 @@ static class ToolHeader
         new(@"       |___/                       ", @"      ", @"                           ")
     ];
 
-    public static string Description
-        => $"This tool composes a repo-optimized set of agentic directives and skills from best-in-class github skill repo's, based on which .NET technologies and features are used.\n\n" +
-            "The skill composition minimizes context usage and avoids contradictions and ambiguities to reduce agent mistakes.\n\n" +
-            "The tool lets you select what to install or update; for skills it uses 'gh skill' to install / update directly from the source repo's.\n\n" +
-            "Currently supports foundational agentic habits, .NET, ASP.NET, Microsoft Orleans and Uno Platform.\n" +
-            "Uno Platform skills are selected depending on repo usage of MVVM or MVUX update pattern, pure XAML markup or combined with either Uno C# Markup or C# Markup 2, and Fluent / Material / Cupertino design system.\n";
-        //=> $"{Name} checks a repo for agentic directives and skills, then installs or updates selected recommendations.";
+    public static string Description => """
+        Optimizes your repo for agentic engineering with .NET - based technologies.
+
+        Use 'agentic-check -h' for full tool description and parameter usage.
+
+        """;
 
     public static string ProductLine
         => $"\n✓ .NET Agentic Engineering Check {Version}";
@@ -58,10 +58,10 @@ static class ToolHeader
     }
 
     public static string RepositoryLinkMarkup
-        => $"See: [link={RepositoryUrl}]{Markup.Escape(RepositoryUrl)}[/]";
+        => $"Learn more at [link={RepositoryUrl}]{Markup.Escape(RepositoryUrl)}[/].";
 
     public static string SeparatorMarkup(int width)
-        => $"[bold]{Markup.Escape(new string('─', Math.Max(1, width)))}[/]";
+        => $"[bold]{Markup.Escape(new string('─', Math.Clamp(width, 1, MaxSeparatorWidth)))}[/]";
 
     static string Styled(string style, string value)
         => $"[bold {style}]{Markup.Escape(value)}[/]";
