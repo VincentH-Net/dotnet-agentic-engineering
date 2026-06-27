@@ -1,6 +1,6 @@
 namespace Agentic.Check;
 
-sealed record AgentSkillHost(string Id, string ProjectDirectory);
+sealed record AgentSkillHost(string Id, string Name, string ProjectDirectory);
 
 static class AgentSkillRegistry
 {
@@ -10,51 +10,51 @@ static class AgentSkillRegistry
 
     static readonly IReadOnlyList<AgentSkillHost> Hosts =
     [
-        new("github-copilot", AgentsProjectDirectory),
-        new(ClaudeCodeAgentId, ".claude/skills"),
-        new("cursor", AgentsProjectDirectory),
-        new("codex", AgentsProjectDirectory),
-        new("gemini-cli", AgentsProjectDirectory),
-        new("antigravity", AgentsProjectDirectory),
-        new("adal", ".adal/skills"),
-        new("amp", AgentsProjectDirectory),
-        new("augment", ".augment/skills"),
-        new("bob", ".bob/skills"),
-        new("cline", AgentsProjectDirectory),
-        new("codebuddy", ".codebuddy/skills"),
-        new("command-code", ".commandcode/skills"),
-        new("continue", ".continue/skills"),
-        new("cortex", ".cortex/skills"),
-        new("crush", ".crush/skills"),
-        new("deepagents", AgentsProjectDirectory),
-        new("droid", ".factory/skills"),
-        new("firebender", AgentsProjectDirectory),
-        new("goose", ".goose/skills"),
-        new("iflow-cli", ".iflow/skills"),
-        new("junie", ".junie/skills"),
-        new("kilo", ".kilocode/skills"),
-        new("kimi-cli", AgentsProjectDirectory),
-        new("kiro-cli", ".kiro/skills"),
-        new("kode", ".kode/skills"),
-        new("mcpjam", ".mcpjam/skills"),
-        new("mistral-vibe", ".vibe/skills"),
-        new("mux", ".mux/skills"),
-        new("neovate", ".neovate/skills"),
-        new("openclaw", "skills"),
-        new("opencode", AgentsProjectDirectory),
-        new("openhands", ".openhands/skills"),
-        new("pi", ".pi/skills"),
-        new("pochi", ".pochi/skills"),
-        new("qoder", ".qoder/skills"),
-        new("qwen-code", ".qwen/skills"),
-        new("replit", AgentsProjectDirectory),
-        new("roo", ".roo/skills"),
-        new("trae", ".trae/skills"),
-        new("trae-cn", ".trae/skills"),
-        new("universal", AgentsProjectDirectory),
-        new("warp", AgentsProjectDirectory),
-        new("windsurf", ".windsurf/skills"),
-        new("zencoder", ".zencoder/skills")
+        new("github-copilot", "GitHub Copilot", AgentsProjectDirectory),
+        new(ClaudeCodeAgentId, "Claude Code", ".claude/skills"),
+        new("cursor", "Cursor", AgentsProjectDirectory),
+        new("codex", "Codex", AgentsProjectDirectory),
+        new("gemini-cli", "Gemini CLI", AgentsProjectDirectory),
+        new("antigravity", "Antigravity", AgentsProjectDirectory),
+        new("adal", "AdaL", ".adal/skills"),
+        new("amp", "Amp", AgentsProjectDirectory),
+        new("augment", "Augment", ".augment/skills"),
+        new("bob", "IBM Bob", ".bob/skills"),
+        new("cline", "Cline", AgentsProjectDirectory),
+        new("codebuddy", "CodeBuddy", ".codebuddy/skills"),
+        new("command-code", "Command Code", ".commandcode/skills"),
+        new("continue", "Continue", ".continue/skills"),
+        new("cortex", "Cortex Code", ".cortex/skills"),
+        new("crush", "Crush", ".crush/skills"),
+        new("deepagents", "Deep Agents", AgentsProjectDirectory),
+        new("droid", "Droid", ".factory/skills"),
+        new("firebender", "Firebender", AgentsProjectDirectory),
+        new("goose", "Goose", ".goose/skills"),
+        new("iflow-cli", "iFlow CLI", ".iflow/skills"),
+        new("junie", "Junie", ".junie/skills"),
+        new("kilo", "Kilo Code", ".kilocode/skills"),
+        new("kimi-cli", "Kimi Code CLI", AgentsProjectDirectory),
+        new("kiro-cli", "Kiro CLI", ".kiro/skills"),
+        new("kode", "Kode", ".kode/skills"),
+        new("mcpjam", "MCPJam", ".mcpjam/skills"),
+        new("mistral-vibe", "Mistral Vibe", ".vibe/skills"),
+        new("mux", "Mux", ".mux/skills"),
+        new("neovate", "Neovate", ".neovate/skills"),
+        new("openclaw", "OpenClaw", "skills"),
+        new("opencode", "OpenCode", AgentsProjectDirectory),
+        new("openhands", "OpenHands", ".openhands/skills"),
+        new("pi", "Pi", ".pi/skills"),
+        new("pochi", "Pochi", ".pochi/skills"),
+        new("qoder", "Qoder", ".qoder/skills"),
+        new("qwen-code", "Qwen Code", ".qwen/skills"),
+        new("replit", "Replit", AgentsProjectDirectory),
+        new("roo", "Roo Code", ".roo/skills"),
+        new("trae", "Trae", ".trae/skills"),
+        new("trae-cn", "Trae CN", ".trae/skills"),
+        new("universal", "Universal", AgentsProjectDirectory),
+        new("warp", "Warp", AgentsProjectDirectory),
+        new("windsurf", "Windsurf", ".windsurf/skills"),
+        new("zencoder", "Zencoder", ".zencoder/skills")
     ];
 
     static readonly Dictionary<string, AgentSkillHost> HostsById =
@@ -62,6 +62,9 @@ static class AgentSkillRegistry
 
     public static string AgentIds => string.Join(", ", Hosts
         .Select(host => host.Id));
+
+    public static string AgentHelpLines => string.Join(Environment.NewLine, Hosts
+        .Select(host => $"  - {host.Name} ({host.Id})"));
 
     public static AgentDirectoryResolution ResolveProjectDirectories(
         string? agentsValue,

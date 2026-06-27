@@ -44,6 +44,17 @@ public sealed class InteractionTests
     }
 
     [Fact]
+    public void AgentHelpLinesIncludeNamesAndIdsInGhOrder()
+    {
+        string[] lines = AgentSkillRegistry.AgentHelpLines.Split(Environment.NewLine);
+
+        Assert.Equal("  - GitHub Copilot (github-copilot)", lines[0]);
+        Assert.Equal("  - Claude Code (claude-code)", lines[1]);
+        Assert.Contains("  - Codex (codex)", lines);
+        Assert.Equal("  - Zencoder (zencoder)", lines[^1]);
+    }
+
+    [Fact]
     public void SummaryTableShowsRowSeparatorsBetweenChecks()
     {
         var table = SpectreReporter.CreateSummaryTable(

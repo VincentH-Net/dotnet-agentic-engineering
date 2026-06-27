@@ -10,7 +10,7 @@ static class AgenticCheckCli
         Argument<DirectoryInfo> targetDirectoryArgument = new(
             "target-dir",
             () => new DirectoryInfo(Environment.CurrentDirectory),
-            "Target directory. Defaults to the current working directory.")
+            "Target directory.")
         {
             Arity = ArgumentArity.ZeroOrOne
         };
@@ -18,14 +18,13 @@ static class AgenticCheckCli
         Option<bool> dryRunOption = new("--dry-run", "Report recommended actions without applying them.");
         Option<bool> yesOption = new("--yes", "Apply all recommended actions.");
         Option<FileInfo?> reportOption = new("--report", "Write a JSON report to this path.");
-        Option<DirectoryInfo?> skillsDirectoryOption = new("--skills-dir", "Repo-local skills directory. Overrides --agents.");
+        Option<DirectoryInfo?> skillsDirectoryOption = new("--skills-dir", "Repo-local skills directory. Overrides directories implied by --agents.");
         Option<string?> agentsOption = new(
             "--agents", $"""
-            Comma-separated agent values to install; defaults to {AgentSkillRegistry.DefaultAgents}.
+            Comma-separated agent values to support. [default: {AgentSkillRegistry.DefaultAgents}]
 
-            Valid agent values: {AgentSkillRegistry.AgentIds}.
-
-            (agent values are identical to what 'gh skill' supports)
+            Supported agent values (identical to what 'gh skill' supports):
+            {AgentSkillRegistry.AgentHelpLines}
             """);
         Option<bool> verboseOption = new("--verbose", "Include detailed command and scan information.");
 
