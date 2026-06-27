@@ -26,7 +26,7 @@ static class ToolHeader
     public static string Description => """
         Optimizes your repo for agentic engineering with .NET - based technologies.
 
-        Use 'agentic-check -h' for full tool description and parameter usage.
+        - Use 'agentic-check -h' for full tool description and parameter usage
 
         """;
 
@@ -58,7 +58,7 @@ static class ToolHeader
     }
 
     public static string RepositoryLinkMarkup
-        => $"Learn more at [link={RepositoryUrl}]{Markup.Escape(RepositoryUrl)}[/].";
+        => $"- Learn more at [link={RepositoryUrl}]{Markup.Escape(RepositoryUrl)}[/]";
 
     public static string SeparatorMarkup(int width)
         => $"[bold]{Markup.Escape(new string('─', Math.Clamp(width, 1, MaxSeparatorWidth)))}[/]";

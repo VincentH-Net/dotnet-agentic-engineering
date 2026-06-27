@@ -372,7 +372,7 @@ sealed class CheckWorkflow(
             return;
         }
 
-        reporter.Bold(header);
+        ReportSectionHeader(header);
         foreach (string directiveName in directiveNames)
         {
             reporter.Plain($"  {directiveName}");
@@ -386,8 +386,7 @@ sealed class CheckWorkflow(
             return;
         }
 
-        reporter.Plain(string.Empty);
-        reporter.Bold("Would install skills into repo skills directories:");
+        ReportSectionHeader("Would install skills into repo skills directories:");
         ReportSkillGroups(selectedSkills, skill => $"      {skill.LocalFolder}", ItemStyle.Plain);
     }
 
@@ -401,7 +400,7 @@ sealed class CheckWorkflow(
             return;
         }
 
-        reporter.Bold("Would update skills in repo skills directories:");
+        ReportSectionHeader("Would update skills in repo skills directories:");
         ReportSkillUpdateGroups(skillUpdates, recommendedSkills);
     }
 
@@ -429,11 +428,9 @@ sealed class CheckWorkflow(
             return;
         }
 
-        reporter.Plain(string.Empty);
-
         if (currentDirectives.Length > 0)
         {
-            reporter.Bold("Up to date directives:");
+            ReportSectionHeader("Up to date directives:");
             foreach (var directive in currentDirectives)
             {
                 reporter.Success($"  ✓ {directive.Name}");
@@ -445,7 +442,7 @@ sealed class CheckWorkflow(
             return;
         }
 
-        reporter.Bold("Up to date skills:");
+        ReportSectionHeader("Up to date skills:");
         ReportSkillGroups(
             upToDateSkills,
             skill => $"      ✓ {skill.LocalFolder}",
@@ -456,9 +453,14 @@ sealed class CheckWorkflow(
         IReadOnlyList<SkillUpdateCandidate> skillUpdates,
         IReadOnlyList<SkillManifestEntry> recommendedSkills)
     {
-        reporter.Info(string.Empty);
-        reporter.Bold(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Found {skillUpdates.Count} skill update(s) available:"));
+        ReportSectionHeader(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Found {skillUpdates.Count} skill update(s) available:"));
         ReportSkillUpdateGroups(skillUpdates, recommendedSkills);
+    }
+
+    void ReportSectionHeader(string header)
+    {
+        reporter.Plain(string.Empty);
+        reporter.Bold(header);
     }
 
     enum ItemStyle

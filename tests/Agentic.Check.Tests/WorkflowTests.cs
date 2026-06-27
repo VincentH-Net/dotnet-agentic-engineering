@@ -50,9 +50,11 @@ public sealed class WorkflowTests
         Assert.Contains(result.Report.SkillUpdateDryRuns, update => update.StandardOutput.Contains("Would update dotnet-livecharts2", StringComparison.Ordinal));
         Assert.Contains(result.Report.SkillUpdateDryRuns, update => update.StandardOutput.Contains("Would update dotnet-modern-csharp-editorconfig", StringComparison.Ordinal));
         Assert.Contains("Would install directives into AGENTS.md:", reporter.BoldMessages);
+        AssertExactlyOneBlankLineBefore(reporter.Infos, "Would install directives into AGENTS.md:");
         Assert.Contains("  dotnet-cli-run", reporter.Infos);
         Assert.Contains("  foundation-prompt-log", reporter.Infos);
         Assert.Contains("Would install skills into repo skills directories:", reporter.BoldMessages);
+        AssertExactlyOneBlankLineBefore(reporter.Infos, "Would install skills into repo skills directories:");
         int wouldInstallBlankLineIndex = reporter.Infos.IndexOf(string.Empty);
         Assert.True(wouldInstallBlankLineIndex >= 0);
         Assert.Contains("  VincentH-Net/dotnet-agentic-engineering repo:", reporter.BoldMessages);
@@ -67,6 +69,7 @@ public sealed class WorkflowTests
         Assert.Contains("    dotnet-test:", reporter.Infos);
         Assert.Contains("      run-tests", reporter.Infos);
         Assert.Contains("Would update skills in repo skills directories:", reporter.BoldMessages);
+        AssertExactlyOneBlankLineBefore(reporter.Infos, "Would update skills in repo skills directories:");
         Assert.Contains("      dotnet-livecharts2", reporter.Infos);
         Assert.Contains("      dotnet-modern-csharp-editorconfig", reporter.Infos);
         Assert.DoesNotContain(reporter.Infos, message => message.Contains("Would update repo-local skills", StringComparison.Ordinal));
@@ -139,6 +142,7 @@ public sealed class WorkflowTests
 
         Assert.Equal(0, result.ExitCode);
         Assert.Contains("Would update directives in AGENTS.md:", reporter.BoldMessages);
+        AssertExactlyOneBlankLineBefore(reporter.Infos, "Would update directives in AGENTS.md:");
         Assert.Contains("  foundation-prompt-log", reporter.Infos);
     }
 
@@ -359,8 +363,10 @@ public sealed class WorkflowTests
         Assert.True(upToDateHeaderIndex > 0);
         Assert.Equal(string.Empty, reporter.Infos[upToDateHeaderIndex - 1]);
         Assert.Contains("Up to date directives:", reporter.BoldMessages);
+        AssertExactlyOneBlankLineBefore(reporter.Infos, "Up to date directives:");
         Assert.Contains("  ✓ foundation-prompt-log", reporter.Successes);
         Assert.Contains("Up to date skills:", reporter.BoldMessages);
+        AssertExactlyOneBlankLineBefore(reporter.Infos, "Up to date skills:");
         Assert.Contains("  VincentH-Net/dotnet-agentic-engineering repo:", reporter.BoldMessages);
         Assert.Contains("    dotnet:", reporter.BoldMessages);
         Assert.Contains("  VincentH-Net/dotnet-agentic-engineering repo:", reporter.Infos);
@@ -413,6 +419,7 @@ public sealed class WorkflowTests
         Assert.Contains(commandRunner.Calls, call => call.Arguments.SequenceEqual(["skill", "update", "--dir", agentsSkillsDirectory, "--all"]));
         Assert.Contains(commandRunner.Calls, call => call.Arguments.SequenceEqual(["skill", "update", "--dir", claudeSkillsDirectory, "--all"]));
         Assert.Contains("Found 1 skill update(s) available:", reporter.BoldMessages);
+        AssertExactlyOneBlankLineBefore(reporter.Infos, "Found 1 skill update(s) available:");
         Assert.Contains(string.Empty, reporter.Infos);
         Assert.Contains("  VincentH-Net/dotnet-agentic-engineering repo:", reporter.BoldMessages);
         Assert.Contains("    dotnet:", reporter.BoldMessages);
@@ -646,5 +653,25 @@ public sealed class WorkflowTests
         Assert.True(File.Exists(Path.Combine(tempDirectory.Path, ".claude", "skills", "dotnet-modern-csharp-editorconfig", "SKILL.md")));
         Assert.Contains("Installing skills", reporter.ProgressDescriptions);
         Assert.Equal(2, reporter.ProgressTicksByDescription["Installing skills"]);
+    }
+
+    static void AssertExactlyOneBlankLineBefore(List<string> messages, string header)
+    {
+        int headerIndex = -1;
+        for (int index = 0; index < messages.Count; index++)
+        {
+            if (messages[index].Equals(header, StringComparison.Ordinal))
+            {
+                headerIndex = index;
+                break;
+            }
+        }
+
+        Assert.True(headerIndex > 0, $"Expected '{header}' to have a preceding blank line.");
+        Assert.Equal(string.Empty, messages[headerIndex - 1]);
+        if (headerIndex > 1)
+        {
+            Assert.NotEqual(string.Empty, messages[headerIndex - 2]);
+        }
     }
 }
