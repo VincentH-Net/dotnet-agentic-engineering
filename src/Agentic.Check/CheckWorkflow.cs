@@ -555,6 +555,18 @@ sealed class CheckWorkflow(
     void ReportSectionHeader(string header)
     {
         reporter.Plain(string.Empty);
+        if (header.StartsWith("Would ", StringComparison.Ordinal))
+        {
+            reporter.Bold(header, ToolHeader.CheckColor);
+            return;
+        }
+
+        if (header.StartsWith("Up to date ", StringComparison.Ordinal))
+        {
+            reporter.Bold(header, ToolHeader.AgenticColor);
+            return;
+        }
+
         reporter.Bold(header);
     }
 
@@ -594,7 +606,7 @@ sealed class CheckWorkflow(
     }
 
     void ReportHeader(string message)
-        => reporter.Bold(message);
+        => reporter.Bold(message, ToolHeader.AgenticColor);
 
     void ReportItem(string message, ItemStyle style)
     {
@@ -623,14 +635,14 @@ sealed class CheckWorkflow(
             .OrderBy(group => SkillOrdering.GetSourceRepoOrder(group.Key))
             .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase))
         {
-            reporter.Bold($"  {FormatSkillSourceHeader(sourceGroup.Key)}:");
+            reporter.Bold($"  {FormatSkillSourceHeader(sourceGroup.Key)}:", ToolHeader.AgenticColor);
             var pluginGroups = OrderPluginGroups(sourceGroup.Key, sourceGroup.GroupBy(update => update.Plugin, StringComparer.OrdinalIgnoreCase));
             bool showPluginHeaders = SkillGroupHeaderPolicy.ShouldShowPluginHeaders(sourceGroup.Key, pluginGroups.Select(group => group.Key));
             foreach (var pluginGroup in pluginGroups)
             {
                 if (showPluginHeaders)
                 {
-                    reporter.Bold($"    {FormatSkillPluginHeader(pluginGroup.Key)}:");
+                    reporter.Bold($"    {FormatSkillPluginHeader(pluginGroup.Key)}:", ToolHeader.AgenticColor);
                 }
 
                 foreach (var update in pluginGroup)

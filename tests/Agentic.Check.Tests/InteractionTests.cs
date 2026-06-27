@@ -55,6 +55,23 @@ public sealed class InteractionTests
     }
 
     [Fact]
+    public void RecommendationListHeadersUseRequestedColors()
+    {
+        Assert.Equal(
+            $"[bold {ToolHeader.CheckColor}]Directives[/]",
+            RecommendationSelectionPrompt.FormatRecommendationKindHeaderMarkup(RecommendationSelectionKind.Directive));
+        Assert.Equal(
+            $"[bold {ToolHeader.CheckColor}]Skills[/]",
+            RecommendationSelectionPrompt.FormatRecommendationKindHeaderMarkup(RecommendationSelectionKind.Skill));
+        Assert.Equal(
+            $"  [bold {ToolHeader.AgenticColor}]dotnet/skills repo[/]",
+            RecommendationSelectionPrompt.FormatRecommendationSourceHeaderMarkup("dotnet/skills"));
+        Assert.Equal(
+            $"    [bold {ToolHeader.AgenticColor}]dotnet-test[/]",
+            RecommendationSelectionPrompt.FormatRecommendationPluginHeaderMarkup("dotnet-test"));
+    }
+
+    [Fact]
     public void UnknownOptionGuardRejectsOptionLookingTargetDirectory()
     {
         Assert.Equal("--unknown-option", AgenticCheckCli.FindUnknownOption(["--unknown-option"]));

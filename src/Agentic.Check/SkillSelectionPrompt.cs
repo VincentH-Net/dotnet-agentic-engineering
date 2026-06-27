@@ -318,6 +318,15 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
     internal static string FormatRecommendationPromptHeading(int itemCount)
         => string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Recommend {itemCount} action(s), select which to apply:");
 
+    internal static string FormatRecommendationKindHeaderMarkup(RecommendationSelectionKind kind)
+        => $"[bold {ToolHeader.CheckColor}]{(kind == RecommendationSelectionKind.Directive ? "Directives" : "Skills")}[/]";
+
+    internal static string FormatRecommendationSourceHeaderMarkup(string sourceRepo)
+        => $"  [bold {ToolHeader.AgenticColor}]{Markup.Escape(FormatSkillSourceHeader(sourceRepo))}[/]";
+
+    internal static string FormatRecommendationPluginHeaderMarkup(string plugin)
+        => $"    [bold {ToolHeader.AgenticColor}]{Markup.Escape(FormatSkillPluginHeader(plugin))}[/]";
+
     static SkillSelectionInput MapKey(ConsoleKeyInfo key)
         => key.Key switch
         {
@@ -389,7 +398,7 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
             var item = visibleItems[index];
             if (item.Kind != lastKind)
             {
-                MarkupLine($"[bold]{(item.Kind == RecommendationSelectionKind.Directive ? "Directives" : "Skills")}[/]");
+                MarkupLine(FormatRecommendationKindHeaderMarkup(item.Kind));
                 lastKind = item.Kind;
                 lastSkillSourceRepo = null;
                 lastSkillPlugin = null;
@@ -401,7 +410,7 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
                 bool showPluginHeaders = !visibleSkillSourceReposWithoutPluginHeaders.Contains(skillSourceRepo, StringComparer.OrdinalIgnoreCase);
                 if (!skillSourceRepo.Equals(lastSkillSourceRepo, StringComparison.OrdinalIgnoreCase))
                 {
-                    MarkupLine($"  [bold]{Markup.Escape(FormatSkillSourceHeader(skillSourceRepo))}[/]");
+                    MarkupLine(FormatRecommendationSourceHeaderMarkup(skillSourceRepo));
                     lastSkillSourceRepo = skillSourceRepo;
                     lastSkillPlugin = null;
                 }
@@ -409,7 +418,7 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
                 string skillPlugin = item.Skill.Plugin;
                 if (showPluginHeaders && !skillPlugin.Equals(lastSkillPlugin, StringComparison.OrdinalIgnoreCase))
                 {
-                    MarkupLine($"    [bold]{Markup.Escape(FormatSkillPluginHeader(skillPlugin))}[/]");
+                    MarkupLine(FormatRecommendationPluginHeaderMarkup(skillPlugin));
                     lastSkillPlugin = skillPlugin;
                 }
             }

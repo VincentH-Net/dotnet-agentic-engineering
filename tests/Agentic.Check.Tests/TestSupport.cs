@@ -107,6 +107,8 @@ sealed class RecordingReporter : IReporter
 
     public List<string> BoldMessages { get; } = [];
 
+    public List<(string Message, string Color)> ColoredBoldMessages { get; } = [];
+
     public List<string> Successes { get; } = [];
 
     public List<string> Warnings { get; } = [];
@@ -132,6 +134,13 @@ sealed class RecordingReporter : IReporter
     public void Bold(string message)
     {
         BoldMessages.Add(message);
+        Infos.Add(message);
+    }
+
+    public void Bold(string message, string color)
+    {
+        BoldMessages.Add(message);
+        ColoredBoldMessages.Add((message, color));
         Infos.Add(message);
     }
 
