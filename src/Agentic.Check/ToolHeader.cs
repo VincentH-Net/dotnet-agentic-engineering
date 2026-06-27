@@ -23,7 +23,7 @@ static class ToolHeader
     ];
 
     public static string Description
-        => $"\nThis tool composes a repo-optimized set of agentic directives and skills from best-in-class github skill repo's, based on which .NET technologies and features are used.\n\n" +
+        => $"This tool composes a repo-optimized set of agentic directives and skills from best-in-class github skill repo's, based on which .NET technologies and features are used.\n\n" +
             "The skill composition minimizes context usage and avoids contradictions and ambiguities to reduce agent mistakes.\n\n" +
             "The tool lets you select what to install or update; for skills it uses 'gh skill' to install / update directly from the source repo's.\n\n" +
             "Currently supports foundational agentic habits, .NET, ASP.NET, Microsoft Orleans and Uno Platform.\n" +
