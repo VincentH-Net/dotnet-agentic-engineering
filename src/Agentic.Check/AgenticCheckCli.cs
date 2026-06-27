@@ -23,9 +23,7 @@ static class AgenticCheckCli
             "--agents", $"""
             Comma-separated agent values to install; defaults to {AgentSkillRegistry.DefaultAgents}.
 
-            Use {AgentSkillRegistry.StandardAgentId} for {AgentSkillRegistry.StandardProjectDirectory} (standard-path agents: {AgentSkillRegistry.StandardAgentNames}).
-
-            Other valid agent values: {AgentSkillRegistry.AgentIds}.
+            Valid agent values: {AgentSkillRegistry.AgentIds}.
 
             (agent values are identical to what 'gh skill' supports)
             """);

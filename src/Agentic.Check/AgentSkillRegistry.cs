@@ -1,69 +1,64 @@
 namespace Agentic.Check;
 
-sealed record AgentSkillHost(string Id, string Name, string ProjectDirectory);
+sealed record AgentSkillHost(string Id, string ProjectDirectory);
 
 static class AgentSkillRegistry
 {
-    public const string DefaultAgents = "standard,claude-code";
-    public const string StandardAgentId = "standard";
-    public const string StandardProjectDirectory = ".agents/skills";
+    public const string DefaultAgents = "claude-code,codex";
+    public const string AgentsProjectDirectory = ".agents/skills";
     public const string ClaudeCodeAgentId = "claude-code";
 
     static readonly IReadOnlyList<AgentSkillHost> Hosts =
     [
-        new("github-copilot", "GitHub Copilot", StandardProjectDirectory),
-        new(ClaudeCodeAgentId, "Claude Code", ".claude/skills"),
-        new("cursor", "Cursor", StandardProjectDirectory),
-        new("codex", "Codex", StandardProjectDirectory),
-        new("gemini-cli", "Gemini CLI", StandardProjectDirectory),
-        new("antigravity", "Antigravity", StandardProjectDirectory),
-        new("adal", "AdaL", ".adal/skills"),
-        new("amp", "Amp", StandardProjectDirectory),
-        new("augment", "Augment", ".augment/skills"),
-        new("bob", "IBM Bob", ".bob/skills"),
-        new("cline", "Cline", StandardProjectDirectory),
-        new("codebuddy", "CodeBuddy", ".codebuddy/skills"),
-        new("command-code", "Command Code", ".commandcode/skills"),
-        new("continue", "Continue", ".continue/skills"),
-        new("cortex", "Cortex Code", ".cortex/skills"),
-        new("crush", "Crush", ".crush/skills"),
-        new("deepagents", "Deep Agents", StandardProjectDirectory),
-        new("droid", "Droid", ".factory/skills"),
-        new("firebender", "Firebender", StandardProjectDirectory),
-        new("goose", "Goose", ".goose/skills"),
-        new("iflow-cli", "iFlow CLI", ".iflow/skills"),
-        new("junie", "Junie", ".junie/skills"),
-        new("kilo", "Kilo Code", ".kilocode/skills"),
-        new("kimi-cli", "Kimi Code CLI", StandardProjectDirectory),
-        new("kiro-cli", "Kiro CLI", ".kiro/skills"),
-        new("kode", "Kode", ".kode/skills"),
-        new("mcpjam", "MCPJam", ".mcpjam/skills"),
-        new("mistral-vibe", "Mistral Vibe", ".vibe/skills"),
-        new("mux", "Mux", ".mux/skills"),
-        new("neovate", "Neovate", ".neovate/skills"),
-        new("openclaw", "OpenClaw", "skills"),
-        new("opencode", "OpenCode", StandardProjectDirectory),
-        new("openhands", "OpenHands", ".openhands/skills"),
-        new("pi", "Pi", ".pi/skills"),
-        new("pochi", "Pochi", ".pochi/skills"),
-        new("qoder", "Qoder", ".qoder/skills"),
-        new("qwen-code", "Qwen Code", ".qwen/skills"),
-        new("replit", "Replit", StandardProjectDirectory),
-        new("roo", "Roo Code", ".roo/skills"),
-        new("trae", "Trae", ".trae/skills"),
-        new("trae-cn", "Trae CN", ".trae/skills"),
-        new("universal", "Universal", StandardProjectDirectory),
-        new("warp", "Warp", StandardProjectDirectory),
-        new("windsurf", "Windsurf", ".windsurf/skills"),
-        new("zencoder", "Zencoder", ".zencoder/skills")
+        new("github-copilot", AgentsProjectDirectory),
+        new(ClaudeCodeAgentId, ".claude/skills"),
+        new("cursor", AgentsProjectDirectory),
+        new("codex", AgentsProjectDirectory),
+        new("gemini-cli", AgentsProjectDirectory),
+        new("antigravity", AgentsProjectDirectory),
+        new("adal", ".adal/skills"),
+        new("amp", AgentsProjectDirectory),
+        new("augment", ".augment/skills"),
+        new("bob", ".bob/skills"),
+        new("cline", AgentsProjectDirectory),
+        new("codebuddy", ".codebuddy/skills"),
+        new("command-code", ".commandcode/skills"),
+        new("continue", ".continue/skills"),
+        new("cortex", ".cortex/skills"),
+        new("crush", ".crush/skills"),
+        new("deepagents", AgentsProjectDirectory),
+        new("droid", ".factory/skills"),
+        new("firebender", AgentsProjectDirectory),
+        new("goose", ".goose/skills"),
+        new("iflow-cli", ".iflow/skills"),
+        new("junie", ".junie/skills"),
+        new("kilo", ".kilocode/skills"),
+        new("kimi-cli", AgentsProjectDirectory),
+        new("kiro-cli", ".kiro/skills"),
+        new("kode", ".kode/skills"),
+        new("mcpjam", ".mcpjam/skills"),
+        new("mistral-vibe", ".vibe/skills"),
+        new("mux", ".mux/skills"),
+        new("neovate", ".neovate/skills"),
+        new("openclaw", "skills"),
+        new("opencode", AgentsProjectDirectory),
+        new("openhands", ".openhands/skills"),
+        new("pi", ".pi/skills"),
+        new("pochi", ".pochi/skills"),
+        new("qoder", ".qoder/skills"),
+        new("qwen-code", ".qwen/skills"),
+        new("replit", AgentsProjectDirectory),
+        new("roo", ".roo/skills"),
+        new("trae", ".trae/skills"),
+        new("trae-cn", ".trae/skills"),
+        new("universal", AgentsProjectDirectory),
+        new("warp", AgentsProjectDirectory),
+        new("windsurf", ".windsurf/skills"),
+        new("zencoder", ".zencoder/skills")
     ];
 
     static readonly Dictionary<string, AgentSkillHost> HostsById =
         Hosts.ToDictionary(host => host.Id, StringComparer.OrdinalIgnoreCase);
-
-    public static string StandardAgentNames => string.Join(", ", Hosts
-        .Where(IsStandardPath)
-        .Select(host => host.Name));
 
     public static string AgentIds => string.Join(", ", Hosts
         .Select(host => host.Id));
@@ -79,7 +74,7 @@ static class AgentSkillRegistry
         if (agentIds.Length == 0)
         {
             return AgentDirectoryResolution.Invalid(
-                $"No agent values were specified. Valid values: {StandardAgentId}, {AgentIds}.");
+                $"No agent values were specified. Valid values: {AgentIds}.");
         }
 
         List<string> unknownAgents = [];
@@ -89,12 +84,6 @@ static class AgentSkillRegistry
 
         foreach (string agentId in agentIds)
         {
-            if (agentId.Equals(StandardAgentId, StringComparison.OrdinalIgnoreCase))
-            {
-                AddDirectory(Path.GetFullPath(Path.Combine(repoRoot, StandardProjectDirectory)));
-                continue;
-            }
-
             if (!HostsById.TryGetValue(agentId, out var host))
             {
                 unknownAgents.Add(agentId);
@@ -107,7 +96,7 @@ static class AgentSkillRegistry
 
         return unknownAgents.Count > 0
             ? AgentDirectoryResolution.Invalid(
-                $"Unknown agent value(s): {string.Join(", ", unknownAgents)}. Valid values: {StandardAgentId}, {AgentIds}.")
+                $"Unknown agent value(s): {string.Join(", ", unknownAgents)}. Valid values: {AgentIds}.")
             : AgentDirectoryResolution.Valid(directories, manageClaude);
 
         void AddDirectory(string directory)
@@ -118,9 +107,6 @@ static class AgentSkillRegistry
             }
         }
     }
-
-    static bool IsStandardPath(AgentSkillHost host)
-        => host.ProjectDirectory.Equals(StandardProjectDirectory, StringComparison.OrdinalIgnoreCase);
 }
 
 sealed record AgentDirectoryResolution(

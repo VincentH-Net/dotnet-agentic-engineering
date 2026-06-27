@@ -8,4 +8,4 @@ Recommended directive updates and missing skills are shown in one selection list
 
 Use `--yes` to apply all recommended directive updates and missing skills without prompting. Use `--dry-run` to report intended directive and skill actions without writing files or running installs.
 
-By default, `--agents` is `standard,claude-code`: `standard` installs into `.agents/skills`, and `claude-code` adds `.claude/skills` plus `CLAUDE.md` import management. Use `--agents standard` for only the shared `.agents/skills` target.
+By default, `--agents` is `claude-code,codex`: `claude-code` installs into `.claude/skills` and enables `CLAUDE.md` import management, while `codex` installs into `.agents/skills`. Each `--agents` value maps directly to the skill path supported by that agent.

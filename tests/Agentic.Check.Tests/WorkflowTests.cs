@@ -30,6 +30,12 @@ public sealed class WorkflowTests
             CancellationToken.None);
 
         Assert.Equal(0, result.ExitCode);
+        Assert.Equal(
+            [
+                Path.Combine(tempDirectory.Path, ".claude", "skills"),
+                Path.Combine(tempDirectory.Path, ".agents", "skills")
+            ],
+            result.Report.SkillsDirectories);
         Assert.Contains(result.Report.Actions, action => action.Contains("Would install", StringComparison.Ordinal));
         Assert.DoesNotContain(commandRunner.Calls, call => call.Arguments.Contains("install"));
         Assert.Contains(commandRunner.Calls, call => call.Arguments.SequenceEqual([
@@ -74,7 +80,7 @@ public sealed class WorkflowTests
         Assert.Contains("      dotnet-modern-csharp-editorconfig", reporter.Infos);
         Assert.DoesNotContain(reporter.Infos, message => message.Contains("Would update repo-local skills", StringComparison.Ordinal));
         Assert.DoesNotContain(reporter.Infos, message => message.StartsWith("Directive ", StringComparison.Ordinal));
-        Assert.Equal("standard,claude-code", reporter.TargetAgents);
+        Assert.Equal("claude-code,codex", reporter.TargetAgents);
         Assert.Contains("Scanning repository", reporter.ProgressDescriptions);
         Assert.Equal(3, reporter.ProgressTicksByDescription["Scanning repository"]);
     }
@@ -137,7 +143,7 @@ public sealed class WorkflowTests
             new FakeDirectiveSource());
 
         var result = await workflow.RunAsync(
-            new AgenticCheckOptions(tempDirectory.Path, true, false, null, null, "standard", false),
+            new AgenticCheckOptions(tempDirectory.Path, true, false, null, null, "codex", false),
             CancellationToken.None);
 
         Assert.Equal(0, result.ExitCode);
@@ -180,7 +186,7 @@ public sealed class WorkflowTests
     }
 
     [Fact]
-    public async Task ExplicitAgentsAddDistinctSkillDirectoriesAfterStandardDirectory()
+    public async Task ExplicitAgentsAddDistinctSkillDirectoriesInAgentOrder()
     {
         using TempDirectory tempDirectory = new();
         tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
@@ -197,7 +203,7 @@ public sealed class WorkflowTests
         CheckWorkflow workflow = new(commandRunner, new FakePrompts(), reporter, new FakeDirectiveSource());
 
         var result = await workflow.RunAsync(
-            new AgenticCheckOptions(tempDirectory.Path, true, false, null, null, "standard,claude-code,trae,trae-cn", false),
+            new AgenticCheckOptions(tempDirectory.Path, true, false, null, null, "codex,claude-code,trae,trae-cn", false),
             CancellationToken.None);
 
         Assert.Equal(0, result.ExitCode);
@@ -208,7 +214,7 @@ public sealed class WorkflowTests
                 Path.Combine(tempDirectory.Path, ".trae", "skills")
             ],
             result.Report.SkillsDirectories);
-        Assert.Equal("standard,claude-code,trae,trae-cn", reporter.TargetAgents);
+        Assert.Equal("codex,claude-code,trae,trae-cn", reporter.TargetAgents);
     }
 
     [Fact]
@@ -246,7 +252,7 @@ public sealed class WorkflowTests
     }
 
     [Fact]
-    public async Task StandardAgentOnlyUsesStandardDirectoryAndDoesNotManageClaude()
+    public async Task StandardAgentValueProducesValidationError()
     {
         using TempDirectory tempDirectory = new();
         tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
@@ -256,22 +262,17 @@ public sealed class WorkflowTests
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
-        commandRunner.Enqueue(new CommandResult(0, "agents dry-run", string.Empty));
         CheckWorkflow workflow = new(commandRunner, new FakePrompts(), new NullReporter(), new FakeDirectiveSource());
 
         var result = await workflow.RunAsync(
             new AgenticCheckOptions(tempDirectory.Path, true, false, null, null, "standard", false),
             CancellationToken.None);
 
-        Assert.Equal(0, result.ExitCode);
-        Assert.Equal([Path.Combine(tempDirectory.Path, ".agents", "skills")], result.Report.SkillsDirectories);
-        Assert.False(result.Report.DirectiveSummary?.CreateClaudeFile);
-        Assert.Equal(string.Empty, result.Report.ClaudeFile);
-        Assert.DoesNotContain(result.Report.Actions, action => action.Contains("CLAUDE", StringComparison.Ordinal));
+        Assert.Equal(2, result.ExitCode);
     }
 
     [Fact]
-    public async Task StandardPathAgentValueMapsToStandardDirectory()
+    public async Task CodexAgentValueMapsToAgentsDirectory()
     {
         using TempDirectory tempDirectory = new();
         tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
@@ -294,7 +295,7 @@ public sealed class WorkflowTests
     }
 
     [Fact]
-    public async Task StandardAgentOnlyDoesNotCreateClaudeFile()
+    public async Task CodexAgentOnlyDoesNotCreateClaudeFile()
     {
         using TempDirectory tempDirectory = new();
         tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
@@ -311,7 +312,7 @@ public sealed class WorkflowTests
             new FakeDirectiveSource());
 
         var result = await workflow.RunAsync(
-            new AgenticCheckOptions(tempDirectory.Path, false, false, null, null, "standard", false),
+            new AgenticCheckOptions(tempDirectory.Path, false, false, null, null, "codex", false),
             CancellationToken.None);
 
         Assert.Equal(0, result.ExitCode);
@@ -498,7 +499,7 @@ public sealed class WorkflowTests
         CheckWorkflow workflow = new(commandRunner, prompts, new NullReporter(), new FakeDirectiveSource());
 
         var result = await workflow.RunAsync(
-            new AgenticCheckOptions(tempDirectory.Path, false, false, null, null, "standard", false),
+            new AgenticCheckOptions(tempDirectory.Path, false, false, null, null, "codex", false),
             CancellationToken.None);
 
         Assert.Equal(0, result.ExitCode);
@@ -582,7 +583,7 @@ public sealed class WorkflowTests
             new FakeDirectiveSource());
 
         var result = await workflow.RunAsync(
-            new AgenticCheckOptions(tempDirectory.Path, false, false, null, null, null, false),
+            new AgenticCheckOptions(tempDirectory.Path, false, false, null, null, "codex", false),
             CancellationToken.None);
 
         Assert.Equal(0, result.ExitCode);
@@ -623,7 +624,7 @@ public sealed class WorkflowTests
             {
                 if (call.Arguments.Contains("install"))
                 {
-                    tempDirectory.Write(".agents/skills/dotnet-modern-csharp-editorconfig/SKILL.md", "# Installed");
+                    tempDirectory.Write(".claude/skills/dotnet-modern-csharp-editorconfig/SKILL.md", "# Installed");
                 }
             }
         };
@@ -650,7 +651,7 @@ public sealed class WorkflowTests
 
         Assert.Equal(0, result.ExitCode);
         _ = Assert.Single(commandRunner.Calls, call => call.Arguments.Contains("install"));
-        Assert.True(File.Exists(Path.Combine(tempDirectory.Path, ".claude", "skills", "dotnet-modern-csharp-editorconfig", "SKILL.md")));
+        Assert.True(File.Exists(Path.Combine(tempDirectory.Path, ".agents", "skills", "dotnet-modern-csharp-editorconfig", "SKILL.md")));
         Assert.Contains("Installing skills", reporter.ProgressDescriptions);
         Assert.Equal(2, reporter.ProgressTicksByDescription["Installing skills"]);
     }

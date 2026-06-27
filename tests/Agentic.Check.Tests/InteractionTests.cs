@@ -50,7 +50,7 @@ public sealed class InteractionTests
             "/repo",
             new HashSet<string>(StringComparer.OrdinalIgnoreCase) { TechnologyNames.Dotnet },
             [],
-            "standard",
+            "codex",
             ["/repo/.agents/skills"],
             new DirectiveSummary(false, false, 3, 0, 0),
             recommendedCount: 2,
