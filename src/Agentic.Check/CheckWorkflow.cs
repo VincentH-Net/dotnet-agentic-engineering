@@ -372,10 +372,10 @@ sealed class CheckWorkflow(
             return;
         }
 
-        reporter.Info(header);
+        reporter.Bold(header);
         foreach (string directiveName in directiveNames)
         {
-            reporter.Info($"  {directiveName}");
+            reporter.Plain($"  {directiveName}");
         }
     }
 
@@ -388,7 +388,7 @@ sealed class CheckWorkflow(
 
         reporter.Plain(string.Empty);
         reporter.Bold("Would install skills into repo skills directories:");
-        ReportSkillGroups(selectedSkills, skill => $"      {skill.LocalFolder}", HeaderStyle.Plain, ItemStyle.Plain);
+        ReportSkillGroups(selectedSkills, skill => $"      {skill.LocalFolder}", ItemStyle.Plain);
     }
 
     void ReportSkillUpdateDryRunActions(
@@ -401,7 +401,7 @@ sealed class CheckWorkflow(
             return;
         }
 
-        reporter.Info("Would update skills in repo skills directories:");
+        reporter.Bold("Would update skills in repo skills directories:");
         ReportSkillUpdateGroups(skillUpdates, recommendedSkills);
     }
 
@@ -433,7 +433,7 @@ sealed class CheckWorkflow(
 
         if (currentDirectives.Length > 0)
         {
-            reporter.Plain("Up to date directives:");
+            reporter.Bold("Up to date directives:");
             foreach (var directive in currentDirectives)
             {
                 reporter.Success($"  ✓ {directive.Name}");
@@ -445,11 +445,10 @@ sealed class CheckWorkflow(
             return;
         }
 
-        reporter.Plain("Up to date skills:");
+        reporter.Bold("Up to date skills:");
         ReportSkillGroups(
             upToDateSkills,
             skill => $"      ✓ {skill.LocalFolder}",
-            HeaderStyle.Plain,
             ItemStyle.Success);
     }
 
@@ -458,14 +457,8 @@ sealed class CheckWorkflow(
         IReadOnlyList<SkillManifestEntry> recommendedSkills)
     {
         reporter.Info(string.Empty);
-        reporter.Info(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Found {skillUpdates.Count} skill update(s) available:"));
+        reporter.Bold(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Found {skillUpdates.Count} skill update(s) available:"));
         ReportSkillUpdateGroups(skillUpdates, recommendedSkills);
-    }
-
-    enum HeaderStyle
-    {
-        Info,
-        Plain
     }
 
     enum ItemStyle
@@ -478,7 +471,6 @@ sealed class CheckWorkflow(
     void ReportSkillGroups(
         IEnumerable<SkillManifestEntry> skills,
         Func<SkillManifestEntry, string> formatSkill,
-        HeaderStyle headerStyle = HeaderStyle.Info,
         ItemStyle itemStyle = ItemStyle.Info)
     {
         foreach (var sourceGroup in skills
@@ -486,14 +478,14 @@ sealed class CheckWorkflow(
             .OrderBy(group => SkillOrdering.GetSourceRepoOrder(group.Key))
             .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase))
         {
-            ReportHeader($"  {FormatSkillSourceHeader(sourceGroup.Key)}:", headerStyle);
+            ReportHeader($"  {FormatSkillSourceHeader(sourceGroup.Key)}:");
             var pluginGroups = OrderPluginGroups(sourceGroup.Key, sourceGroup.GroupBy(skill => skill.Plugin, StringComparer.OrdinalIgnoreCase));
             bool showPluginHeaders = SkillGroupHeaderPolicy.ShouldShowPluginHeaders(sourceGroup.Key, pluginGroups.Select(group => group.Key));
             foreach (var pluginGroup in pluginGroups)
             {
                 if (showPluginHeaders)
                 {
-                    ReportHeader($"    {FormatSkillPluginHeader(pluginGroup.Key)}:", headerStyle);
+                    ReportHeader($"    {FormatSkillPluginHeader(pluginGroup.Key)}:");
                 }
 
                 foreach (var skill in pluginGroup)
@@ -504,16 +496,8 @@ sealed class CheckWorkflow(
         }
     }
 
-    void ReportHeader(string message, HeaderStyle style)
-    {
-        if (style == HeaderStyle.Plain)
-        {
-            reporter.Plain(message);
-            return;
-        }
-
-        reporter.Info(message);
-    }
+    void ReportHeader(string message)
+        => reporter.Bold(message);
 
     void ReportItem(string message, ItemStyle style)
     {
@@ -542,14 +526,14 @@ sealed class CheckWorkflow(
             .OrderBy(group => SkillOrdering.GetSourceRepoOrder(group.Key))
             .ThenBy(group => group.Key, StringComparer.OrdinalIgnoreCase))
         {
-            reporter.Info($"  {FormatSkillSourceHeader(sourceGroup.Key)}:");
+            reporter.Bold($"  {FormatSkillSourceHeader(sourceGroup.Key)}:");
             var pluginGroups = OrderPluginGroups(sourceGroup.Key, sourceGroup.GroupBy(update => update.Plugin, StringComparer.OrdinalIgnoreCase));
             bool showPluginHeaders = SkillGroupHeaderPolicy.ShouldShowPluginHeaders(sourceGroup.Key, pluginGroups.Select(group => group.Key));
             foreach (var pluginGroup in pluginGroups)
             {
                 if (showPluginHeaders)
                 {
-                    reporter.Info($"    {FormatSkillPluginHeader(pluginGroup.Key)}:");
+                    reporter.Bold($"    {FormatSkillPluginHeader(pluginGroup.Key)}:");
                 }
 
                 foreach (var update in pluginGroup)

@@ -123,7 +123,10 @@ sealed class RecordingReporter : IReporter
         => Infos.Add(message);
 
     public void Bold(string message)
-        => BoldMessages.Add(message);
+    {
+        BoldMessages.Add(message);
+        Infos.Add(message);
+    }
 
     public void Info(string message)
         => Infos.Add(message);

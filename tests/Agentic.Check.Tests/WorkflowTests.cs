@@ -49,20 +49,24 @@ public sealed class WorkflowTests
         Assert.DoesNotContain(commandRunner.Calls, call => call.Arguments.Contains("update") && call.Arguments.Contains("--all") && !call.Arguments.Contains("--dry-run"));
         Assert.Contains(result.Report.SkillUpdateDryRuns, update => update.StandardOutput.Contains("Would update dotnet-livecharts2", StringComparison.Ordinal));
         Assert.Contains(result.Report.SkillUpdateDryRuns, update => update.StandardOutput.Contains("Would update dotnet-modern-csharp-editorconfig", StringComparison.Ordinal));
-        Assert.Contains("Would install directives into AGENTS.md:", reporter.Infos);
+        Assert.Contains("Would install directives into AGENTS.md:", reporter.BoldMessages);
         Assert.Contains("  dotnet-cli-run", reporter.Infos);
         Assert.Contains("  foundation-prompt-log", reporter.Infos);
         Assert.Contains("Would install skills into repo skills directories:", reporter.BoldMessages);
         int wouldInstallBlankLineIndex = reporter.Infos.IndexOf(string.Empty);
         Assert.True(wouldInstallBlankLineIndex >= 0);
+        Assert.Contains("  VincentH-Net/dotnet-agentic-engineering repo:", reporter.BoldMessages);
+        Assert.Contains("    dotnet:", reporter.BoldMessages);
         Assert.Contains("  VincentH-Net/dotnet-agentic-engineering repo:", reporter.Infos);
         Assert.Contains("    dotnet:", reporter.Infos);
         Assert.Contains("      dotnet-livecharts2", reporter.Infos);
         Assert.Contains("      dotnet-modern-csharp-editorconfig", reporter.Infos);
+        Assert.Contains("  dotnet/skills repo:", reporter.BoldMessages);
+        Assert.Contains("    dotnet-test:", reporter.BoldMessages);
         Assert.Contains("  dotnet/skills repo:", reporter.Infos);
         Assert.Contains("    dotnet-test:", reporter.Infos);
         Assert.Contains("      run-tests", reporter.Infos);
-        Assert.Contains("Would update skills in repo skills directories:", reporter.Infos);
+        Assert.Contains("Would update skills in repo skills directories:", reporter.BoldMessages);
         Assert.Contains("      dotnet-livecharts2", reporter.Infos);
         Assert.Contains("      dotnet-modern-csharp-editorconfig", reporter.Infos);
         Assert.DoesNotContain(reporter.Infos, message => message.Contains("Would update repo-local skills", StringComparison.Ordinal));
@@ -134,7 +138,7 @@ public sealed class WorkflowTests
             CancellationToken.None);
 
         Assert.Equal(0, result.ExitCode);
-        Assert.Contains("Would update directives in AGENTS.md:", reporter.Infos);
+        Assert.Contains("Would update directives in AGENTS.md:", reporter.BoldMessages);
         Assert.Contains("  foundation-prompt-log", reporter.Infos);
     }
 
@@ -354,9 +358,11 @@ public sealed class WorkflowTests
         int upToDateHeaderIndex = reporter.Infos.IndexOf("Up to date directives:");
         Assert.True(upToDateHeaderIndex > 0);
         Assert.Equal(string.Empty, reporter.Infos[upToDateHeaderIndex - 1]);
-        Assert.Contains("Up to date directives:", reporter.Infos);
+        Assert.Contains("Up to date directives:", reporter.BoldMessages);
         Assert.Contains("  ✓ foundation-prompt-log", reporter.Successes);
-        Assert.Contains("Up to date skills:", reporter.Infos);
+        Assert.Contains("Up to date skills:", reporter.BoldMessages);
+        Assert.Contains("  VincentH-Net/dotnet-agentic-engineering repo:", reporter.BoldMessages);
+        Assert.Contains("    dotnet:", reporter.BoldMessages);
         Assert.Contains("  VincentH-Net/dotnet-agentic-engineering repo:", reporter.Infos);
         Assert.Contains("    dotnet:", reporter.Infos);
         Assert.Contains("      ✓ dotnet-livecharts2", reporter.Successes);
@@ -406,8 +412,10 @@ public sealed class WorkflowTests
         Assert.Contains(commandRunner.Calls, call => call.Arguments.SequenceEqual(["skill", "update", "--dir", claudeSkillsDirectory, "--all", "--dry-run"]));
         Assert.Contains(commandRunner.Calls, call => call.Arguments.SequenceEqual(["skill", "update", "--dir", agentsSkillsDirectory, "--all"]));
         Assert.Contains(commandRunner.Calls, call => call.Arguments.SequenceEqual(["skill", "update", "--dir", claudeSkillsDirectory, "--all"]));
-        Assert.Contains("Found 1 skill update(s) available:", reporter.Infos);
+        Assert.Contains("Found 1 skill update(s) available:", reporter.BoldMessages);
         Assert.Contains(string.Empty, reporter.Infos);
+        Assert.Contains("  VincentH-Net/dotnet-agentic-engineering repo:", reporter.BoldMessages);
+        Assert.Contains("    dotnet:", reporter.BoldMessages);
         Assert.Contains("  VincentH-Net/dotnet-agentic-engineering repo:", reporter.Infos);
         Assert.Contains("    dotnet:", reporter.Infos);
         Assert.Contains("      dotnet-livecharts2", reporter.Infos);
