@@ -351,7 +351,7 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
         console.WriteLine();
         lineCount++;
         MarkupLine($"[bold]{Markup.Escape(FormatRecommendationPromptHeading(itemCount))}[/]");
-        MarkupLine("[grey][[Use arrows to move, space to select, <right> to all, <left> to none, type to filter]][/]");
+        MarkupLine("[grey][[Use arrows to move, space to select, <right> to all, <left> to none, type to filter, Enter to confirm]][/]");
 
         if (state.Filter.Length > 0)
         {
