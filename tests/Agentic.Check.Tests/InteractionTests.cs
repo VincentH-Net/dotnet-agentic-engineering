@@ -1,4 +1,6 @@
-﻿namespace Agentic.Check.Tests;
+﻿using Spectre.Console;
+
+namespace Agentic.Check.Tests;
 
 public sealed class InteractionTests
 {
@@ -34,6 +36,26 @@ public sealed class InteractionTests
     {
         Assert.Equal("Check", SpectreReporter.SummaryLabelColumnHeader);
         Assert.Equal("Status", SpectreReporter.SummaryValueColumnHeader);
+        Assert.Equal("[bold green]Check[/]", SpectreReporter.SummaryHeaderMarkup(SpectreReporter.SummaryLabelColumnHeader, ToolHeader.CheckColor));
+        Assert.Equal("[bold cyan]Status[/]", SpectreReporter.SummaryHeaderMarkup(SpectreReporter.SummaryValueColumnHeader, ToolHeader.AgenticColor));
+    }
+
+    [Fact]
+    public void SummaryTableShowsRowSeparatorsBetweenChecks()
+    {
+        var table = SpectreReporter.CreateSummaryTable(
+            "/repo",
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase) { TechnologyNames.Dotnet },
+            [],
+            "standard",
+            ["/repo/.agents/skills"],
+            new DirectiveSummary(false, false, 3, 0, 0),
+            recommendedCount: 2,
+            missingCount: 0,
+            outdatedCount: 0);
+
+        Assert.True(table.ShowRowSeparators);
+        Assert.Same(TableBorder.HeavyHead, table.Border);
     }
 
     [Fact]

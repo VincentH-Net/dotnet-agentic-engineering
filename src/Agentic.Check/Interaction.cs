@@ -126,10 +126,35 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
         int recommendedCount,
         int missingCount,
         int outdatedCount)
+        => console.Write(CreateSummaryTable(
+            repoRoot,
+            technologies,
+            unoGates,
+            targetAgents,
+            skillsDirectories,
+            directiveSummary,
+            recommendedCount,
+            missingCount,
+            outdatedCount));
+
+    internal static Table CreateSummaryTable(
+        string repoRoot,
+        IReadOnlySet<string> technologies,
+        IReadOnlyList<UnoGateReport> unoGates,
+        string targetAgents,
+        IReadOnlyList<string> skillsDirectories,
+        DirectiveSummary directiveSummary,
+        int recommendedCount,
+        int missingCount,
+        int outdatedCount)
     {
-        Table table = new();
-        _ = table.AddColumn(SummaryLabelColumnHeader);
-        _ = table.AddColumn(SummaryValueColumnHeader);
+        Table table = new()
+        {
+            Border = TableBorder.HeavyHead,
+            ShowRowSeparators = true
+        };
+        _ = table.AddColumn(new TableColumn(new Markup(SummaryHeaderMarkup(SummaryLabelColumnHeader, ToolHeader.CheckColor))));
+        _ = table.AddColumn(new TableColumn(new Markup(SummaryHeaderMarkup(SummaryValueColumnHeader, ToolHeader.AgenticColor))));
         _ = table.AddRow("Repository", Markup.Escape(repoRoot));
         _ = table.AddRow("Stack", Markup.Escape(FormatStack(technologies, unoGates)));
         _ = table.AddRow("Target agents", Markup.Escape(targetAgents));
@@ -138,8 +163,11 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
         _ = table.AddRow("Create CLAUDE.md", directiveSummary.CreateClaudeFile ? "yes" : "no");
         _ = table.AddRow("Recommended directives", Markup.Escape(FormatDirectiveSummary(directiveSummary)));
         _ = table.AddRow("Recommended skills", Markup.Escape(FormatSkillSummary(recommendedCount, missingCount, outdatedCount)));
-        console.Write(table);
+        return table;
     }
+
+    internal static string SummaryHeaderMarkup(string header, string color)
+        => $"[bold {color}]{Markup.Escape(header)}[/]";
 
     public async Task RunProgressAsync(
         string description,
