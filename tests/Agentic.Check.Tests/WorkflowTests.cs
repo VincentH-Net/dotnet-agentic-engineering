@@ -231,6 +231,79 @@ public sealed class WorkflowTests
     }
 
     [Fact]
+    public async Task ExistingFileTargetDirectoryProducesValidationErrorBeforePrerequisites()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write("target-file", "not a directory");
+        FakeCommandRunner commandRunner = new();
+        RecordingReporter reporter = new();
+        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), reporter);
+
+        var result = await workflow.RunAsync(
+            new AgenticCheckOptions(Path.Combine(tempDirectory.Path, "target-file"), true, false, null, null, null, false),
+            CancellationToken.None);
+
+        Assert.Equal(2, result.ExitCode);
+        Assert.Empty(commandRunner.Calls);
+        Assert.Contains(reporter.Errors, error => error.Contains("Invalid target directory", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task InvalidTargetDirectoryPathProducesValidationErrorBeforePrerequisites()
+    {
+        FakeCommandRunner commandRunner = new();
+        RecordingReporter reporter = new();
+        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), reporter);
+
+        var result = await workflow.RunAsync(
+            new AgenticCheckOptions($"invalid{'\0'}path", true, false, null, null, null, false),
+            CancellationToken.None);
+
+        Assert.Equal(2, result.ExitCode);
+        Assert.Empty(commandRunner.Calls);
+        Assert.Contains(reporter.Errors, error => error.Contains("Invalid target directory", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task MissingTargetDirectoryProducesValidationErrorBeforePrerequisites()
+    {
+        using TempDirectory tempDirectory = new();
+        string targetDirectory = Path.Combine(tempDirectory.Path, "repo");
+        FakeCommandRunner commandRunner = new();
+        FakePrompts prompts = new();
+        RecordingReporter reporter = new();
+        CheckWorkflow workflow = new(commandRunner, prompts, reporter);
+
+        var result = await workflow.RunAsync(
+            new AgenticCheckOptions(targetDirectory, false, false, null, null, null, false),
+            CancellationToken.None);
+
+        Assert.Equal(2, result.ExitCode);
+        Assert.False(Directory.Exists(targetDirectory));
+        Assert.Empty(commandRunner.Calls);
+        Assert.Empty(prompts.ConfirmPrompts);
+        Assert.Contains(reporter.Errors, error => error.Contains("Target directory does not exist", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ExistingFileSkillsDirectoryProducesValidationErrorBeforePrerequisites()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write("skills-file", "not a directory");
+        FakeCommandRunner commandRunner = new();
+        RecordingReporter reporter = new();
+        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), reporter);
+
+        var result = await workflow.RunAsync(
+            new AgenticCheckOptions(tempDirectory.Path, true, false, null, Path.Combine(tempDirectory.Path, "skills-file"), null, false),
+            CancellationToken.None);
+
+        Assert.Equal(2, result.ExitCode);
+        Assert.Empty(commandRunner.Calls);
+        Assert.Contains(reporter.Errors, error => error.Contains("Invalid skills directory", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task UnknownAgentProducesValidationError()
     {
         using TempDirectory tempDirectory = new();
@@ -249,6 +322,7 @@ public sealed class WorkflowTests
             CancellationToken.None);
 
         Assert.Equal(2, result.ExitCode);
+        Assert.Empty(commandRunner.Calls);
     }
 
     [Fact]
@@ -427,6 +501,8 @@ public sealed class WorkflowTests
         Assert.Contains("  VincentH-Net/dotnet-agentic-engineering repo:", reporter.Infos);
         Assert.Contains("    dotnet:", reporter.Infos);
         Assert.Contains("      dotnet-livecharts2", reporter.Infos);
+        Assert.Contains("      dotnet-livecharts2", reporter.PlainMessages);
+        Assert.DoesNotContain("      dotnet-livecharts2", reporter.InfoMessages);
         Assert.Equal(1, reporter.OutdatedSkillCount);
         Assert.DoesNotContain(reporter.Infos, message => message.Contains("Skills in", StringComparison.Ordinal)
             && message.Contains("with update available", StringComparison.Ordinal));

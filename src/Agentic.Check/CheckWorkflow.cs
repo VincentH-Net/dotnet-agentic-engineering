@@ -6,6 +6,19 @@ sealed record SkillUpdateCandidate(string Name, string SourceRepo);
 
 sealed record SkillUpdateDisplayItem(string Name, string SourceRepo, string Plugin);
 
+sealed record DirectoryValidationResult(
+    bool Success,
+    string Directory,
+    IReadOnlyList<string> Actions,
+    string? Error)
+{
+    public static DirectoryValidationResult Valid(string directory, IReadOnlyList<string> actions)
+        => new(true, directory, actions, null);
+
+    public static DirectoryValidationResult Invalid(string directory, string? error = null)
+        => new(false, directory, [], error);
+}
+
 sealed class CheckWorkflow(
     ICommandRunner commandRunner,
     IUserPrompts prompts,
@@ -21,13 +34,38 @@ sealed class CheckWorkflow(
     {
         AgenticCheckReport report = new()
         {
-            TargetDirectory = Path.GetFullPath(options.TargetDirectory),
             DryRun = options.DryRun
         };
 
         if (!string.IsNullOrWhiteSpace(options.SkillsDirectory) && !string.IsNullOrWhiteSpace(options.Agents))
         {
             reporter.Error("Specify no more than one of --skills-dir and --agents.");
+            await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
+            return new CheckRunResult(2, report);
+        }
+
+        var agentValidation = AgentSkillRegistry.ValidateAgentsValue(options.Agents);
+        if (!agentValidation.Success)
+        {
+            reporter.Error(agentValidation.Error ?? "Invalid --agents value.");
+            await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
+            return new CheckRunResult(2, report);
+        }
+
+        var targetDirectoryResolution = ValidateTargetDirectory(options.TargetDirectory);
+        report.TargetDirectory = targetDirectoryResolution.Directory;
+        report.Actions.AddRange(targetDirectoryResolution.Actions);
+        if (!targetDirectoryResolution.Success)
+        {
+            reporter.Error(targetDirectoryResolution.Error ?? "Invalid target directory.");
+            await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
+            return new CheckRunResult(2, report);
+        }
+
+        var skillsDirectoryValidation = ValidateSkillsDirectory(options.SkillsDirectory);
+        if (!skillsDirectoryValidation.Success)
+        {
+            reporter.Error(skillsDirectoryValidation.Error ?? "Invalid --skills-dir value.");
             await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
             return new CheckRunResult(2, report);
         }
@@ -60,9 +98,9 @@ sealed class CheckWorkflow(
         IReadOnlyList<string> skillsDirectories;
         bool manageClaudeFile;
         string targetAgents;
-        if (options.SkillsDirectory is { Length: > 0 })
+        if (!string.IsNullOrWhiteSpace(skillsDirectoryValidation.Directory))
         {
-            string skillsDirectory = Path.GetFullPath(options.SkillsDirectory);
+            string skillsDirectory = skillsDirectoryValidation.Directory;
             skillsDirectories = [skillsDirectory];
             manageClaudeFile = IsClaudeSkillsDirectory(skillsDirectory);
             targetAgents = "custom skills directory";
@@ -253,6 +291,63 @@ sealed class CheckWorkflow(
         int exitCode = report.InstallResults.Any(result => !result.Success) || report.SkillCopyResults.Any(result => !result.Success) ? 1 : 0;
         await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
         return new CheckRunResult(exitCode, report);
+    }
+
+    static DirectoryValidationResult ValidateTargetDirectory(string targetDirectory)
+    {
+        var pathValidation = TryGetFullPath(targetDirectory, "target directory");
+        if (!pathValidation.Success)
+        {
+            return DirectoryValidationResult.Invalid(targetDirectory, pathValidation.Error);
+        }
+
+        string fullTargetDirectory = pathValidation.Directory;
+        if (File.Exists(fullTargetDirectory))
+        {
+            return DirectoryValidationResult.Invalid(
+                fullTargetDirectory,
+                $"Invalid target directory: {fullTargetDirectory} is a file.");
+        }
+
+        if (Directory.Exists(fullTargetDirectory))
+        {
+            return DirectoryValidationResult.Valid(fullTargetDirectory, []);
+        }
+
+        return DirectoryValidationResult.Invalid(
+            fullTargetDirectory,
+            $"Target directory does not exist: {fullTargetDirectory}.");
+    }
+
+    static DirectoryValidationResult ValidateSkillsDirectory(string? skillsDirectory)
+    {
+        if (string.IsNullOrWhiteSpace(skillsDirectory))
+        {
+            return DirectoryValidationResult.Valid(string.Empty, []);
+        }
+
+        var pathValidation = TryGetFullPath(skillsDirectory, "skills directory");
+        if (!pathValidation.Success)
+        {
+            return DirectoryValidationResult.Invalid(skillsDirectory, pathValidation.Error);
+        }
+
+        string fullSkillsDirectory = pathValidation.Directory;
+        return File.Exists(fullSkillsDirectory)
+            ? DirectoryValidationResult.Invalid(fullSkillsDirectory, $"Invalid skills directory: {fullSkillsDirectory} is a file.")
+            : DirectoryValidationResult.Valid(fullSkillsDirectory, []);
+    }
+
+    static DirectoryValidationResult TryGetFullPath(string path, string parameterName)
+    {
+        try
+        {
+            return DirectoryValidationResult.Valid(Path.GetFullPath(path), []);
+        }
+        catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return DirectoryValidationResult.Invalid(path, $"Invalid {parameterName}: {exception.Message}");
+        }
     }
 
     async Task RunSkillUpdateAsync(
@@ -540,7 +635,7 @@ sealed class CheckWorkflow(
 
                 foreach (var update in pluginGroup)
                 {
-                    reporter.Info($"      {update.Name}");
+                    reporter.Plain($"      {update.Name}");
                 }
             }
         }

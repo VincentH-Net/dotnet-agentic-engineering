@@ -55,6 +55,16 @@ public sealed class InteractionTests
     }
 
     [Fact]
+    public void UnknownOptionGuardRejectsOptionLookingTargetDirectory()
+    {
+        Assert.Equal("--unknown-option", AgenticCheckCli.FindUnknownOption(["--unknown-option"]));
+        Assert.Equal("--unknown-option", AgenticCheckCli.FindUnknownOption(["--dry-run", "--unknown-option"]));
+        Assert.Null(AgenticCheckCli.FindUnknownOption(["-"]));
+        Assert.Null(AgenticCheckCli.FindUnknownOption(["--agents", "--unknown-agent-value"]));
+        Assert.Null(AgenticCheckCli.FindUnknownOption(["--report=--option-looking-file"]));
+    }
+
+    [Fact]
     public void SummaryTableShowsRowSeparatorsBetweenChecks()
     {
         var table = SpectreReporter.CreateSummaryTable(

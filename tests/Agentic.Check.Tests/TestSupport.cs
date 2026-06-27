@@ -101,6 +101,10 @@ sealed class RecordingReporter : IReporter
 {
     public List<string> Infos { get; } = [];
 
+    public List<string> PlainMessages { get; } = [];
+
+    public List<string> InfoMessages { get; } = [];
+
     public List<string> BoldMessages { get; } = [];
 
     public List<string> Successes { get; } = [];
@@ -120,7 +124,10 @@ sealed class RecordingReporter : IReporter
     public int? OutdatedSkillCount { get; private set; }
 
     public void Plain(string message)
-        => Infos.Add(message);
+    {
+        PlainMessages.Add(message);
+        Infos.Add(message);
+    }
 
     public void Bold(string message)
     {
@@ -129,7 +136,10 @@ sealed class RecordingReporter : IReporter
     }
 
     public void Info(string message)
-        => Infos.Add(message);
+    {
+        InfoMessages.Add(message);
+        Infos.Add(message);
+    }
 
     public void Success(string message)
         => Successes.Add(message);

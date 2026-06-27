@@ -66,14 +66,35 @@ static class AgentSkillRegistry
     public static string AgentHelpLines => string.Join(Environment.NewLine, Hosts
         .Select(host => $"  - {host.Name} ({host.Id})"));
 
+    public static AgentValueValidation ValidateAgentsValue(string? agentsValue)
+    {
+        if (string.IsNullOrWhiteSpace(agentsValue))
+        {
+            return AgentValueValidation.Valid();
+        }
+
+        string[] agentIds = ParseAgentIds(agentsValue);
+        if (agentIds.Length == 0)
+        {
+            return AgentValueValidation.Invalid(
+                $"No agent values were specified. Valid values: {AgentIds}.");
+        }
+
+        string[] unknownAgents = [.. agentIds
+            .Where(agentId => !HostsById.ContainsKey(agentId))
+            .Distinct(StringComparer.OrdinalIgnoreCase)];
+        return unknownAgents.Length > 0
+            ? AgentValueValidation.Invalid(
+                $"Unknown agent value(s): {string.Join(", ", unknownAgents)}. Valid values: {AgentIds}.")
+            : AgentValueValidation.Valid();
+    }
+
     public static AgentDirectoryResolution ResolveProjectDirectories(
         string? agentsValue,
         string repoRoot)
     {
         string value = string.IsNullOrWhiteSpace(agentsValue) ? DefaultAgents : agentsValue;
-        string[] agentIds = [.. value
-            .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-            .Distinct(StringComparer.OrdinalIgnoreCase)];
+        string[] agentIds = ParseAgentIds(value);
         if (agentIds.Length == 0)
         {
             return AgentDirectoryResolution.Invalid(
@@ -110,6 +131,20 @@ static class AgentSkillRegistry
             }
         }
     }
+
+    static string[] ParseAgentIds(string value)
+        => [.. value
+            .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Distinct(StringComparer.OrdinalIgnoreCase)];
+}
+
+sealed record AgentValueValidation(bool Success, string? Error)
+{
+    public static AgentValueValidation Valid()
+        => new(true, null);
+
+    public static AgentValueValidation Invalid(string error)
+        => new(false, error);
 }
 
 sealed record AgentDirectoryResolution(

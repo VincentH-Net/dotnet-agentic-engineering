@@ -1,12 +1,42 @@
 ﻿using System.CommandLine;
+using System.CommandLine.Parsing;
 using Spectre.Console;
 
 namespace Agentic.Check;
 
 static class AgenticCheckCli
 {
+    static readonly HashSet<string> KnownOptions = new(StringComparer.Ordinal)
+    {
+        "--agents",
+        "--skills-dir",
+        "--dry-run",
+        "--yes",
+        "--report",
+        "--verbose",
+        "--version",
+        "-?",
+        "-h",
+        "--help"
+    };
+
+    static readonly HashSet<string> OptionsWithValues = new(StringComparer.Ordinal)
+    {
+        "--agents",
+        "--skills-dir",
+        "--report"
+    };
+
     internal static async Task<int> InvokeAsync(string[] args)
     {
+        string? unknownOption = FindUnknownOption(args);
+        if (unknownOption is not null)
+        {
+            await Console.Error.WriteLineAsync($"Unknown option: {unknownOption}").ConfigureAwait(false);
+            await Console.Error.WriteLineAsync().ConfigureAwait(false);
+            return 1;
+        }
+
         Argument<DirectoryInfo> targetDirectoryArgument = new(
             "target-dir",
             () => new DirectoryInfo(Environment.CurrentDirectory),
@@ -26,6 +56,14 @@ static class AgenticCheckCli
             Supported agent values (identical to what 'gh skill' supports):
             {AgentSkillRegistry.AgentHelpLines}
             """);
+        agentsOption.AddValidator(result =>
+        {
+            var validation = AgentSkillRegistry.ValidateAgentsValue(result.GetValueOrDefault<string?>());
+            if (!validation.Success)
+            {
+                result.ErrorMessage = validation.Error;
+            }
+        });
         Option<bool> verboseOption = new("--verbose", "Include detailed command and scan information.");
 
         RootCommand rootCommand = new("""
@@ -61,6 +99,14 @@ static class AgenticCheckCli
             reportOption,
             verboseOption
         };
+        rootCommand.AddValidator(result =>
+        {
+            if (result.GetValueForOption(skillsDirectoryOption) is not null
+                && !string.IsNullOrWhiteSpace(result.GetValueForOption(agentsOption)))
+            {
+                result.ErrorMessage = "Specify no more than one of --skills-dir and --agents.";
+            }
+        });
 
         rootCommand.SetHandler(
             async (targetDirectory, dryRun, yes, report, skillsDirectory, agents, verbose) =>
@@ -109,5 +155,46 @@ static class AgenticCheckCli
 
         int parseExitCode = await rootCommand.InvokeAsync(args).ConfigureAwait(false);
         return parseExitCode == 0 ? Environment.ExitCode : parseExitCode;
+    }
+
+    internal static string? FindUnknownOption(string[] args)
+    {
+        for (int index = 0; index < args.Length; index++)
+        {
+            string arg = args[index];
+            if (arg.Equals("--", StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            if (arg.Equals("-", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            string optionName = arg;
+            int valueSeparatorIndex = arg.IndexOf('=', StringComparison.Ordinal);
+            if (valueSeparatorIndex > 0)
+            {
+                optionName = arg[..valueSeparatorIndex];
+            }
+
+            if (!optionName.StartsWith('-'))
+            {
+                continue;
+            }
+
+            if (!KnownOptions.Contains(optionName))
+            {
+                return optionName;
+            }
+
+            if (valueSeparatorIndex < 0 && OptionsWithValues.Contains(optionName))
+            {
+                index++;
+            }
+        }
+
+        return null;
     }
 }
