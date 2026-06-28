@@ -15,7 +15,7 @@ Hex1b is a good fit when tests need any of these:
 - Terminal screen inspection after ANSI output, cursor movement, tables, progress bars, or interactive prompts.
 - Keyboard input such as arrows, Enter, Escape, Ctrl+C, text typing, or selection-list navigation.
 - Headless CI execution without opening a real terminal window.
-- Debuggable failures with a terminal snapshot and step history.
+- Debuggable failures with a terminal snapshot, step history, and replayable terminal recording.
 
 Avoid Hex1b for simple non-interactive commands where `ProcessStartInfo` with redirected output is enough.
 
@@ -27,10 +27,12 @@ Avoid Hex1b for simple non-interactive commands where `ProcessStartInfo` with re
    - `WithHeadless()`
    - fixed dimensions large enough for the expected output
    - `WithPtyProcess(...)` for the shell or CLI process under test
+   - `WithAsciinemaRecording(...)` writing to a per-test `.cast` file
 4. Wrap it in `Hex1bTerminalAutomator`.
 5. Type commands, send keys, and wait for specific output.
 6. Inspect terminal snapshots and side effects.
 7. Stop the shell/process in `finally`.
+8. Keep the recording as a test artifact for visual review.
 
 ## Basic Pattern
 
@@ -53,6 +55,14 @@ await using var terminal = Hex1bTerminal.CreateBuilder()
             ["PATH"] = testBin + Path.PathSeparator + (Environment.GetEnvironmentVariable("PATH") ?? "")
         };
     })
+    .WithAsciinemaRecording(
+        recordingPath,
+        new AsciinemaRecorderOptions
+        {
+            Title = "my-cli end-to-end test",
+            Command = "my-cli",
+            IdleTimeLimit = 1
+        })
     .Build();
 
 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(90));
@@ -76,6 +86,39 @@ finally
     await runTask.WaitAsync(TimeSpan.FromSeconds(5));
 }
 ```
+
+## Recordings
+
+Make Hex1b asciinema recordings a standard artifact for terminal e2e tests. This gives reviewers a visual playback of what happened without changing the CLI tool under test.
+
+Recording guidelines:
+
+- Store recordings outside any disposable temp workspace, typically under the test project's `TestResults/recordings` directory.
+- Use a unique filename that includes the test name and a GUID or timestamp.
+- Write the recording path to test output, for example through `ITestOutputHelper`.
+- Do not commit recordings; keep them as local or CI artifacts.
+- Keep `CaptureInput` disabled unless a test explicitly needs to review typed input. It is disabled by default.
+- Use `IdleTimeLimit` to compress long pauses in playback.
+- Ensure the terminal is disposed before asserting the recording is complete.
+
+Example recording path helper:
+
+```csharp
+static string CreateRecordingPath(string testName)
+{
+    string recordingDirectory = Path.Combine(ProjectDirectory, "TestResults", "recordings");
+    _ = Directory.CreateDirectory(recordingDirectory);
+    return Path.Combine(recordingDirectory, $"{testName}-{Guid.NewGuid():N}.cast");
+}
+```
+
+Visual verification:
+
+```bash
+asciinema play tests/MyCli.LiveTests/TestResults/recordings/MyTest-abc123.cast
+```
+
+For CI, upload `TestResults/recordings/*.cast` as test artifacts so failures can be replayed locally.
 
 ## Waiting
 
@@ -137,7 +180,7 @@ Assert both terminal output and side effects:
 - Side effects: files created/updated, command log contents, exit code sentinel.
 - Negative checks: no install/update command was invoked, no directive block was written, no unexpected prompt appeared.
 
-Use `GetScreenText()` for visible terminal contents. If important output can scroll out of view, use larger fixed dimensions, add a sentinel near the end, or add logging/recording.
+Use `GetScreenText()` for visible terminal contents. If important output can scroll out of view, use larger fixed dimensions, add a sentinel near the end, or assert side effects and inspect the Hex1b recording.
 
 ## Failure Diagnostics
 
@@ -147,9 +190,10 @@ When diagnosing a failing test:
 
 1. Check the failed wait description.
 2. Inspect the terminal snapshot from the exception.
-3. Verify the wait text is literal and not accidentally matching echoed command text.
-4. Verify the CLI process inherited the intended `PATH`, HOME/config variables, and working directory.
-5. Confirm the test waited for the UI to rerender after each key input.
+3. Play the `.cast` recording to see the terminal flow exactly as the test saw it.
+4. Verify the wait text is literal and not accidentally matching echoed command text.
+5. Verify the CLI process inherited the intended `PATH`, HOME/config variables, and working directory.
+6. Confirm the test waited for the UI to rerender after each key input.
 
 ## Common Pitfalls
 
@@ -158,4 +202,5 @@ When diagnosing a failing test:
 - Relying on arbitrary delays instead of `WaitUntilTextAsync` or `WaitUntilAsync`.
 - Letting tests use the developer machine's real CLI extensions, global config, or network credentials.
 - Using a terminal height too small for the output under test.
+- Writing recordings into a temp workspace that the test deletes before the developer can replay them.
 - Asserting a file was not created when the CLI intentionally creates scaffolding even with no selected actions; assert the meaningful content instead.

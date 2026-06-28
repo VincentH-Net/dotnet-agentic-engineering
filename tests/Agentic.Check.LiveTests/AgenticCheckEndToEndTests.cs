@@ -1,10 +1,11 @@
 using System.Diagnostics;
 using Hex1b;
 using Hex1b.Automation;
+using Xunit.Abstractions;
 
 namespace Agentic.Check.LiveTests;
 
-public sealed class AgenticCheckEndToEndTests
+public sealed class AgenticCheckEndToEndTests(ITestOutputHelper output)
 {
     [Fact]
     [Trait("Category", "EndToEnd")]
@@ -15,28 +16,33 @@ public sealed class AgenticCheckEndToEndTests
             return;
         }
 
-        using var workspace = await TestWorkspace.CreateAsync().ConfigureAwait(true);
-        await using var terminal = CreateTerminal(workspace);
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(90));
-        var runTask = terminal.RunAsync(cancellation.Token);
-        var auto = new Hex1bTerminalAutomator(terminal, defaultTimeout: TimeSpan.FromSeconds(30));
-
-        try
+        using var workspace = await TestWorkspace.CreateAsync(nameof(DryRunDisplaysSummaryAndWouldActions)).ConfigureAwait(true);
+        output.WriteLine($"Hex1b recording: {workspace.RecordingPath}");
+        await using (var terminal = CreateTerminal(workspace))
         {
-            await RunCommandAsync(auto, workspace, AgenticCheckCommand(workspace, $"--dry-run {Quote(workspace.RepoPath)}")).ConfigureAwait(true);
+            using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(90));
+            var runTask = terminal.RunAsync(cancellation.Token);
+            var auto = new Hex1bTerminalAutomator(terminal, defaultTimeout: TimeSpan.FromSeconds(30));
 
-            using var snapshot = auto.CreateSnapshot();
-            string screen = snapshot.GetScreenText();
-            Assert.Contains("Recommended directives", screen, StringComparison.Ordinal);
-            Assert.Contains("Recommended skills", screen, StringComparison.Ordinal);
-            Assert.Contains("Would install directives into AGENTS.md:", screen, StringComparison.Ordinal);
-            Assert.Contains("Would install skills into repo skills directories:", screen, StringComparison.Ordinal);
-            Assert.Contains("__AGENTIC_DONE:0__", screen, StringComparison.Ordinal);
+            try
+            {
+                await RunCommandAsync(auto, workspace, AgenticCheckCommand(workspace, $"--dry-run {Quote(workspace.RepoPath)}")).ConfigureAwait(true);
+
+                using var snapshot = auto.CreateSnapshot();
+                string screen = snapshot.GetScreenText();
+                Assert.Contains("Recommended directives", screen, StringComparison.Ordinal);
+                Assert.Contains("Recommended skills", screen, StringComparison.Ordinal);
+                Assert.Contains("Would install directives into AGENTS.md:", screen, StringComparison.Ordinal);
+                Assert.Contains("Would install skills into repo skills directories:", screen, StringComparison.Ordinal);
+                Assert.Contains("__AGENTIC_DONE:0__", screen, StringComparison.Ordinal);
+            }
+            finally
+            {
+                await StopShellAsync(auto, runTask).ConfigureAwait(true);
+            }
         }
-        finally
-        {
-            await StopShellAsync(auto, runTask).ConfigureAwait(true);
-        }
+
+        AssertRecordingWasWritten(workspace);
     }
 
     [Fact]
@@ -48,39 +54,44 @@ public sealed class AgenticCheckEndToEndTests
             return;
         }
 
-        using var workspace = await TestWorkspace.CreateAsync().ConfigureAwait(true);
-        await using var terminal = CreateTerminal(workspace);
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(90));
-        var runTask = terminal.RunAsync(cancellation.Token);
-        var auto = new Hex1bTerminalAutomator(terminal, defaultTimeout: TimeSpan.FromSeconds(30));
-
-        try
+        using var workspace = await TestWorkspace.CreateAsync(nameof(InteractiveRecommendationListAcceptsKeyboardInput)).ConfigureAwait(true);
+        output.WriteLine($"Hex1b recording: {workspace.RecordingPath}");
+        await using (var terminal = CreateTerminal(workspace))
         {
-            await auto.TypeAsync($"{AgenticCheckCommand(workspace, Quote(workspace.RepoPath))}; printf '\\n__AGENTIC_DONE:%s__\\n' \"$?\"").ConfigureAwait(true);
-            await auto.EnterAsync().ConfigureAwait(true);
-            await auto.WaitUntilTextAsync("Recommend ", timeout: TimeSpan.FromSeconds(45)).ConfigureAwait(true);
-            await auto.WaitUntilTextAsync("select which to apply:", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
+            using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(90));
+            var runTask = terminal.RunAsync(cancellation.Token);
+            var auto = new Hex1bTerminalAutomator(terminal, defaultTimeout: TimeSpan.FromSeconds(30));
 
-            await auto.LeftAsync().ConfigureAwait(true);
-            await auto.WaitUntilTextAsync("[ ] dotnet-cli-run", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
-            await auto.EnterAsync().ConfigureAwait(true);
+            try
+            {
+                await auto.TypeAsync($"{AgenticCheckCommand(workspace, Quote(workspace.RepoPath))}; printf '\\n__AGENTIC_DONE:%s__\\n' \"$?\"").ConfigureAwait(true);
+                await auto.EnterAsync().ConfigureAwait(true);
+                await auto.WaitUntilTextAsync("Recommend ", timeout: TimeSpan.FromSeconds(45)).ConfigureAwait(true);
+                await auto.WaitUntilTextAsync("select which to apply:", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
 
-            await auto.WaitUntilTextAsync("__AGENTIC_DONE:0__", timeout: TimeSpan.FromSeconds(45)).ConfigureAwait(true);
-            using var snapshot = auto.CreateSnapshot();
-            string screen = snapshot.GetScreenText();
-            Assert.Contains("__AGENTIC_DONE:0__", screen, StringComparison.Ordinal);
-            string agentsContent = File.Exists(Path.Combine(workspace.RepoPath, "AGENTS.md"))
-                ? await File.ReadAllTextAsync(Path.Combine(workspace.RepoPath, "AGENTS.md")).ConfigureAwait(true)
-                : string.Empty;
-            Assert.DoesNotContain("dotnet-agentic-engineering:", agentsContent, StringComparison.Ordinal);
-            string[] ghCalls = [.. (await File.ReadAllLinesAsync(workspace.GhLogPath).ConfigureAwait(true))
-                .Where(line => !string.IsNullOrWhiteSpace(line))];
-            Assert.DoesNotContain(ghCalls, line => line.Contains(" install ", StringComparison.Ordinal));
+                await auto.LeftAsync().ConfigureAwait(true);
+                await auto.WaitUntilTextAsync("[ ] dotnet-cli-run", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
+                await auto.EnterAsync().ConfigureAwait(true);
+
+                await auto.WaitUntilTextAsync("__AGENTIC_DONE:0__", timeout: TimeSpan.FromSeconds(45)).ConfigureAwait(true);
+                using var snapshot = auto.CreateSnapshot();
+                string screen = snapshot.GetScreenText();
+                Assert.Contains("__AGENTIC_DONE:0__", screen, StringComparison.Ordinal);
+                string agentsContent = File.Exists(Path.Combine(workspace.RepoPath, "AGENTS.md"))
+                    ? await File.ReadAllTextAsync(Path.Combine(workspace.RepoPath, "AGENTS.md")).ConfigureAwait(true)
+                    : string.Empty;
+                Assert.DoesNotContain("dotnet-agentic-engineering:", agentsContent, StringComparison.Ordinal);
+                string[] ghCalls = [.. (await File.ReadAllLinesAsync(workspace.GhLogPath).ConfigureAwait(true))
+                    .Where(line => !string.IsNullOrWhiteSpace(line))];
+                Assert.DoesNotContain(ghCalls, line => line.Contains(" install ", StringComparison.Ordinal));
+            }
+            finally
+            {
+                await StopShellAsync(auto, runTask).ConfigureAwait(true);
+            }
         }
-        finally
-        {
-            await StopShellAsync(auto, runTask).ConfigureAwait(true);
-        }
+
+        AssertRecordingWasWritten(workspace);
     }
 
     static string ToolAssemblyPath => typeof(AgenticCheckCli).Assembly.Location;
@@ -110,7 +121,22 @@ public sealed class AgenticCheckEndToEndTests
                     ["TERM"] = "xterm-256color"
                 };
             })
+            .WithAsciinemaRecording(
+                workspace.RecordingPath,
+                new AsciinemaRecorderOptions
+                {
+                    Title = "agentic-check end-to-end test",
+                    Command = "agentic-check",
+                    IdleTimeLimit = 1
+                })
             .Build();
+    }
+
+    static void AssertRecordingWasWritten(TestWorkspace workspace)
+    {
+        FileInfo recording = new(workspace.RecordingPath);
+        Assert.True(recording.Exists, $"Expected Hex1b recording to exist: {workspace.RecordingPath}");
+        Assert.True(recording.Length > 0, $"Expected Hex1b recording to contain events: {workspace.RecordingPath}");
     }
 
     static async Task RunCommandAsync(Hex1bTerminalAutomator auto, TestWorkspace workspace, string command)
@@ -146,12 +172,13 @@ public sealed class AgenticCheckEndToEndTests
 
     sealed class TestWorkspace : IDisposable
     {
-        TestWorkspace(string rootPath)
+        TestWorkspace(string rootPath, string testName)
         {
             RootPath = rootPath;
             RepoPath = Path.Combine(rootPath, "repo");
             BinPath = Path.Combine(rootPath, "bin");
             GhLogPath = Path.Combine(rootPath, "gh.log");
+            RecordingPath = CreateRecordingPath(testName);
         }
 
         public string RootPath { get; }
@@ -162,9 +189,11 @@ public sealed class AgenticCheckEndToEndTests
 
         public string GhLogPath { get; }
 
-        public static async Task<TestWorkspace> CreateAsync()
+        public string RecordingPath { get; }
+
+        public static async Task<TestWorkspace> CreateAsync(string testName)
         {
-            var workspace = new TestWorkspace(Path.Combine(Path.GetTempPath(), $"agentic-check-e2e-{Guid.NewGuid():N}"));
+            var workspace = new TestWorkspace(Path.Combine(Path.GetTempPath(), $"agentic-check-e2e-{Guid.NewGuid():N}"), testName);
             _ = Directory.CreateDirectory(workspace.RootPath);
             _ = Directory.CreateDirectory(workspace.RepoPath);
             _ = Directory.CreateDirectory(workspace.BinPath);
@@ -181,6 +210,32 @@ public sealed class AgenticCheckEndToEndTests
             await RunProcessAsync("git", ["init"], workspace.RepoPath).ConfigureAwait(true);
             await WriteFakeGhAsync(workspace).ConfigureAwait(true);
             return workspace;
+        }
+
+        static string CreateRecordingPath(string testName)
+        {
+            string recordingDirectory = Path.Combine(GetProjectDirectory(), "TestResults", "recordings");
+            _ = Directory.CreateDirectory(recordingDirectory);
+            string safeTestName = string.Join(
+                '_',
+                testName.Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+            return Path.Combine(recordingDirectory, $"{safeTestName}-{Guid.NewGuid():N}.cast");
+        }
+
+        static string GetProjectDirectory()
+        {
+            DirectoryInfo? directory = new(AppContext.BaseDirectory);
+            while (directory is not null)
+            {
+                if (File.Exists(Path.Combine(directory.FullName, "Agentic.Check.LiveTests.csproj")))
+                {
+                    return directory.FullName;
+                }
+
+                directory = directory.Parent;
+            }
+
+            return AppContext.BaseDirectory;
         }
 
         public void Dispose()
