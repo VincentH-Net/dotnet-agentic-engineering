@@ -190,7 +190,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
         Assert.Contains("Uno Platform", result.Screen, StringComparison.Ordinal);
         Assert.Contains("UI update pattern: mvux, mvvm", result.Screen, StringComparison.Ordinal);
         Assert.Contains("Markup type: csharp, csharp2, xaml", result.Screen, StringComparison.Ordinal);
-        Assert.Contains("Design system: fluent, material, simple", result.RecordingText, StringComparison.Ordinal);
+        Assert.Contains("Design system: material, simple", result.RecordingText, StringComparison.Ordinal);
         Assert.Contains("Microsoft Orleans", result.Screen, StringComparison.Ordinal);
         Assert.Contains("ASP.NET", result.Screen, StringComparison.Ordinal);
         Assert.Contains(".NET", result.Screen, StringComparison.Ordinal);

@@ -52,6 +52,10 @@ static class StackDetector
         {
             string content = File.ReadAllText(projectFile);
             var document = TryParseProject(projectFile, content, warnings);
+            if (!IsUnoProject(document, content))
+            {
+                continue;
+            }
 
             HashSet<string> presentation = new(StringComparer.OrdinalIgnoreCase);
             HashSet<string> markup = new(StringComparer.OrdinalIgnoreCase)
@@ -108,6 +112,22 @@ static class StackDetector
         }
 
         return reports;
+    }
+
+    static bool IsUnoProject(XDocument? document, string content)
+    {
+        if (document is null)
+        {
+            return content.Contains("Uno.Sdk", StringComparison.OrdinalIgnoreCase);
+        }
+
+        string? projectSdk = document.Root?.Attribute("Sdk")?.Value;
+        return ContainsSdk(projectSdk, "Uno.Sdk")
+            || document.Descendants()
+                .Where(element => element.Name.LocalName.Equals("Sdk", StringComparison.OrdinalIgnoreCase))
+                .Select(element => element.Attribute("Name")?.Value)
+                .OfType<string>()
+                .Any(sdk => sdk.Equals("Uno.Sdk", StringComparison.OrdinalIgnoreCase));
     }
 
     static void AddMultiValueWarnings(IReadOnlyList<UnoGateReport> reports, List<string> warnings)
