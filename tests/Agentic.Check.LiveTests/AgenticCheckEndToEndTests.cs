@@ -30,6 +30,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
         Assert.Equal(0, result.ExitCode);
         Assert.Contains("Optimizes your repo for agentic engineering", result.Screen, StringComparison.Ordinal);
         Assert.Contains("--agents", result.Screen, StringComparison.Ordinal);
+        Assert.Contains("[default: claude-code,codex]", result.Screen, StringComparison.Ordinal);
         Assert.Contains("--skills-dir", result.Screen, StringComparison.Ordinal);
         Assert.Contains("--dry-run", result.Screen, StringComparison.Ordinal);
         Assert.Contains("GitHub Copilot (github-copilot)", result.Screen, StringComparison.Ordinal);
@@ -714,6 +715,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
 
             await RunProcessAsync("git", ["init"], workspace.RepoPath).ConfigureAwait(true);
             await WriteFakeGhAsync(workspace).ConfigureAwait(true);
+            await WriteFakeAgentProbeCommandsAsync(workspace).ConfigureAwait(true);
             return workspace;
         }
 
@@ -881,6 +883,61 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
             {
                 File.SetUnixFileMode(
                     ghPath,
+                    UnixFileMode.UserRead
+                    | UnixFileMode.UserWrite
+                    | UnixFileMode.UserExecute
+                    | UnixFileMode.GroupRead
+                    | UnixFileMode.GroupExecute
+                    | UnixFileMode.OtherRead
+                    | UnixFileMode.OtherExecute);
+            }
+        }
+
+        static async Task WriteFakeAgentProbeCommandsAsync(TestWorkspace workspace)
+        {
+            await WriteExecutableAsync(
+                workspace,
+                "claude",
+                """
+                #!/usr/bin/env bash
+                if [[ "${1:-}" == "--help" ]]; then
+                  echo "Claude Code test cli"
+                  exit 0
+                fi
+                exit 2
+                """).ConfigureAwait(true);
+            await WriteExecutableAsync(
+                workspace,
+                "codex",
+                """
+                #!/usr/bin/env bash
+                if [[ "${1:-}" == "--version" ]]; then
+                  echo "codex 0.0.0-test"
+                  exit 0
+                fi
+                exit 2
+                """).ConfigureAwait(true);
+
+            foreach (string command in new[] { "copilot", "gemini", "crush", "goose", "opencode", "qwen" })
+            {
+                await WriteExecutableAsync(
+                    workspace,
+                    command,
+                    """
+                    #!/usr/bin/env bash
+                    exit 127
+                    """).ConfigureAwait(true);
+            }
+        }
+
+        static async Task WriteExecutableAsync(TestWorkspace workspace, string name, string content)
+        {
+            string path = Path.Combine(workspace.BinPath, name);
+            await File.WriteAllTextAsync(path, content).ConfigureAwait(true);
+            if (!OperatingSystem.IsWindows())
+            {
+                File.SetUnixFileMode(
+                    path,
                     UnixFileMode.UserRead
                     | UnixFileMode.UserWrite
                     | UnixFileMode.UserExecute

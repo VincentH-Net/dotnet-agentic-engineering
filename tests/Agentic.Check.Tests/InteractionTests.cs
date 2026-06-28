@@ -55,6 +55,36 @@ public sealed class InteractionTests
     }
 
     [Fact]
+    public async Task AgentCliDetectorUsesOnlyClearIdentifyingOutput()
+    {
+        MappedCommandRunner commandRunner = new();
+        commandRunner.Set("copilot", ["version"], new CommandResult(0, "GitHub Copilot CLI 1.0.0", string.Empty));
+        commandRunner.Set("claude", ["--help"], new CommandResult(0, "Usage: Claude Code", string.Empty));
+        commandRunner.Set("codex", ["--version"], new CommandResult(0, "codex 0.1.0", string.Empty));
+        commandRunner.Set("gemini", ["--help"], new CommandResult(0, "1.2.3", string.Empty));
+        commandRunner.Set("qwen", ["--help"], new CommandResult(0, "Qwen Code help", string.Empty));
+
+        string defaultAgents = await AgentCliDetector
+            .DetectDefaultAgentsAsync(commandRunner, "/repo", CancellationToken.None)
+            .ConfigureAwait(true);
+
+        Assert.Equal("github-copilot,claude-code,codex,qwen-code", defaultAgents);
+        Assert.Contains(commandRunner.Calls, call => call.FileName == "gemini" && call.Arguments.SequenceEqual(["--help"]));
+    }
+
+    [Fact]
+    public async Task AgentCliDetectorFallsBackToCodexWhenNothingIsDetected()
+    {
+        MappedCommandRunner commandRunner = new();
+
+        string defaultAgents = await AgentCliDetector
+            .DetectDefaultAgentsAsync(commandRunner, "/repo", CancellationToken.None)
+            .ConfigureAwait(true);
+
+        Assert.Equal("codex", defaultAgents);
+    }
+
+    [Fact]
     public void RecommendationListHeadersUseRequestedColors()
     {
         Assert.Equal(
@@ -79,6 +109,11 @@ public sealed class InteractionTests
         Assert.Null(AgenticCheckCli.FindUnknownOption(["-"]));
         Assert.Null(AgenticCheckCli.FindUnknownOption(["--agents", "--unknown-agent-value"]));
         Assert.Null(AgenticCheckCli.FindUnknownOption(["--report=--option-looking-file"]));
+        Assert.True(AgenticCheckCli.IsOptionSpecified(["--agents=codex"], "--agents"));
+        Assert.True(AgenticCheckCli.IsOptionSpecified(["--agents", "codex"], "--agents"));
+        Assert.False(AgenticCheckCli.IsOptionSpecified(["--", "--agents"], "--agents"));
+        Assert.True(AgenticCheckCli.IsHelpRequested(["--help"]));
+        Assert.False(AgenticCheckCli.IsHelpRequested(["--", "--help"]));
     }
 
     [Fact]

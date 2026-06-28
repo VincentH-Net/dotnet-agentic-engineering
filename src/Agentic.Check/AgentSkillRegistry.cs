@@ -5,6 +5,7 @@ sealed record AgentSkillHost(string Id, string Name, string ProjectDirectory);
 static class AgentSkillRegistry
 {
     public const string DefaultAgents = "claude-code,codex";
+    public const string DetectedAgentsFallback = "codex";
     public const string AgentsProjectDirectory = ".agents/skills";
     public const string ClaudeCodeAgentId = "claude-code";
 
@@ -65,6 +66,16 @@ static class AgentSkillRegistry
 
     public static string AgentHelpLines => string.Join(Environment.NewLine, Hosts
         .Select(host => $"  - {host.Name} ({host.Id})"));
+
+    public static string FormatDefaultAgentsValue(IReadOnlySet<string> detectedAgentIds)
+    {
+        string[] detectedInAgentOrder = [.. Hosts
+            .Where(host => detectedAgentIds.Contains(host.Id))
+            .Select(host => host.Id)];
+        return detectedInAgentOrder.Length > 0
+            ? string.Join(',', detectedInAgentOrder)
+            : DetectedAgentsFallback;
+    }
 
     public static AgentValueValidation ValidateAgentsValue(string? agentsValue)
     {

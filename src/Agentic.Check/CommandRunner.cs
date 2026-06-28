@@ -39,18 +39,28 @@ sealed class ProcessCommandRunner : ICommandRunner
             StartInfo = startInfo
         };
 
+        bool started = false;
         try
         {
             _ = process.Start();
+            started = true;
+            string standardOutput = await process.StandardOutput.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
+            string standardError = await process.StandardError.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
+            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+            return new CommandResult(process.ExitCode, standardOutput, standardError);
         }
         catch (System.ComponentModel.Win32Exception exception)
         {
             return new CommandResult(127, string.Empty, exception.Message);
         }
+        catch (OperationCanceledException) when (started)
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+            }
 
-        string standardOutput = await process.StandardOutput.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
-        string standardError = await process.StandardError.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
-        await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
-        return new CommandResult(process.ExitCode, standardOutput, standardError);
+            throw;
+        }
     }
 }

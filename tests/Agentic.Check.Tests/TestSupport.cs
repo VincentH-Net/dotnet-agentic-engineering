@@ -64,6 +64,32 @@ sealed class FakeCommandRunner : ICommandRunner
 
 sealed record CommandCall(string FileName, IReadOnlyList<string> Arguments, string WorkingDirectory);
 
+sealed class MappedCommandRunner : ICommandRunner
+{
+    readonly Dictionary<string, CommandResult> results = new(StringComparer.Ordinal);
+
+    public List<CommandCall> Calls { get; } = [];
+
+    public void Set(string fileName, IReadOnlyList<string> arguments, CommandResult result)
+        => results[CreateKey(fileName, arguments)] = result;
+
+    public Task<CommandResult> RunAsync(
+        string fileName,
+        IReadOnlyList<string> arguments,
+        string workingDirectory,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        Calls.Add(new CommandCall(fileName, [.. arguments], workingDirectory));
+        return Task.FromResult(results.GetValueOrDefault(
+            CreateKey(fileName, arguments),
+            new CommandResult(127, string.Empty, "command not found")));
+    }
+
+    static string CreateKey(string fileName, IReadOnlyList<string> arguments)
+        => $"{fileName}\n{string.Join('\n', arguments)}";
+}
+
 sealed class FakePrompts : IUserPrompts
 {
     public bool ConfirmResult { get; init; } = true;

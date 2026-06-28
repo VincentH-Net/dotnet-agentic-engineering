@@ -37,6 +37,14 @@ static class AgenticCheckCli
             return 1;
         }
 
+        string defaultAgents = AgentSkillRegistry.DefaultAgents;
+        if (IsHelpRequested(args) || !IsOptionSpecified(args, "--agents"))
+        {
+            defaultAgents = await AgentCliDetector
+                .DetectDefaultAgentsAsync(new ProcessCommandRunner(), Environment.CurrentDirectory, CancellationToken.None)
+                .ConfigureAwait(false);
+        }
+
         Argument<DirectoryInfo> targetDirectoryArgument = new(
             "target-dir",
             () => new DirectoryInfo(Environment.CurrentDirectory),
@@ -51,7 +59,7 @@ static class AgenticCheckCli
         Option<DirectoryInfo?> skillsDirectoryOption = new("--skills-dir", "Repo-local skills directory. Overrides directories implied by --agents.");
         Option<string?> agentsOption = new(
             "--agents", $"""
-            Comma-separated agent values to support. [default: {AgentSkillRegistry.DefaultAgents}]
+            Comma-separated agent values to support. [default: {defaultAgents}]
 
             Supported agent values (identical to what 'gh skill' supports):
             {AgentSkillRegistry.AgentHelpLines}
@@ -123,13 +131,17 @@ static class AgenticCheckCli
                         return;
                     }
 
+                    string? effectiveAgents = string.IsNullOrWhiteSpace(agents) && skillsDirectory is null
+                        ? defaultAgents
+                        : agents;
+
                     var options = new AgenticCheckOptions(
                         targetDirectory.FullName,
                         dryRun,
                         yes,
                         report?.FullName,
                         skillsDirectory?.FullName,
-                        agents,
+                        effectiveAgents,
                         verbose);
 
                     var workflow = new CheckWorkflow(
@@ -155,6 +167,44 @@ static class AgenticCheckCli
 
         int parseExitCode = await rootCommand.InvokeAsync(args).ConfigureAwait(false);
         return parseExitCode == 0 ? Environment.ExitCode : parseExitCode;
+    }
+
+    internal static bool IsHelpRequested(string[] args)
+    {
+        foreach (string arg in args)
+        {
+            if (arg.Equals("--", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            if (arg is "--help" or "-h" or "-?")
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    internal static bool IsOptionSpecified(string[] args, string optionName)
+    {
+        for (int index = 0; index < args.Length; index++)
+        {
+            string arg = args[index];
+            if (arg.Equals("--", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            if (arg.Equals(optionName, StringComparison.Ordinal)
+                || arg.StartsWith(optionName + "=", StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     internal static string? FindUnknownOption(string[] args)
