@@ -1,5 +1,4 @@
 ﻿using System.CommandLine;
-using System.CommandLine.Parsing;
 using Spectre.Console;
 
 namespace Agentic.Check;
@@ -45,34 +44,50 @@ static class AgenticCheckCli
                 .ConfigureAwait(false);
         }
 
-        Argument<DirectoryInfo> targetDirectoryArgument = new(
-            "target-dir",
-            () => new DirectoryInfo(Environment.CurrentDirectory),
-            "Target directory.")
+        Argument<DirectoryInfo> targetDirectoryArgument = new("target-dir")
         {
-            Arity = ArgumentArity.ZeroOrOne
+            Arity = ArgumentArity.ZeroOrOne,
+            DefaultValueFactory = _ => new DirectoryInfo(Environment.CurrentDirectory),
+            Description = "Target directory."
         };
 
-        Option<bool> dryRunOption = new("--dry-run", "Report recommended actions without applying them.");
-        Option<bool> yesOption = new("--yes", "Apply all recommended actions.");
-        Option<FileInfo?> reportOption = new("--report", "Write a JSON report to this path.");
-        Option<DirectoryInfo?> skillsDirectoryOption = new("--skills-dir", "Repo-local skills directory. Overrides directories implied by --agents.");
-        Option<string?> agentsOption = new(
-            "--agents", $"""
+        Option<bool> dryRunOption = new("--dry-run")
+        {
+            Description = "Report recommended actions without applying them."
+        };
+        Option<bool> yesOption = new("--yes")
+        {
+            Description = "Apply all recommended actions."
+        };
+        Option<FileInfo?> reportOption = new("--report")
+        {
+            Description = "Write a JSON report to this path."
+        };
+        Option<DirectoryInfo?> skillsDirectoryOption = new("--skills-dir")
+        {
+            Description = "Repo-local skills directory. Overrides directories implied by --agents."
+        };
+        Option<string?> agentsOption = new("--agents")
+        {
+            Description = $"""
             Comma-separated agent values to support. [default: {defaultAgents}]
 
             Supported agent values (identical to what 'gh skill' supports):
             {AgentSkillRegistry.AgentHelpLines}
-            """);
-        agentsOption.AddValidator(result =>
+            """
+        };
+        agentsOption.Validators.Add(result =>
         {
             var validation = AgentSkillRegistry.ValidateAgentsValue(result.GetValueOrDefault<string?>());
             if (!validation.Success)
             {
-                result.ErrorMessage = validation.Error;
+                result.AddError(validation.Error ?? "Invalid --agents value.");
             }
         });
-        Option<bool> verboseOption = new("--verbose", "Include detailed command and scan information.");
+        Option<bool> verboseOption = new("--verbose")
+        {
+            Description = "Include detailed command and scan information."
+        };
 
         RootCommand rootCommand = new("""
         Optimizes your repo for agentic engineering with .NET - based technologies.
@@ -97,38 +112,36 @@ static class AgenticCheckCli
         - Pure XAML markup or XAML combined with either Uno C# Markup or C# Markup 2
         - Fluent / Material / Cupertino design system
 
-        """
-        ) {
-            targetDirectoryArgument,
-            agentsOption,
-            skillsDirectoryOption,
-            dryRunOption,
-            yesOption,
-            reportOption,
-            verboseOption
-        };
-        rootCommand.AddValidator(result =>
-        {
-            if (result.GetValueForOption(skillsDirectoryOption) is not null
-                && !string.IsNullOrWhiteSpace(result.GetValueForOption(agentsOption)))
-            {
-                result.ErrorMessage = "Specify no more than one of --skills-dir and --agents.";
-            }
-        });
+        """);
+        rootCommand.Arguments.Add(targetDirectoryArgument);
+        rootCommand.Options.Add(agentsOption);
+        rootCommand.Options.Add(skillsDirectoryOption);
+        rootCommand.Options.Add(dryRunOption);
+        rootCommand.Options.Add(yesOption);
+        rootCommand.Options.Add(reportOption);
+        rootCommand.Options.Add(verboseOption);
 
-        rootCommand.SetHandler(
-            async (targetDirectory, dryRun, yes, report, skillsDirectory, agents, verbose) =>
+        rootCommand.SetAction(
+            async (parseResult, cancellationToken) =>
             {
                 SpectreReporter reporter = new(AnsiConsole.Console);
                 try
                 {
                     reporter.Header();
 
+                    var targetDirectory = parseResult.GetValue(targetDirectoryArgument)
+                        ?? new DirectoryInfo(Environment.CurrentDirectory);
+                    bool dryRun = parseResult.GetValue(dryRunOption);
+                    bool yes = parseResult.GetValue(yesOption);
+                    var report = parseResult.GetValue(reportOption);
+                    var skillsDirectory = parseResult.GetValue(skillsDirectoryOption);
+                    string? agents = parseResult.GetValue(agentsOption);
+                    bool verbose = parseResult.GetValue(verboseOption);
+
                     if (skillsDirectory is not null && !string.IsNullOrWhiteSpace(agents))
                     {
                         AnsiConsole.MarkupLine("[red]Specify no more than one of --skills-dir and --agents.[/]");
-                        Environment.ExitCode = 2;
-                        return;
+                        return 1;
                     }
 
                     string? effectiveAgents = string.IsNullOrWhiteSpace(agents) && skillsDirectory is null
@@ -150,23 +163,15 @@ static class AgenticCheckCli
                         reporter);
 
                     var result = await workflow.RunAsync(options, CancellationToken.None).ConfigureAwait(false);
-                    Environment.ExitCode = result.ExitCode;
+                    return result.ExitCode;
                 }
                 finally
                 {
                     AnsiConsole.WriteLine();
                 }
-            },
-            targetDirectoryArgument,
-            dryRunOption,
-            yesOption,
-            reportOption,
-            skillsDirectoryOption,
-            agentsOption,
-            verboseOption);
+            });
 
-        int parseExitCode = await rootCommand.InvokeAsync(args).ConfigureAwait(false);
-        return parseExitCode == 0 ? Environment.ExitCode : parseExitCode;
+        return await rootCommand.Parse(args).InvokeAsync(cancellationToken: CancellationToken.None).ConfigureAwait(false);
     }
 
     internal static bool IsHelpRequested(string[] args)
