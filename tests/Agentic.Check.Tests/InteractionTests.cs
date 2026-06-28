@@ -46,12 +46,23 @@ public sealed class InteractionTests
     [Fact]
     public void AgentHelpLinesIncludeNamesAndIdsInGhOrder()
     {
-        string[] lines = AgentSkillRegistry.AgentHelpLines.Split(Environment.NewLine);
+        string[] lines = AgentSkillRegistry.FormatAgentHelpLines(68).Split(Environment.NewLine);
 
         Assert.Equal("  - GitHub Copilot (github-copilot)", lines[0]);
         Assert.Equal("  - Claude Code (claude-code)", lines[1]);
         Assert.Contains("  - Codex (codex)", lines);
         Assert.Equal("  - Zencoder (zencoder)", lines[^1]);
+    }
+
+    [Fact]
+    public void AgentHelpLinesUseMultipleColumnsWhenTheyFit()
+    {
+        string[] lines = AgentSkillRegistry.FormatAgentHelpLines(180).Split(Environment.NewLine);
+
+        Assert.True(lines.Length < AgentSkillRegistry.AgentIds.Split(',').Length);
+        Assert.Contains("GitHub Copilot (github-copilot)", lines[0], StringComparison.Ordinal);
+        Assert.Contains("  - ", lines[0][4..], StringComparison.Ordinal);
+        Assert.Contains(lines, line => line.Contains("Zencoder (zencoder)", StringComparison.Ordinal));
     }
 
     [Fact]

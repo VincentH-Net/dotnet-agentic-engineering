@@ -64,8 +64,37 @@ static class AgentSkillRegistry
     public static string AgentIds => string.Join(", ", Hosts
         .Select(host => host.Id));
 
-    public static string AgentHelpLines => string.Join(Environment.NewLine, Hosts
-        .Select(host => $"  - {host.Name} ({host.Id})"));
+    public static string AgentHelpLines => FormatAgentHelpLines(Console.WindowWidth);
+
+    public static string FormatAgentHelpLines(int terminalWidth)
+    {
+        string[] values = [.. Hosts.Select(host => $"{host.Name} ({host.Id})")];
+        int availableWidth = Math.Max(40, terminalWidth - 28);
+        int cellWidth = values.Max(value => value.Length) + 6;
+        int columns = Math.Max(1, Math.Min(values.Length, availableWidth / cellWidth));
+        int rows = (int)Math.Ceiling(values.Length / (double)columns);
+
+        List<string> lines = [];
+        for (int row = 0; row < rows; row++)
+        {
+            List<string> cells = [];
+            for (int column = 0; column < columns; column++)
+            {
+                int index = (column * rows) + row;
+                if (index >= values.Length)
+                {
+                    continue;
+                }
+
+                string cell = $"  - {values[index]}";
+                cells.Add(column == columns - 1 ? cell : cell.PadRight(cellWidth));
+            }
+
+            lines.Add(string.Concat(cells).TrimEnd());
+        }
+
+        return string.Join(Environment.NewLine, lines);
+    }
 
     public static string FormatDefaultAgentsValue(IReadOnlySet<string> detectedAgentIds)
     {
