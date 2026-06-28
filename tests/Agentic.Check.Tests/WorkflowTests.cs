@@ -84,7 +84,8 @@ public sealed class WorkflowTests
         Assert.Contains("      dotnet-livecharts2", reporter.Infos);
         Assert.Contains("      dotnet-modern-csharp-editorconfig", reporter.Infos);
         Assert.DoesNotContain(reporter.Infos, message => message.Contains("Would update repo-local skills", StringComparison.Ordinal));
-        Assert.DoesNotContain(reporter.Infos, message => message.StartsWith("Directive ", StringComparison.Ordinal));
+        Assert.Contains("Directive cache duration: 30 minute(s)", reporter.Infos);
+        Assert.DoesNotContain(reporter.Infos, IsLegacyDirectiveStatusMessage);
         Assert.Equal("claude-code,codex", reporter.TargetAgents);
         Assert.Contains("Scanning repository", reporter.ProgressDescriptions);
         Assert.Equal(3, reporter.ProgressTicksByDescription["Scanning repository"]);
@@ -457,7 +458,8 @@ public sealed class WorkflowTests
         Assert.Contains("    dotnet:", reporter.Infos);
         Assert.Contains("      ✓ dotnet-livecharts2", reporter.Successes);
         Assert.Contains("      ✓ dotnet-modern-csharp-editorconfig", reporter.Successes);
-        Assert.DoesNotContain(reporter.Infos, message => message.StartsWith("Directive ", StringComparison.Ordinal));
+        Assert.Contains("Directive cache duration: 30 minute(s)", reporter.Infos);
+        Assert.DoesNotContain(reporter.Infos, IsLegacyDirectiveStatusMessage);
     }
 
     [Fact]
@@ -763,4 +765,8 @@ public sealed class WorkflowTests
             Assert.NotEqual(string.Empty, messages[headerIndex - 2]);
         }
     }
+
+    static bool IsLegacyDirectiveStatusMessage(string message)
+        => message.StartsWith("Directive ", StringComparison.Ordinal)
+            && !message.StartsWith("Directive cache duration:", StringComparison.Ordinal);
 }

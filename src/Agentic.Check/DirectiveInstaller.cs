@@ -1,4 +1,7 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Net.Http.Headers;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
@@ -471,22 +474,19 @@ sealed partial class DirectiveInstaller(IDirectiveSource source, IReporter repor
     private static partial Regex AgentsImportRegex();
 }
 
-sealed class GitHubDirectiveSource(HttpClient? httpClient = null) : IDirectiveSource
+sealed class GitHubDirectiveSource(
+    HttpClient? httpClient = null,
+    DirectiveCacheSettings? cacheSettings = null,
+    IReporter? reporter = null) : IDirectiveSource
 {
     static readonly Uri ListingUri = new(DirectiveInstallerListingUrl.Value);
     readonly HttpClient httpClient = httpClient ?? CreateHttpClient();
+    readonly DirectiveHttpCache cache = new(cacheSettings ?? DirectiveCacheSettings.FromEnvironment(), reporter);
 
     public async Task<IReadOnlyList<DirectiveSourceFile>> ListAsync(CancellationToken cancellationToken)
     {
-        using var response = await GetAsync(ListingUri, DirectiveInstallerListingUrl.Value, cancellationToken).ConfigureAwait(false);
-        if (!response.IsSuccessStatusCode)
-        {
-            throw new DirectiveException($"Could not fetch directives listing from {DirectiveInstallerListingUrl.Value}: HTTP {(int)response.StatusCode}.");
-        }
-
-        using var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-        var items = await JsonSerializer.DeserializeAsync<IReadOnlyList<GitHubContentItem>>(stream, cancellationToken: cancellationToken)
-            .ConfigureAwait(false)
+        string content = await GetStringAsync(ListingUri, DirectiveInstallerListingUrl.Value, "directives listing", cancellationToken).ConfigureAwait(false);
+        var items = JsonSerializer.Deserialize<IReadOnlyList<GitHubContentItem>>(content)
             ?? throw new DirectiveException($"Could not parse directives listing from {DirectiveInstallerListingUrl.Value}.");
 
         return [.. items
@@ -503,26 +503,53 @@ sealed class GitHubDirectiveSource(HttpClient? httpClient = null) : IDirectiveSo
             throw new DirectiveException($"Directive download URL is invalid: {sourceFile.DownloadUrl}.");
         }
 
-        using var response = await GetAsync(downloadUri, sourceFile.DownloadUrl, cancellationToken).ConfigureAwait(false);
-        if (!response.IsSuccessStatusCode)
-        {
-            throw new DirectiveException($"Could not fetch directive from {sourceFile.DownloadUrl}: HTTP {(int)response.StatusCode}.");
-        }
-
-        return await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+        return await GetStringAsync(downloadUri, sourceFile.DownloadUrl, $"directive from {sourceFile.DownloadUrl}", cancellationToken).ConfigureAwait(false);
     }
 
-    async Task<HttpResponseMessage> GetAsync(Uri uri, string displayUrl, CancellationToken cancellationToken)
+    async Task<string> GetStringAsync(Uri uri, string displayUrl, string description, CancellationToken cancellationToken)
     {
+        if (cache.TryReadFresh(uri, out string? cachedContent))
+        {
+            return cachedContent;
+        }
+
+        HttpResponseMessage response;
         try
         {
-            return await httpClient.GetAsync(uri, cancellationToken).ConfigureAwait(false);
+            response = await GetAsync(uri, cancellationToken).ConfigureAwait(false);
         }
         catch (HttpRequestException exception)
         {
+            if (cache.TryReadStale(uri, displayUrl, exception.Message, out cachedContent))
+            {
+                return cachedContent;
+            }
+
             throw new DirectiveException($"Could not fetch {displayUrl}: {exception.Message}", exception);
         }
+
+        using (response)
+        {
+            if (!response.IsSuccessStatusCode)
+            {
+                int statusCode = (int)response.StatusCode;
+                if (statusCode is 403 or 429
+                    && cache.TryReadStale(uri, displayUrl, $"HTTP {statusCode}", out cachedContent))
+                {
+                    return cachedContent;
+                }
+
+                throw new DirectiveException($"Could not fetch {description}: HTTP {statusCode}.");
+            }
+
+            string content = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            cache.TryWrite(uri, content);
+            return content;
+        }
     }
+
+    async Task<HttpResponseMessage> GetAsync(Uri uri, CancellationToken cancellationToken)
+        => await httpClient.GetAsync(uri, cancellationToken).ConfigureAwait(false);
 
     static HttpClient CreateHttpClient()
     {
@@ -531,6 +558,205 @@ sealed class GitHubDirectiveSource(HttpClient? httpClient = null) : IDirectiveSo
         return client;
     }
 }
+
+sealed record DirectiveCacheSettings(
+    int DurationSeconds,
+    string CacheDirectory,
+    IReadOnlyList<string> ConfigurationWarnings)
+{
+    public const int DefaultDurationSeconds = 1800;
+    public const string DurationEnvironmentVariable = "AGENTIC_CHECK_CACHE_SECONDS";
+    public const string DirectoryEnvironmentVariable = "AGENTIC_CHECK_CACHE_DIR";
+
+    public bool ReadFreshCache => DurationSeconds > 0;
+
+    public TimeSpan Duration => TimeSpan.FromSeconds(DurationSeconds);
+
+    public string DurationDescription
+    {
+        get
+        {
+            if (DurationSeconds == 0)
+            {
+                return "0 minutes (fresh fetch; successful responses still refresh cache)";
+            }
+
+            if (DurationSeconds % 60 == 0)
+            {
+                int minutes = DurationSeconds / 60;
+                return string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{minutes} minute(s)");
+            }
+
+            double minutesValue = DurationSeconds / 60d;
+            return string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{minutesValue:0.##} minute(s)");
+        }
+    }
+
+    public static DirectiveCacheSettings FromEnvironment()
+    {
+        List<string> warnings = [];
+        int durationSeconds = DefaultDurationSeconds;
+        string? durationValue = Environment.GetEnvironmentVariable(DurationEnvironmentVariable);
+        if (!string.IsNullOrWhiteSpace(durationValue)
+            && (!int.TryParse(
+                durationValue,
+                System.Globalization.NumberStyles.Integer,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out durationSeconds)
+                || durationSeconds < 0))
+        {
+            warnings.Add($"Configuration warning: {DurationEnvironmentVariable} value '{durationValue}' is invalid; using {DefaultDurationSeconds} seconds.");
+            durationSeconds = DefaultDurationSeconds;
+        }
+
+        string cacheDirectory = ResolveCacheDirectory(warnings);
+        return new DirectiveCacheSettings(durationSeconds, cacheDirectory, warnings);
+    }
+
+    static string ResolveCacheDirectory(List<string> warnings)
+    {
+        string? configuredDirectory = Environment.GetEnvironmentVariable(DirectoryEnvironmentVariable);
+        if (!string.IsNullOrWhiteSpace(configuredDirectory))
+        {
+            try
+            {
+                return Path.GetFullPath(configuredDirectory);
+            }
+            catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException)
+            {
+                warnings.Add($"Configuration warning: {DirectoryEnvironmentVariable} value '{configuredDirectory}' is invalid; using default cache directory.");
+            }
+        }
+
+        return DefaultCacheDirectory();
+    }
+
+    static string DefaultCacheDirectory()
+    {
+        string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        if (OperatingSystem.IsMacOS() && !string.IsNullOrWhiteSpace(home))
+        {
+            return Path.Combine(home, "Library", "Caches", "Agentic.Check");
+        }
+
+        if (OperatingSystem.IsWindows())
+        {
+            string localApplicationData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            if (!string.IsNullOrWhiteSpace(localApplicationData))
+            {
+                return Path.Combine(localApplicationData, "Agentic.Check", "Cache");
+            }
+        }
+
+        string? xdgCacheHome = Environment.GetEnvironmentVariable("XDG_CACHE_HOME");
+        if (!string.IsNullOrWhiteSpace(xdgCacheHome))
+        {
+            return Path.Combine(xdgCacheHome, "Agentic.Check");
+        }
+
+        return !string.IsNullOrWhiteSpace(home)
+            ? Path.Combine(home, ".cache", "Agentic.Check")
+            : Path.Combine(Path.GetTempPath(), "Agentic.Check", "Cache");
+    }
+}
+
+sealed class DirectiveHttpCache(DirectiveCacheSettings settings, IReporter? reporter)
+{
+    static readonly JsonSerializerOptions SerializerOptions = new(JsonSerializerDefaults.Web);
+
+    public bool TryReadFresh(Uri uri, [NotNullWhen(true)] out string? content)
+    {
+        content = null;
+        if (!settings.ReadFreshCache)
+        {
+            return false;
+        }
+
+        if (!TryReadEntry(uri, out var entry))
+        {
+            return false;
+        }
+
+        if (DateTimeOffset.UtcNow - entry.FetchedAtUtc > settings.Duration)
+        {
+            return false;
+        }
+
+        content = entry.Content;
+        return true;
+    }
+
+    public bool TryReadStale(Uri uri, string displayUrl, string reason, [NotNullWhen(true)] out string? content)
+    {
+        content = null;
+        if (!TryReadEntry(uri, out var entry))
+        {
+            return false;
+        }
+
+        reporter?.Warning($"Using stale cached directive response for {displayUrl} because the fresh fetch failed: {reason}.");
+        content = entry.Content;
+        return true;
+    }
+
+    public void TryWrite(Uri uri, string content)
+    {
+        try
+        {
+            _ = Directory.CreateDirectory(settings.CacheDirectory);
+            string cachePath = CachePath(uri);
+            string tempPath = $"{cachePath}.{Guid.NewGuid():N}.tmp";
+            string json = JsonSerializer.Serialize(
+                new DirectiveHttpCacheEntry(uri.AbsoluteUri, DateTimeOffset.UtcNow, content),
+                SerializerOptions);
+            File.WriteAllText(tempPath, json);
+            File.Move(tempPath, cachePath, overwrite: true);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException or NotSupportedException)
+        {
+            reporter?.Warning($"Configuration warning: could not write directive cache in {settings.CacheDirectory}: {exception.Message}");
+        }
+    }
+
+    bool TryReadEntry(Uri uri, out DirectiveHttpCacheEntry entry)
+    {
+        entry = new DirectiveHttpCacheEntry(string.Empty, DateTimeOffset.MinValue, string.Empty);
+        try
+        {
+            string cachePath = CachePath(uri);
+            if (!File.Exists(cachePath))
+            {
+                return false;
+            }
+
+            string json = File.ReadAllText(cachePath);
+            var cached = JsonSerializer.Deserialize<DirectiveHttpCacheEntry>(json, SerializerOptions);
+            if (cached is null
+                || !cached.Url.Equals(uri.AbsoluteUri, StringComparison.Ordinal)
+                || string.IsNullOrWhiteSpace(cached.Content))
+            {
+                return false;
+            }
+
+            entry = cached;
+            return true;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException or NotSupportedException)
+        {
+            reporter?.Warning($"Configuration warning: could not read directive cache in {settings.CacheDirectory}: {exception.Message}");
+            return false;
+        }
+    }
+
+    string CachePath(Uri uri)
+    {
+        byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes(uri.AbsoluteUri));
+        string fileName = Convert.ToHexString(hash) + ".json";
+        return Path.Combine(settings.CacheDirectory, fileName);
+    }
+}
+
+sealed record DirectiveHttpCacheEntry(string Url, DateTimeOffset FetchedAtUtc, string Content);
 
 static class DirectiveInstallerListingUrl
 {

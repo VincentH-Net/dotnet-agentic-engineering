@@ -127,7 +127,11 @@ sealed class CheckWorkflow(
         IReadOnlyList<SkillManifestEntry> recommended = [];
         IReadOnlyList<SkillManifestEntry> missing = [];
         IReadOnlyList<SkillUpdateCandidate> skillUpdates = [];
-        DirectiveInstaller directiveInstaller = new(directiveSource ?? new GitHubDirectiveSource(), reporter);
+        var directiveCacheSettings = DirectiveCacheSettings.FromEnvironment();
+        report.Warnings.AddRange(directiveCacheSettings.ConfigurationWarnings);
+        DirectiveInstaller directiveInstaller = new(
+            directiveSource ?? new GitHubDirectiveSource(cacheSettings: directiveCacheSettings, reporter: reporter),
+            reporter);
         string firstSkillsDirectory = skillsDirectories[0];
         report.SkillsDirectory = firstSkillsDirectory;
         report.SkillsDirectories.AddRange(skillsDirectories);
@@ -183,8 +187,9 @@ sealed class CheckWorkflow(
         report.DirectiveSummary = directiveSummary;
 
         reporter.Summary(repoResolution.RepoRoot, stack.Technologies, stack.UnoGates, targetAgents, skillsDirectories, directiveSummary, recommended.Count, missing.Count, report.OutdatedSkills);
+        reporter.Info($"Directive cache duration: {directiveCacheSettings.DurationDescription}");
 
-        foreach (string warning in stack.Warnings)
+        foreach (string warning in report.Warnings)
         {
             reporter.Warning(warning);
         }
