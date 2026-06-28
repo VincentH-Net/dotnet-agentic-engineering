@@ -324,6 +324,62 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
 
     [Fact]
     [Trait("Category", "EndToEnd")]
+    public async Task InteractiveRecommendationListSupportsFilterAsYouTypeAndScrolling()
+    {
+        if (IsUnsupportedPlatform())
+        {
+            return;
+        }
+
+        using var workspace = await TestWorkspace.CreateAsync(
+            nameof(InteractiveRecommendationListSupportsFilterAsYouTypeAndScrolling),
+            writeDotnetProject: false).ConfigureAwait(true);
+        WriteFullStackProjects(workspace);
+
+        var result = await RunInteractiveCommandAsync(
+            workspace,
+            $"--agents codex {Quote(workspace.RepoPath)}",
+            async auto =>
+            {
+                await auto.WaitUntilTextAsync("Recommend ", timeout: TimeSpan.FromSeconds(45)).ConfigureAwait(true);
+                await auto.WaitUntilTextAsync("Showing 1-24 of", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
+                for (int index = 0; index < 30; index++)
+                {
+                    await auto.DownAsync().ConfigureAwait(true);
+                }
+
+                await auto.WaitUntilTextAsync("Showing 19-42 of", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
+
+                await auto.TypeAsync("t").ConfigureAwait(true);
+                await auto.WaitUntilTextAsync("Filter: t", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
+                await auto.TypeAsync("e").ConfigureAwait(true);
+                await auto.WaitUntilTextAsync("Filter: te", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
+                await auto.TypeAsync("s").ConfigureAwait(true);
+                await auto.WaitUntilTextAsync("Filter: tes", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
+                await auto.TypeAsync("t").ConfigureAwait(true);
+                await auto.WaitUntilTextAsync("Filter: test", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
+                await auto.WaitUntilTextAsync("uno-test-resize-app-window (install)", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
+                await auto.WaitUntilTextAsync("dotnet-test", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
+                await auto.WaitUntilTextAsync("run-tests (install)", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
+
+                using (var snapshot = auto.CreateSnapshot())
+                {
+                    string filteredScreen = snapshot.GetScreenText();
+                    Assert.DoesNotContain("orleans-result-pattern (install)", filteredScreen, StringComparison.Ordinal);
+                    Assert.DoesNotContain("uno-navigation-contentcontrol (install)", filteredScreen, StringComparison.Ordinal);
+                }
+
+                await auto.LeftAsync().ConfigureAwait(true);
+                await auto.EnterAsync().ConfigureAwait(true);
+            }).ConfigureAwait(true);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.DoesNotContain(" skill install ", await workspace.ReadGhLogAsync().ConfigureAwait(true), StringComparison.Ordinal);
+        AssertRecordingWasWritten(workspace);
+    }
+
+    [Fact]
+    [Trait("Category", "EndToEnd")]
     public async Task InteractiveSelectingSkillSelectsAndInstallsDependencies()
     {
         if (IsUnsupportedPlatform())
@@ -427,6 +483,43 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
     }
 
     static string ToolAssemblyPath => typeof(AgenticCheckCli).Assembly.Location;
+
+    static void WriteFullStackProjects(TestWorkspace workspace)
+    {
+        workspace.WriteRepoFile(
+            "src/UnoCSharp/App.csproj",
+            """
+            <Project Sdk="Uno.Sdk">
+              <PropertyGroup>
+                <UnoFeatures>MVVM;CSharpMarkup;Material</UnoFeatures>
+              </PropertyGroup>
+              <ItemGroup>
+                <PackageReference Include="Microsoft.Orleans.Server" Version="10.0.0" />
+              </ItemGroup>
+            </Project>
+            """);
+        workspace.WriteRepoFile(
+            "src/UnoCSharp2/App.csproj",
+            """
+            <Project Sdk="Uno.Sdk">
+              <PropertyGroup>
+                <UnoFeatures>MVUX;SimpleTheme</UnoFeatures>
+              </PropertyGroup>
+              <ItemGroup>
+                <PackageReference Include="CSharpMarkup.WinUI" Version="1.0.0" />
+              </ItemGroup>
+            </Project>
+            """);
+        workspace.WriteRepoFile(
+            "src/Web/Web.csproj",
+            """
+            <Project Sdk="Microsoft.NET.Sdk.Web">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+    }
 
     async Task<TerminalRunResult> RunCommandAsync(
         TestWorkspace workspace,
