@@ -58,9 +58,11 @@ Install an optimized combination of models, harnesses, plugins, MCP's, skills an
 ### Install or update directives and skills
 
 From within a folder in your repo, run:
-  ```bash
-  dnx agentic.check
-  ```
+```bash
+dnx agentic.check
+```
+Run this regularly to catch skills updates and to get add directives and skills when you expand your tech stack.
+
 Alternatively, you can [manually compose and install directives and skills](/docs/manual-install.md)
 
 ## Directives catalog
