@@ -4,7 +4,7 @@ Keep the **most important part of your source** - your prompts and your answers 
 
 This preserves **intent** in source control, using the same unit of work as your branching strategy, and makes it possible to **replay** your input at a later stage with better models, harnesses and tools.
 
-Use the `ensure-directives` skill to install or update directives for your technology, or manually copy below markdown in your `AGENTS.MD`:
+Use the `agentic-check` tool to install or update directives for your technology, or manually copy below markdown in your `AGENTS.MD`:
 
 ~~~md
 <!-- dotnet-agentic-engineering:foundation-prompt-log:start -->

@@ -8,16 +8,9 @@ Prerequisites:
 
 Required:
 
-- [x] [.NET Agentic Engineering](https://github.com/VincentH-Net/dotnet-agentic-engineering#installation) by [VincentH-Net](https://github.com/VincentH-Net)
-  - [x] Uno Platform Claude Code plugin
-  - [x] Uno Platform Codex plugin
 - [x] Uno Platform and it's MCP's
   - [x] [Uno Platform Get started with Claude Code](https://platform.uno/docs/articles/get-started-ai-claude.html?tabs=macos)
   - [x] [Uno Platform Get started with Codex](https://platform.uno/docs/articles/get-started-ai-codex.html?tabs=macos)
-
-Recommended:
-
-- [x] [Uno Platform Skills](https://github.com/mtmattei/UnoPlatformSkills/tree/main#installation) by Uno's [Matthew Mattei](https://github.com/mtmattei)
 
 ## Which model for what
 
