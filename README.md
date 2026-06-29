@@ -30,7 +30,7 @@ Demos:
 - [GPT 5.4 vs Opus 4.6 for UI with Uno Platform](https://x.com/compose/articles/edit/2031388424310075392)
   (article with side-by-side apps video)
 
-This repo exists to save .NET software engineers from a significant ongoing effort:
+This repo saves .NET software engineers a significant, ongoing effort:
 
 - **filter** proven engineering value from untested content and marketing in the agentic ecosystem
 - **fill** agentic ecosystem gaps, both technology-independent and for specific technologies
@@ -48,22 +48,14 @@ In the coming months I will be adding content for the latest [.NET](https://dotn
 
 Install an optimized combination of models, harnesses, plugins, MCP's, skills and directives for your tech stack with these steps:
 
-### Manual dev tools setup
+1. Check your [Agentic Development Environment Setup](/docs/dev-environment-setup.md)
+2. From within a folder in your repo, run:
+   ```bash
+   dnx agentic.check
+   ```
+   Run this regularly to catch skills updates and to get add directives and skills when you expand your tech stack.
 
-1. [Foundation Setup](./setups/foundation.md)
-2. For the technologies in your target stack:
-    - [x] [.NET Setup](./setups/dotnet.md)
-    - [ ] [UI with Uno Platform Setup](./setups/ui-uno-platform.md)
-
-### Install or update directives and skills
-
-From within a folder in your repo, run:
-```bash
-dnx agentic.check
-```
-Run this regularly to catch skills updates and to get add directives and skills when you expand your tech stack.
-
-Alternatively, you can [manually compose and install directives and skills](/docs/manual-install.md)
+   Alternatively, you can [manually compose and install directives and skills](/docs/manual-install.md)
 
 ## Directives catalog
 This repo offers the following directives (markdown snippets to include in your AGENTS.md / CLAUDE.md):
