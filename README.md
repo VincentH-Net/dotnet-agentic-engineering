@@ -6,7 +6,7 @@ Battle-tested agentic engineering for [.NET](https://dotnet.microsoft.com), [Asp
 
 - Agentic engineering `setups`, `directives` and `skills` that I use for building real-world .NET applications. Everything here has been used with real-world codebases - not generated with prompts and published untested.
 
-- The `agentic-check` tool scans your repo and automaticaly composes, installs and updates an optimized set of directives and skills for your tech stack, directly from best-in-class GitHub skills repo's.
+- The `agentic-check` tool scans your repo and automatically composes, installs and updates an optimized set of directives and skills for your tech stack, directly from best-in-class GitHub skills repo's.
   ![Terminal window on macOS running dnx agentic.check in the Api3 project folder, showing large cyan and green agentic-check ASCII art. The terminal text reads ~/Projects/Api3, dnx agentic.check, .NET Agentic Engineering Check 0.3.1, Optimizes your repo for agentic engineering with .NET - based technologies. The surrounding environment is a dark terminal window with standard macOS window controls. The tone is technical, polished, and reassuring.](docs/images/agentic-check.png)
 
   The skills available for composition are carefully tested and are selected from 
