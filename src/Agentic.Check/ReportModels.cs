@@ -16,7 +16,7 @@ sealed class AgenticCheckReport
 
     public List<string> Technologies { get; } = [];
 
-    public List<UnoGateReport> UnoGates { get; } = [];
+    public List<InstallGateReport> InstallGates { get; } = [];
 
     public List<string> Warnings { get; } = [];
 

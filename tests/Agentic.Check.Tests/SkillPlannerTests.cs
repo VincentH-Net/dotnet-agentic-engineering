@@ -18,8 +18,34 @@ public sealed class SkillPlannerTests
 
         Assert.Contains(plan, skill => skill.InstallArg == "dotnet-livecharts2");
         Assert.Contains(plan, skill => skill.InstallArg == "plugins/dotnet-test/skills/run-tests");
+        Assert.DoesNotContain(plan, skill => skill.InstallArg == "cli-e2e-testing");
         Assert.DoesNotContain(plan, skill => skill.Plugin == "dotnet-aspnetcore");
         Assert.DoesNotContain(plan, skill => skill.Technology == TechnologyNames.Uno);
+    }
+
+    [Fact]
+    public void PlansCliE2eTestingSkillForDotnetCliGate()
+    {
+        StackDetectionResult stack = new(
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                TechnologyNames.Foundation,
+                TechnologyNames.Dotnet
+            },
+            [
+                new InstallGateReport(
+                    TechnologyNames.Dotnet,
+                    "Tool.csproj",
+                    new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        ["cli"] = ["cli"]
+                    })
+            ],
+            []);
+
+        var plan = SkillPlanner.Plan(StaticSkillManifest.All, stack);
+
+        Assert.Contains(plan, skill => skill.InstallArg == "cli-e2e-testing");
     }
 
     [Fact]

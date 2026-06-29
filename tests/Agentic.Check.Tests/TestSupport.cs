@@ -188,7 +188,7 @@ sealed class RecordingReporter : IReporter
     public void Summary(
         string repoRoot,
         IReadOnlySet<string> technologies,
-        IReadOnlyList<UnoGateReport> unoGates,
+        IReadOnlyList<InstallGateReport> installGates,
         string targetAgents,
         IReadOnlyList<string> skillsDirectories,
         DirectiveSummary directiveSummary,

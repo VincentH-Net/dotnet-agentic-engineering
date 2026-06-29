@@ -76,6 +76,7 @@ Skills for .NET development.
 
 | Skill | Description |
 |-------|-------------|
+| `cli-e2e-testing` | CLI end-to-end testing guide for real terminal flows with Hex1b automation, keyboard input, observable terminal output, and asciinema recordings. |
 | `dotnet-livecharts2` | LiveCharts2 development guide — installation, XAML source generator integration, theme config, gotchas, and sample index with exact repo file paths. Covers all platforms (WinUI, Uno, Avalonia, MAUI, WPF, Blazor, WinForms, Eto). |
 | `dotnet-modern-csharp-editorconfig` | Drop-in opinionated `.editorconfig` for modern C# (C# 14 / .NET 10, also works with C# 10–13) — formatting, naming, style, and preview analyzer severities. Covers required `.csproj` flags and the .NET 8 vs .NET 9+ build-respect-editorconfig distinction. |
 

@@ -134,7 +134,7 @@ sealed class CheckWorkflow(
                 var detectedStack = StackDetector.Detect(targetDirectory);
                 stack = detectedStack;
                 report.Technologies.AddRange(detectedStack.Technologies.Order(StringComparer.OrdinalIgnoreCase));
-                report.UnoGates.AddRange(detectedStack.UnoGates);
+                report.InstallGates.AddRange(detectedStack.InstallGates);
                 report.Warnings.AddRange(detectedStack.Warnings);
                 advance();
 
@@ -176,7 +176,7 @@ sealed class CheckWorkflow(
             directivePlan.OutdatedCount);
         report.DirectiveSummary = directiveSummary;
 
-        reporter.Summary(targetDirectory, stack.Technologies, stack.UnoGates, targetAgents, skillsDirectories, directiveSummary, recommended.Count, missing.Count, report.OutdatedSkills);
+        reporter.Summary(targetDirectory, stack.Technologies, stack.InstallGates, targetAgents, skillsDirectories, directiveSummary, recommended.Count, missing.Count, report.OutdatedSkills);
         reporter.Info($"Directive cache duration: {directiveCacheSettings.DurationDescription}");
 
         foreach (string warning in report.Warnings)

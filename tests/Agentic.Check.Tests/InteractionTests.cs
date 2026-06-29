@@ -162,6 +162,13 @@ public sealed class InteractionTests
             ["mvux"],
             ["csharp2", "xaml"],
             ["material"]);
+        InstallGateReport dotnetGate = new(
+            TechnologyNames.Dotnet,
+            "Tool.csproj",
+            new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["cli"] = ["cli"]
+            });
 
         Assert.Equal(
             string.Join(
@@ -174,9 +181,29 @@ public sealed class InteractionTests
                     "Microsoft Orleans",
                     "ASP.NET",
                     ".NET",
+                    "  CLI",
                     "Agentic Foundation"
                 ]),
-            SpectreReporter.FormatStack(technologies, [unoGate]));
+            SpectreReporter.FormatStack(technologies, [unoGate, dotnetGate]));
+    }
+
+    [Fact]
+    public void StackDisplayOmitsAbsentDotnetSubgates()
+    {
+        HashSet<string> technologies = new(StringComparer.OrdinalIgnoreCase)
+        {
+            TechnologyNames.Foundation,
+            TechnologyNames.Dotnet
+        };
+
+        Assert.Equal(
+            string.Join(
+                Environment.NewLine,
+                [
+                    ".NET",
+                    "Agentic Foundation"
+                ]),
+            SpectreReporter.FormatStack(technologies, []));
     }
 
     [Fact]

@@ -58,6 +58,7 @@ static class StaticSkillManifest
 
     internal static IReadOnlyList<SkillManifestEntry> All { get; } =
     [
+        VincentDotnet("cli-e2e-testing", [new("cli", "cli")]),
         VincentDotnet("dotnet-livecharts2"),
         VincentDotnet("dotnet-modern-csharp-editorconfig"),
         ..DotnetTestSkills(),
@@ -88,6 +89,9 @@ static class StaticSkillManifest
 
     static SkillManifestEntry VincentDotnet(string skill)
         => Entry(VincentRepo, skill, TechnologyNames.Dotnet, plugin: "dotnet");
+
+    static SkillManifestEntry VincentDotnet(string skill, IReadOnlyList<GateRequirement> gateRequirements)
+        => Entry(VincentRepo, skill, TechnologyNames.Dotnet, gateRequirements, plugin: "dotnet");
 
     static SkillManifestEntry VincentOrleans(string skill)
         => Entry(VincentRepo, skill, TechnologyNames.Orleans, plugin: "orleans");
@@ -247,7 +251,7 @@ static class SkillPlanner
             .ThenBy(entry => entry.InstallArg, StringComparer.OrdinalIgnoreCase)];
 
     static bool HasGate(StackDetectionResult stack, GateRequirement requirement)
-        => stack.UnoGates.Any(report => report.GetValues(requirement.Gate).Contains(requirement.Value, StringComparer.OrdinalIgnoreCase));
+        => stack.InstallGates.Any(report => report.GetValues(requirement.Gate).Contains(requirement.Value, StringComparer.OrdinalIgnoreCase));
 }
 
 static class SkillOrdering

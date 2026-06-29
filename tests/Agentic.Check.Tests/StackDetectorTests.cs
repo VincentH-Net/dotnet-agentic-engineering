@@ -16,6 +16,27 @@ public sealed class StackDetectorTests
     }
 
     [Fact]
+    public void DetectsCliGateFromExeOutputType()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write(
+            "Tool.csproj",
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <OutputType>Exe</OutputType>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+
+        var result = StackDetector.Detect(tempDirectory.Path);
+
+        var cliGate = Assert.Single(result.InstallGates, gate => gate.Technology == TechnologyNames.Dotnet);
+        Assert.Contains("cli", cliGate.GetValues("cli"));
+    }
+
+    [Fact]
     public void DetectsOrleansPackageReferences()
     {
         using TempDirectory tempDirectory = new();

@@ -9,7 +9,7 @@ static class StackDetector
     internal static StackDetectionResult Detect(string repoRoot)
     {
         List<string> warnings = [];
-        List<UnoGateReport> unoGateReports = [];
+        List<InstallGateReport> installGateReports = [];
         HashSet<string> technologies = new(StringComparer.OrdinalIgnoreCase)
         {
             TechnologyNames.Foundation
@@ -22,13 +22,14 @@ static class StackDetector
         if (projectFiles.Count > 0)
         {
             _ = technologies.Add(TechnologyNames.Dotnet);
+            installGateReports.AddRange(DetectDotnetGates(projectFiles, warnings));
         }
 
         bool unoDetected = projectFiles.Concat(propsTargetsFiles).Any(file => FileContains(file, "Uno.Sdk"));
         if (unoDetected)
         {
             _ = technologies.Add(TechnologyNames.Uno);
-            unoGateReports.AddRange(DetectUnoGates(projectFiles, warnings));
+            installGateReports.AddRange(DetectUnoGates(projectFiles, warnings));
         }
 
         if (projectFiles.Any(HasOrleansReference))
@@ -41,13 +42,36 @@ static class StackDetector
             _ = technologies.Add(TechnologyNames.AspNetCore);
         }
 
-        AddMultiValueWarnings(unoGateReports, warnings);
-        return new StackDetectionResult(technologies, unoGateReports, warnings);
+        AddMultiValueWarnings([.. installGateReports.OfType<UnoGateReport>()], warnings);
+        return new StackDetectionResult(technologies, installGateReports, warnings);
     }
 
-    static List<UnoGateReport> DetectUnoGates(IReadOnlyList<string> projectFiles, List<string> warnings)
+    static List<InstallGateReport> DetectDotnetGates(IReadOnlyList<string> projectFiles, List<string> warnings)
     {
-        List<UnoGateReport> reports = [];
+        List<InstallGateReport> reports = [];
+        foreach (string projectFile in projectFiles)
+        {
+            var document = TryParseProject(projectFile, File.ReadAllText(projectFile), warnings);
+            if (document is null || !IsCliProject(document))
+            {
+                continue;
+            }
+
+            reports.Add(new InstallGateReport(
+                TechnologyNames.Dotnet,
+                ToRelativePath(projectFile),
+                new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["cli"] = ["cli"]
+                }));
+        }
+
+        return reports;
+    }
+
+    static List<InstallGateReport> DetectUnoGates(IReadOnlyList<string> projectFiles, List<string> warnings)
+    {
+        List<InstallGateReport> reports = [];
         foreach (string projectFile in projectFiles)
         {
             string content = File.ReadAllText(projectFile);
@@ -241,6 +265,11 @@ static class StackDetector
                 .Any(sdk => sdk.Equals("Microsoft.NET.Sdk.Web", StringComparison.OrdinalIgnoreCase));
     }
 
+    static bool IsCliProject(XDocument document)
+        => document.Descendants()
+            .Where(element => element.Name.LocalName.Equals("OutputType", StringComparison.OrdinalIgnoreCase))
+            .Any(element => element.Value.Trim().Equals("Exe", StringComparison.OrdinalIgnoreCase));
+
     static bool ContainsSdk(string? value, string sdk)
         => value?.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Any(part => part.Equals(sdk, StringComparison.OrdinalIgnoreCase)
@@ -346,24 +375,34 @@ static class StackDetector
 
 sealed record StackDetectionResult(
     IReadOnlySet<string> Technologies,
-    IReadOnlyList<UnoGateReport> UnoGates,
-    IReadOnlyList<string> Warnings);
+    IReadOnlyList<InstallGateReport> InstallGates,
+    IReadOnlyList<string> Warnings)
+{
+    public IReadOnlyList<UnoGateReport> UnoGates { get; } = [.. InstallGates.OfType<UnoGateReport>()];
+}
+
+record InstallGateReport(
+    string Technology,
+    string ProjectPath,
+    IReadOnlyDictionary<string, IReadOnlyList<string>> Values)
+{
+    public IReadOnlyList<string> GetValues(string gate)
+        => Values.TryGetValue(gate, out var values) ? values : [];
+}
 
 sealed record UnoGateReport(
     string ProjectPath,
     IReadOnlyList<string> Presentation,
     IReadOnlyList<string> Markup,
-    IReadOnlyList<string> Theme)
-{
-    public IReadOnlyList<string> GetValues(string gate)
-        => gate switch
+    IReadOnlyList<string> Theme) : InstallGateReport(
+        TechnologyNames.Uno,
+        ProjectPath,
+        new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
         {
-            "presentation" => Presentation,
-            "markup" => Markup,
-            "theme" => Theme,
-            _ => []
-        };
-}
+            ["presentation"] = Presentation,
+            ["markup"] = Markup,
+            ["theme"] = Theme
+        });
 
 static class TechnologyNames
 {

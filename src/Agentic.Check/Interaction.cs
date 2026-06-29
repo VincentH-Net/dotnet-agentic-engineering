@@ -57,7 +57,7 @@ interface IReporter
     void Summary(
         string targetDirectory,
         IReadOnlySet<string> technologies,
-        IReadOnlyList<UnoGateReport> unoGates,
+        IReadOnlyList<InstallGateReport> installGates,
         string targetAgents,
         IReadOnlyList<string> skillsDirectories,
         DirectiveSummary directiveSummary,
@@ -125,7 +125,7 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
     public void Summary(
         string targetDirectory,
         IReadOnlySet<string> technologies,
-        IReadOnlyList<UnoGateReport> unoGates,
+        IReadOnlyList<InstallGateReport> installGates,
         string targetAgents,
         IReadOnlyList<string> skillsDirectories,
         DirectiveSummary directiveSummary,
@@ -135,7 +135,7 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
         => console.Write(CreateSummaryTable(
             targetDirectory,
             technologies,
-            unoGates,
+            installGates,
             targetAgents,
             skillsDirectories,
             directiveSummary,
@@ -146,7 +146,7 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
     internal static Table CreateSummaryTable(
         string targetDirectory,
         IReadOnlySet<string> technologies,
-        IReadOnlyList<UnoGateReport> unoGates,
+        IReadOnlyList<InstallGateReport> installGates,
         string targetAgents,
         IReadOnlyList<string> skillsDirectories,
         DirectiveSummary directiveSummary,
@@ -163,7 +163,7 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
         _ = table.AddColumn(new TableColumn(new Markup(SummaryHeaderMarkup(SummaryLabelColumnHeader, ToolHeader.CheckColor))));
         _ = table.AddColumn(new TableColumn(new Markup(SummaryHeaderMarkup(SummaryValueColumnHeader, ToolHeader.AgenticColor))));
         _ = table.AddRow("Target directory", Markup.Escape(targetDirectory));
-        _ = table.AddRow("Stack", Markup.Escape(FormatStack(technologies, unoGates)));
+        _ = table.AddRow("Stack", Markup.Escape(FormatStack(technologies, installGates)));
         _ = table.AddRow("Target agents", Markup.Escape(targetAgents));
         _ = table.AddRow("Skills directories", Markup.Escape(FormatSkillsDirectories(targetDirectory, skillsDirectories)));
         _ = table.AddRow("Create AGENTS.md", directiveSummary.CreateAgentsFile ? "yes" : "no");
@@ -207,15 +207,15 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
     internal static string FormatSkillSummary(int recommendedCount, int missingCount, int outdatedCount)
         => FormatRecommendationStatus(recommendedCount, missingCount, outdatedCount);
 
-    internal static string FormatStack(IReadOnlySet<string> technologies, IReadOnlyList<UnoGateReport> unoGates)
+    internal static string FormatStack(IReadOnlySet<string> technologies, IReadOnlyList<InstallGateReport> installGates)
     {
         List<string> lines = [];
         if (technologies.Contains(TechnologyNames.Uno, StringComparer.OrdinalIgnoreCase))
         {
             lines.Add("Uno Platform");
-            lines.Add($"  UI update pattern: {FormatUnoGateValues(unoGates, "presentation")}");
-            lines.Add($"  Markup type: {FormatUnoGateValues(unoGates, "markup")}");
-            lines.Add($"  Design system: {FormatUnoGateValues(unoGates, "theme")}");
+            lines.Add($"  UI update pattern: {FormatGateValues(installGates, TechnologyNames.Uno, "presentation")}");
+            lines.Add($"  Markup type: {FormatGateValues(installGates, TechnologyNames.Uno, "markup")}");
+            lines.Add($"  Design system: {FormatGateValues(installGates, TechnologyNames.Uno, "theme")}");
         }
 
         if (technologies.Contains(TechnologyNames.Orleans, StringComparer.OrdinalIgnoreCase))
@@ -231,6 +231,10 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
         if (technologies.Contains(TechnologyNames.Dotnet, StringComparer.OrdinalIgnoreCase))
         {
             lines.Add(".NET");
+            if (HasGate(installGates, TechnologyNames.Dotnet, "cli"))
+            {
+                lines.Add("  CLI");
+            }
         }
 
         if (technologies.Contains(TechnologyNames.Foundation, StringComparer.OrdinalIgnoreCase))
@@ -241,14 +245,20 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
         return string.Join(Environment.NewLine, lines);
     }
 
-    static string FormatUnoGateValues(IReadOnlyList<UnoGateReport> unoGates, string gate)
+    static string FormatGateValues(IReadOnlyList<InstallGateReport> installGates, string technology, string gate)
     {
-        string[] values = [.. unoGates
+        string[] values = [.. installGates
+            .Where(report => report.Technology.Equals(technology, StringComparison.OrdinalIgnoreCase))
             .SelectMany(report => report.GetValues(gate))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Order(StringComparer.OrdinalIgnoreCase)];
         return values.Length == 0 ? "none" : string.Join(", ", values);
     }
+
+    static bool HasGate(IReadOnlyList<InstallGateReport> installGates, string technology, string gate)
+        => installGates
+            .Where(report => report.Technology.Equals(technology, StringComparison.OrdinalIgnoreCase))
+            .Any(report => report.GetValues(gate).Count > 0);
 
     internal static string FormatRecommendationStatus(int recommendedCount, int missingCount, int outdatedCount)
     {
@@ -323,7 +333,7 @@ sealed class NullReporter : IReporter
     public void Summary(
         string repoRoot,
         IReadOnlySet<string> technologies,
-        IReadOnlyList<UnoGateReport> unoGates,
+        IReadOnlyList<InstallGateReport> installGates,
         string targetAgents,
         IReadOnlyList<string> skillsDirectories,
         DirectiveSummary directiveSummary,
