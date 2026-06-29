@@ -9,10 +9,8 @@ public sealed class WorkflowTests
         tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
         tempDirectory.Write("App.csproj", "<Project />");
         FakeCommandRunner commandRunner = new();
-        commandRunner.Enqueue(new CommandResult(0, "git version 2.50.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
-        commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "Would update dotnet-livecharts2 (VincentH-Net/dotnet-agentic-engineering)", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "Would update dotnet-modern-csharp-editorconfig (VincentH-Net/dotnet-agentic-engineering)", string.Empty));
         RecordingReporter reporter = new();
@@ -60,9 +58,9 @@ public sealed class WorkflowTests
         AssertExactlyOneBlankLineBefore(reporter.Infos, "Would install directives into AGENTS.md:");
         Assert.Contains("  dotnet-cli-run", reporter.Infos);
         Assert.Contains("  foundation-prompt-log", reporter.Infos);
-        Assert.Contains("Would install skills into repo skills directories:", reporter.BoldMessages);
-        Assert.Contains(("Would install skills into repo skills directories:", ToolHeader.CheckColor), reporter.ColoredBoldMessages);
-        AssertExactlyOneBlankLineBefore(reporter.Infos, "Would install skills into repo skills directories:");
+        Assert.Contains("Would install skills into skills directories:", reporter.BoldMessages);
+        Assert.Contains(("Would install skills into skills directories:", ToolHeader.CheckColor), reporter.ColoredBoldMessages);
+        AssertExactlyOneBlankLineBefore(reporter.Infos, "Would install skills into skills directories:");
         int wouldInstallBlankLineIndex = reporter.Infos.IndexOf(string.Empty);
         Assert.True(wouldInstallBlankLineIndex >= 0);
         Assert.Contains("  VincentH-Net/dotnet-agentic-engineering repo:", reporter.BoldMessages);
@@ -78,17 +76,17 @@ public sealed class WorkflowTests
         Assert.Contains("  dotnet/skills repo:", reporter.Infos);
         Assert.Contains("    dotnet-test:", reporter.Infos);
         Assert.Contains("      run-tests", reporter.Infos);
-        Assert.Contains("Would update skills in repo skills directories:", reporter.BoldMessages);
-        Assert.Contains(("Would update skills in repo skills directories:", ToolHeader.CheckColor), reporter.ColoredBoldMessages);
-        AssertExactlyOneBlankLineBefore(reporter.Infos, "Would update skills in repo skills directories:");
+        Assert.Contains("Would update skills in skills directories:", reporter.BoldMessages);
+        Assert.Contains(("Would update skills in skills directories:", ToolHeader.CheckColor), reporter.ColoredBoldMessages);
+        AssertExactlyOneBlankLineBefore(reporter.Infos, "Would update skills in skills directories:");
         Assert.Contains("      dotnet-livecharts2", reporter.Infos);
         Assert.Contains("      dotnet-modern-csharp-editorconfig", reporter.Infos);
-        Assert.DoesNotContain(reporter.Infos, message => message.Contains("Would update repo-local skills", StringComparison.Ordinal));
+        Assert.DoesNotContain(reporter.Infos, message => message.Contains("Would update target-local skills", StringComparison.Ordinal));
         Assert.Contains("Directive cache duration: 30 minute(s)", reporter.Infos);
         Assert.DoesNotContain(reporter.Infos, IsLegacyDirectiveStatusMessage);
         Assert.Equal("claude-code,codex", reporter.TargetAgents);
-        Assert.Contains("Scanning repository", reporter.ProgressDescriptions);
-        Assert.Equal(3, reporter.ProgressTicksByDescription["Scanning repository"]);
+        Assert.Contains("Scanning target directory", reporter.ProgressDescriptions);
+        Assert.Equal(3, reporter.ProgressTicksByDescription["Scanning target directory"]);
     }
 
     [Fact]
@@ -98,11 +96,9 @@ public sealed class WorkflowTests
         tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
         tempDirectory.Write("App.csproj", "<Project />");
         FakeCommandRunner commandRunner = new();
-        commandRunner.Enqueue(new CommandResult(0, "git version 2.50.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(1, string.Empty, "unknown command \"skill\""));
         commandRunner.Enqueue(new CommandResult(1, string.Empty, "unknown command \"skills\""));
-        commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
         commandRunner.Enqueue(new CommandResult(1, string.Empty, "unknown command \"skill\""));
         commandRunner.Enqueue(new CommandResult(1, string.Empty, "unknown command \"skill\""));
         RecordingReporter reporter = new();
@@ -115,8 +111,8 @@ public sealed class WorkflowTests
         Assert.Equal(0, result.ExitCode);
         Assert.Contains(result.Report.Prerequisites, check => check.Name == "gh skill" && !check.Success);
         Assert.DoesNotContain(reporter.Errors, error => error.Contains("Required tools are missing", StringComparison.Ordinal));
-        Assert.Contains("Would install skills into repo skills directories:", reporter.BoldMessages);
-        Assert.Contains(reporter.Warnings, warning => warning.Contains("Could not check repo-local skills for updates", StringComparison.Ordinal));
+        Assert.Contains("Would install skills into skills directories:", reporter.BoldMessages);
+        Assert.Contains(reporter.Warnings, warning => warning.Contains("Could not check target-local skills for updates", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -133,10 +129,8 @@ public sealed class WorkflowTests
             <!-- dotnet-agentic-engineering:foundation-prompt-log:end -->
             """);
         FakeCommandRunner commandRunner = new();
-        commandRunner.Enqueue(new CommandResult(0, "git version 2.50.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
-        commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "No updates available.", string.Empty));
         RecordingReporter reporter = new();
         CheckWorkflow workflow = new(
@@ -166,10 +160,8 @@ public sealed class WorkflowTests
         tempDirectory.Write(".agents/skills/ensure-directives/SKILL.md", "# Present");
         tempDirectory.Write(".agents/skills/dotnet-livecharts2/SKILL.md", "# Present");
         FakeCommandRunner commandRunner = new();
-        commandRunner.Enqueue(new CommandResult(0, "git version 2.50.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
-        commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "no updates", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "no updates", string.Empty));
         commandRunner.Enqueue(new CommandResult(1, string.Empty, "skill not found"));
@@ -198,10 +190,8 @@ public sealed class WorkflowTests
         tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
         tempDirectory.Write("App.csproj", "<Project />");
         FakeCommandRunner commandRunner = new();
-        commandRunner.Enqueue(new CommandResult(0, "git version 2.50.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
-        commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "agents dry-run", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "claude dry-run", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "trae dry-run", string.Empty));
@@ -316,10 +306,8 @@ public sealed class WorkflowTests
         tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
         tempDirectory.Write("App.csproj", "<Project />");
         FakeCommandRunner commandRunner = new();
-        commandRunner.Enqueue(new CommandResult(0, "git version 2.50.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
-        commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "agents dry-run", string.Empty));
         CheckWorkflow workflow = new(commandRunner, new FakePrompts(), new NullReporter(), new FakeDirectiveSource());
 
@@ -338,10 +326,8 @@ public sealed class WorkflowTests
         tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
         tempDirectory.Write("App.csproj", "<Project />");
         FakeCommandRunner commandRunner = new();
-        commandRunner.Enqueue(new CommandResult(0, "git version 2.50.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
-        commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
         CheckWorkflow workflow = new(commandRunner, new FakePrompts(), new NullReporter(), new FakeDirectiveSource());
 
         var result = await workflow.RunAsync(
@@ -358,10 +344,8 @@ public sealed class WorkflowTests
         tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
         tempDirectory.Write("App.csproj", "<Project />");
         FakeCommandRunner commandRunner = new();
-        commandRunner.Enqueue(new CommandResult(0, "git version 2.50.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
-        commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "agents dry-run", string.Empty));
         CheckWorkflow workflow = new(commandRunner, new FakePrompts(), new NullReporter(), new FakeDirectiveSource());
 
@@ -380,10 +364,8 @@ public sealed class WorkflowTests
         using TempDirectory tempDirectory = new();
         tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
         FakeCommandRunner commandRunner = new();
-        commandRunner.Enqueue(new CommandResult(0, "git version 2.50.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
-        commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "no updates", string.Empty));
         CheckWorkflow workflow = new(
             commandRunner,
@@ -419,10 +401,8 @@ public sealed class WorkflowTests
         tempDirectory.Write(".claude/skills/dotnet-livecharts2/SKILL.md", "# Present");
         tempDirectory.Write(".claude/skills/dotnet-modern-csharp-editorconfig/SKILL.md", "# Present");
         FakeCommandRunner commandRunner = new();
-        commandRunner.Enqueue(new CommandResult(0, "git version 2.50.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
-        commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "No updates available.", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "No updates available.", string.Empty));
         RecordingReporter reporter = new();
@@ -468,10 +448,8 @@ public sealed class WorkflowTests
         using TempDirectory tempDirectory = new();
         tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
         FakeCommandRunner commandRunner = new();
-        commandRunner.Enqueue(new CommandResult(0, "git version 2.50.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
-        commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
         commandRunner.Enqueue(new CommandResult(
             0,
             """
@@ -524,8 +502,8 @@ public sealed class WorkflowTests
         Assert.DoesNotContain(reporter.Infos, message => message.Contains(claudeSkillsDirectory, StringComparison.Ordinal));
         Assert.DoesNotContain(reporter.Infos, message => message.Contains("1 update(s) available", StringComparison.Ordinal));
         Assert.Empty(reporter.Warnings);
-        Assert.Contains("Scanning repository", reporter.ProgressDescriptions);
-        Assert.Equal(3, reporter.ProgressTicksByDescription["Scanning repository"]);
+        Assert.Contains("Scanning target directory", reporter.ProgressDescriptions);
+        Assert.Equal(3, reporter.ProgressTicksByDescription["Scanning target directory"]);
         Assert.Contains("Updating skills", reporter.ProgressDescriptions);
         Assert.Equal(2, reporter.ProgressTicksByDescription["Updating skills"]);
         Assert.Contains("Updated 1 skill(s) successfully.", reporter.Successes);
@@ -542,10 +520,8 @@ public sealed class WorkflowTests
         tempDirectory.Write(".claude/skills/dotnet-livecharts2/SKILL.md", "# Present");
         tempDirectory.Write(".claude/skills/dotnet-modern-csharp-editorconfig/SKILL.md", "# Present");
         FakeCommandRunner commandRunner = new();
-        commandRunner.Enqueue(new CommandResult(0, "git version 2.50.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
-        commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
         commandRunner.Enqueue(new CommandResult(
             0,
             """
@@ -580,10 +556,8 @@ public sealed class WorkflowTests
         using TempDirectory tempDirectory = new();
         tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
         FakeCommandRunner commandRunner = new();
-        commandRunner.Enqueue(new CommandResult(0, "git version 2.50.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
-        commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "No updates available.", string.Empty));
         FakePrompts prompts = new() { ConfirmResult = true };
         CheckWorkflow workflow = new(commandRunner, prompts, new NullReporter(), new FakeDirectiveSource());
@@ -600,7 +574,7 @@ public sealed class WorkflowTests
             "--dir",
             Path.Combine(tempDirectory.Path, ".agents", "skills"),
             "--all"]));
-        Assert.Contains(result.Report.Actions, action => action.Equals("No repo-local skill updates found.", StringComparison.Ordinal));
+        Assert.Contains(result.Report.Actions, action => action.Equals("No target-local skill updates found.", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -610,10 +584,8 @@ public sealed class WorkflowTests
         tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
         tempDirectory.Write("App.csproj", "<Project />");
         FakeCommandRunner commandRunner = new();
-        commandRunner.Enqueue(new CommandResult(0, "git version 2.50.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
-        commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "no updates", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "no updates", string.Empty));
         FakePrompts prompts = new()
@@ -653,10 +625,8 @@ public sealed class WorkflowTests
                 tempDirectory.Write(Path.Combine(".agents", "skills", localFolder, "SKILL.md"), "# Installed");
             }
         };
-        commandRunner.Enqueue(new CommandResult(0, "git version 2.50.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
-        commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "no updates", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "no updates", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "installed filter-syntax", string.Empty));
@@ -718,10 +688,8 @@ public sealed class WorkflowTests
                 }
             }
         };
-        commandRunner.Enqueue(new CommandResult(0, "git version 2.50.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
-        commandRunner.Enqueue(new CommandResult(0, tempDirectory.Path, string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "no updates", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "no updates", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "installed", string.Empty));

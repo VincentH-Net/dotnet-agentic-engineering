@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Text.Json;
 using Hex1b;
 using Hex1b.Automation;
@@ -112,14 +111,14 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
         Assert.Contains("Status", result.Screen, StringComparison.Ordinal);
         Assert.Contains("Target agents", result.Screen, StringComparison.Ordinal);
         Assert.Contains("claude-code,codex", result.Screen, StringComparison.Ordinal);
-        Assert.Contains("Repo skills directories", result.Screen, StringComparison.Ordinal);
+        Assert.Contains("Skills directories", result.Screen, StringComparison.Ordinal);
         Assert.Contains(".claude/skills", result.Screen, StringComparison.Ordinal);
         Assert.Contains(".agents/skills", result.Screen, StringComparison.Ordinal);
         Assert.Contains("Recommended directives", result.Screen, StringComparison.Ordinal);
         Assert.Contains("Recommended skills", result.Screen, StringComparison.Ordinal);
         Assert.Contains("Would install directives into AGENTS.md:", result.Screen, StringComparison.Ordinal);
-        Assert.Contains("Would install skills into repo skills directories:", result.Screen, StringComparison.Ordinal);
-        Assert.Contains("Would update skills in repo skills directories:", result.Screen, StringComparison.Ordinal);
+        Assert.Contains("Would install skills into skills directories:", result.Screen, StringComparison.Ordinal);
+        Assert.Contains("Would update skills in skills directories:", result.Screen, StringComparison.Ordinal);
         Assert.Contains("VincentH-Net/dotnet-agentic-engineering repo:", result.Screen, StringComparison.Ordinal);
         Assert.Contains("dotnet:", result.Screen, StringComparison.Ordinal);
         Assert.Contains("dotnet-livecharts2", result.Screen, StringComparison.Ordinal);
@@ -469,8 +468,8 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
         var dryRun = await RunCommandAsync(dryRunWorkspace, $"--dry-run {Quote(dryRunWorkspace.RepoPath)}").ConfigureAwait(true);
 
         Assert.Equal(0, dryRun.ExitCode);
-        Assert.Contains("Could not check repo-local skills for updates", dryRun.Screen, StringComparison.Ordinal);
-        Assert.Contains("Would install skills into repo skills directories:", dryRun.Screen, StringComparison.Ordinal);
+        Assert.Contains("Could not check target-local skills for updates", dryRun.Screen, StringComparison.Ordinal);
+        Assert.Contains("Would install skills into skills directories:", dryRun.Screen, StringComparison.Ordinal);
         AssertRecordingWasWritten(dryRunWorkspace);
 
         using var normalWorkspace = await TestWorkspace.CreateAsync($"{nameof(GhSkillHelpFailureIsWarningInDryRunButFatalInNormalMode)}Normal").ConfigureAwait(true);
@@ -713,7 +712,6 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
                     """);
             }
 
-            await RunProcessAsync("git", ["init"], workspace.RepoPath).ConfigureAwait(true);
             await WriteFakeGhAsync(workspace).ConfigureAwait(true);
             await WriteFakeAgentProbeCommandsAsync(workspace).ConfigureAwait(true);
             return workspace;
@@ -946,34 +944,6 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
                     | UnixFileMode.OtherRead
                     | UnixFileMode.OtherExecute);
             }
-        }
-
-        static async Task RunProcessAsync(string fileName, IReadOnlyList<string> arguments, string workingDirectory)
-        {
-            ProcessStartInfo startInfo = new()
-            {
-                FileName = fileName,
-                WorkingDirectory = workingDirectory,
-                RedirectStandardError = true,
-                RedirectStandardOutput = true
-            };
-            foreach (string argument in arguments)
-            {
-                startInfo.ArgumentList.Add(argument);
-            }
-
-            using Process process = new()
-            {
-                StartInfo = startInfo
-            };
-
-            _ = process.Start();
-            string standardOutput = await process.StandardOutput.ReadToEndAsync().ConfigureAwait(true);
-            string standardError = await process.StandardError.ReadToEndAsync().ConfigureAwait(true);
-            await process.WaitForExitAsync().ConfigureAwait(true);
-            Assert.True(
-                process.ExitCode == 0,
-                $"{fileName} {string.Join(' ', arguments)} failed with exit code {process.ExitCode}.{Environment.NewLine}{standardOutput}{standardError}");
         }
     }
 }

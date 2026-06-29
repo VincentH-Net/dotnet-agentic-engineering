@@ -30,12 +30,11 @@ Uno Platform skills are selected depending on detected:
 ## Prerequisites
 
 - .NET 10 SDK or later ([install](https://dotnet.microsoft.com/download))
-- `git` CLI ([install](https://git-scm.com/install/))
 - `gh` CLI ([install](https://cli.github.com/))
 
 ## Usage
 
-In a repo folder: 
+In a target folder: 
 ```bash
 dnx agentic.check -- -h
 ```

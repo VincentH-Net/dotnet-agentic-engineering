@@ -65,7 +65,7 @@ static class AgenticCheckCli
         };
         Option<DirectoryInfo?> skillsDirectoryOption = new("--skills-dir")
         {
-            Description = "Repo-local skills directory. Overrides directories implied by --agents."
+            Description = "Target-local skills directory. Overrides directories implied by --agents."
         };
         Option<string?> agentsOption = new("--agents")
         {

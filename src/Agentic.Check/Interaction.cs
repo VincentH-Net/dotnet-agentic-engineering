@@ -55,7 +55,7 @@ interface IReporter
     void Error(string message);
 
     void Summary(
-        string repoRoot,
+        string targetDirectory,
         IReadOnlySet<string> technologies,
         IReadOnlyList<UnoGateReport> unoGates,
         string targetAgents,
@@ -123,7 +123,7 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
         => console.MarkupLineInterpolated($"[red]{message}[/]");
 
     public void Summary(
-        string repoRoot,
+        string targetDirectory,
         IReadOnlySet<string> technologies,
         IReadOnlyList<UnoGateReport> unoGates,
         string targetAgents,
@@ -133,7 +133,7 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
         int missingCount,
         int outdatedCount)
         => console.Write(CreateSummaryTable(
-            repoRoot,
+            targetDirectory,
             technologies,
             unoGates,
             targetAgents,
@@ -144,7 +144,7 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
             outdatedCount));
 
     internal static Table CreateSummaryTable(
-        string repoRoot,
+        string targetDirectory,
         IReadOnlySet<string> technologies,
         IReadOnlyList<UnoGateReport> unoGates,
         string targetAgents,
@@ -162,10 +162,10 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
         };
         _ = table.AddColumn(new TableColumn(new Markup(SummaryHeaderMarkup(SummaryLabelColumnHeader, ToolHeader.CheckColor))));
         _ = table.AddColumn(new TableColumn(new Markup(SummaryHeaderMarkup(SummaryValueColumnHeader, ToolHeader.AgenticColor))));
-        _ = table.AddRow("Repository", Markup.Escape(repoRoot));
+        _ = table.AddRow("Target directory", Markup.Escape(targetDirectory));
         _ = table.AddRow("Stack", Markup.Escape(FormatStack(technologies, unoGates)));
         _ = table.AddRow("Target agents", Markup.Escape(targetAgents));
-        _ = table.AddRow("Repo skills directories", Markup.Escape(FormatSkillsDirectories(repoRoot, skillsDirectories)));
+        _ = table.AddRow("Skills directories", Markup.Escape(FormatSkillsDirectories(targetDirectory, skillsDirectories)));
         _ = table.AddRow("Create AGENTS.md", directiveSummary.CreateAgentsFile ? "yes" : "no");
         _ = table.AddRow("Create CLAUDE.md", directiveSummary.CreateClaudeFile ? "yes" : "no");
         _ = table.AddRow("Recommended directives", Markup.Escape(FormatDirectiveSummary(directiveSummary)));

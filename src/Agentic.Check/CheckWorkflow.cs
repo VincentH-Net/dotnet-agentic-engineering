@@ -77,23 +77,13 @@ sealed class CheckWorkflow(
 
         if (!prerequisites.IsSuccessful(options.DryRun))
         {
-            reporter.Error("Required tools are missing or too old. Update git/GitHub CLI and confirm `gh skill --help` or `gh skills --help` works.");
+            reporter.Error("Required tools are missing or too old. Update GitHub CLI and confirm `gh skill --help` or `gh skills --help` works.");
             await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
             return new CheckRunResult(2, report);
         }
 
-        var repoResolution = await new RepoResolver(commandRunner, prompts)
-            .ResolveAsync(report.TargetDirectory, options.DryRun, cancellationToken)
-            .ConfigureAwait(false);
-
-        report.RepoRoot = repoResolution.RepoRoot;
-        report.Actions.AddRange(repoResolution.Actions);
-
-        if (!repoResolution.CanProceed)
-        {
-            await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
-            return new CheckRunResult(2, report);
-        }
+        string targetDirectory = report.TargetDirectory;
+        report.RepoRoot = targetDirectory;
 
         IReadOnlyList<string> skillsDirectories;
         bool manageClaudeFile;
@@ -110,7 +100,7 @@ sealed class CheckWorkflow(
             targetAgents = !string.IsNullOrWhiteSpace(options.Agents)
                 ? options.Agents
                 : AgentSkillRegistry.DefaultAgents;
-            var directoryResolution = AgentSkillRegistry.ResolveProjectDirectories(options.Agents, repoResolution.RepoRoot);
+            var directoryResolution = AgentSkillRegistry.ResolveProjectDirectories(options.Agents, targetDirectory);
             if (!directoryResolution.Success)
             {
                 reporter.Error(directoryResolution.Error ?? "Could not resolve agent skill directories.");
@@ -137,11 +127,11 @@ sealed class CheckWorkflow(
         report.SkillsDirectories.AddRange(skillsDirectories);
 
         await reporter.RunProgressAsync(
-            "Scanning repository",
+            "Scanning target directory",
             3,
             async advance =>
             {
-                var detectedStack = StackDetector.Detect(repoResolution.RepoRoot);
+                var detectedStack = StackDetector.Detect(targetDirectory);
                 stack = detectedStack;
                 report.Technologies.AddRange(detectedStack.Technologies.Order(StringComparer.OrdinalIgnoreCase));
                 report.UnoGates.AddRange(detectedStack.UnoGates);
@@ -149,7 +139,7 @@ sealed class CheckWorkflow(
                 advance();
 
                 directivePlan = await directiveInstaller
-                    .PlanAsync(repoResolution.RepoRoot, detectedStack, manageClaudeFile, cancellationToken)
+                    .PlanAsync(targetDirectory, detectedStack, manageClaudeFile, cancellationToken)
                     .ConfigureAwait(false);
                 advance();
 
@@ -159,15 +149,15 @@ sealed class CheckWorkflow(
                 missing = SkillInstaller.FindMissing(recommended, skillsDirectories);
                 report.MissingSkills.AddRange(missing.Select(SkillReportItem.FromManifestEntry));
 
-                await RunSkillUpdateDryRunAsync(skillsDirectories, repoResolution.RepoRoot, report, cancellationToken).ConfigureAwait(false);
+                await RunSkillUpdateDryRunAsync(skillsDirectories, targetDirectory, report, cancellationToken).ConfigureAwait(false);
                 skillUpdates = ExtractDistinctSkillUpdates(report.SkillUpdateDryRuns, recommended);
                 report.OutdatedSkills = skillUpdates.Count;
                 advance();
             },
             cancellationToken).ConfigureAwait(false);
 
-        stack = stack ?? throw new InvalidOperationException("Repository scan did not detect a stack.");
-        directivePlan = directivePlan ?? throw new InvalidOperationException("Repository scan did not plan directives.");
+        stack = stack ?? throw new InvalidOperationException("Target directory scan did not detect a stack.");
+        directivePlan = directivePlan ?? throw new InvalidOperationException("Target directory scan did not plan directives.");
 
         report.AgentsFile = directivePlan.AgentsFile;
         report.ClaudeFile = directivePlan.ClaudeFile;
@@ -186,7 +176,7 @@ sealed class CheckWorkflow(
             directivePlan.OutdatedCount);
         report.DirectiveSummary = directiveSummary;
 
-        reporter.Summary(repoResolution.RepoRoot, stack.Technologies, stack.UnoGates, targetAgents, skillsDirectories, directiveSummary, recommended.Count, missing.Count, report.OutdatedSkills);
+        reporter.Summary(targetDirectory, stack.Technologies, stack.UnoGates, targetAgents, skillsDirectories, directiveSummary, recommended.Count, missing.Count, report.OutdatedSkills);
         reporter.Info($"Directive cache duration: {directiveCacheSettings.DurationDescription}");
 
         foreach (string warning in report.Warnings)
@@ -259,7 +249,7 @@ sealed class CheckWorkflow(
                 async advance =>
                 {
                     var installResults = await skillInstaller
-                        .InstallAsync(firstDirectoryMissingSkills, firstSkillsDirectory, repoResolution.RepoRoot, cancellationToken, advance)
+                        .InstallAsync(firstDirectoryMissingSkills, firstSkillsDirectory, targetDirectory, cancellationToken, advance)
                         .ConfigureAwait(false);
                     report.InstallResults.AddRange(installResults);
 
@@ -291,7 +281,7 @@ sealed class CheckWorkflow(
             return firstDirectoryMissingSkills.Count + copyOperations;
         }
 
-        await RunSkillUpdateAsync(options, skillsDirectories, repoResolution.RepoRoot, report, skillUpdates, cancellationToken).ConfigureAwait(false);
+        await RunSkillUpdateAsync(options, skillsDirectories, targetDirectory, report, skillUpdates, cancellationToken).ConfigureAwait(false);
 
         int exitCode = report.InstallResults.Any(result => !result.Success) || report.SkillCopyResults.Any(result => !result.Success) ? 1 : 0;
         await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
@@ -370,7 +360,7 @@ sealed class CheckWorkflow(
 
         if (skillUpdates.Count == 0)
         {
-            report.Actions.Add("No repo-local skill updates found.");
+            report.Actions.Add("No target-local skill updates found.");
             return;
         }
 
@@ -381,7 +371,7 @@ sealed class CheckWorkflow(
 
         if (!update)
         {
-            report.Actions.Add("Skipped repo-local skill updates.");
+            report.Actions.Add("Skipped target-local skill updates.");
             return;
         }
 
@@ -446,7 +436,7 @@ sealed class CheckWorkflow(
 
             if (!dryRunResult.Success)
             {
-                reporter.Warning($"Could not check repo-local skills for updates in {skillsDirectory}.");
+                reporter.Warning($"Could not check target-local skills for updates in {skillsDirectory}.");
             }
         }
     }
@@ -486,7 +476,7 @@ sealed class CheckWorkflow(
             return;
         }
 
-        ReportSectionHeader("Would install skills into repo skills directories:");
+        ReportSectionHeader("Would install skills into skills directories:");
         ReportSkillGroups(selectedSkills, skill => $"      {skill.LocalFolder}", ItemStyle.Plain);
     }
 
@@ -500,7 +490,7 @@ sealed class CheckWorkflow(
             return;
         }
 
-        ReportSectionHeader("Would update skills in repo skills directories:");
+        ReportSectionHeader("Would update skills in skills directories:");
         ReportSkillUpdateGroups(skillUpdates, recommendedSkills);
     }
 

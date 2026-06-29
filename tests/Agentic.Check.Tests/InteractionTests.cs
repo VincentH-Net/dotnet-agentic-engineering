@@ -219,7 +219,7 @@ public sealed class InteractionTests
             SpectreReporter.FormatRecommendationStatus(2, 2, 0));
 
     [Fact]
-    public void SkillsDirectoriesAreRenderedRelativeToRepositoryRoot()
+    public void SkillsDirectoriesAreRenderedRelativeToTargetDirectory()
     {
         string repoRoot = Path.Combine(Path.GetTempPath(), "repo");
         string agentsSkills = Path.Combine(repoRoot, ".agents", "skills");

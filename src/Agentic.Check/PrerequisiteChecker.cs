@@ -4,15 +4,11 @@ namespace Agentic.Check;
 
 sealed partial class PrerequisiteChecker(ICommandRunner commandRunner)
 {
-    static readonly Version MinimumGitVersion = new(2, 39, 0);
     static readonly Version MinimumGhVersion = new(2, 93, 0);
 
     public async Task<PrerequisiteResult> CheckAsync(string workingDirectory, CancellationToken cancellationToken)
     {
         List<PrerequisiteCheck> checks = [];
-
-        var gitVersion = await commandRunner.RunAsync("git", ["--version"], workingDirectory, cancellationToken).ConfigureAwait(false);
-        checks.Add(CheckVersion("git", gitVersion, MinimumGitVersion));
 
         var ghVersion = await commandRunner.RunAsync("gh", ["--version"], workingDirectory, cancellationToken).ConfigureAwait(false);
         checks.Add(CheckVersion("gh", ghVersion, MinimumGhVersion));

@@ -6,7 +6,6 @@ public sealed class PrerequisiteCheckerTests
     public async Task CheckAsyncUsesSingularGhSkillHelpWhenAvailable()
     {
         FakeCommandRunner commandRunner = new();
-        commandRunner.Enqueue(new CommandResult(0, "git version 2.50.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.95.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, GhSkillHelp(), string.Empty));
         PrerequisiteChecker checker = new(commandRunner);
@@ -23,7 +22,6 @@ public sealed class PrerequisiteCheckerTests
     public async Task CheckAsyncFallsBackToPluralGhSkillsHelp()
     {
         FakeCommandRunner commandRunner = new();
-        commandRunner.Enqueue(new CommandResult(0, "git version 2.50.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.95.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(1, string.Empty, "unknown command \"skill\""));
         commandRunner.Enqueue(new CommandResult(0, GhSkillHelp(), string.Empty));
@@ -41,7 +39,6 @@ public sealed class PrerequisiteCheckerTests
     public async Task CheckAsyncAcceptsGhSkillHelpOutputWhenExitCodeIsNonZero()
     {
         FakeCommandRunner commandRunner = new();
-        commandRunner.Enqueue(new CommandResult(0, "git version 2.50.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.95.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(1, GhSkillHelp(), string.Empty));
         PrerequisiteChecker checker = new(commandRunner);
@@ -58,7 +55,6 @@ public sealed class PrerequisiteCheckerTests
     {
         PrerequisiteResult result = new(
             [
-                new("git", true, "2.50.0", "2.39.0", string.Empty, string.Empty),
                 new("gh", true, "2.95.0", "2.93.0", string.Empty, string.Empty),
                 new("gh skill", false, null, null, string.Empty, "unknown command")
             ]);
