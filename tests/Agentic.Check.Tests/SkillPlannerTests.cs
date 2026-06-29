@@ -16,7 +16,6 @@ public sealed class SkillPlannerTests
 
         var plan = SkillPlanner.Plan(StaticSkillManifest.All, stack);
 
-        Assert.DoesNotContain(plan, skill => skill.InstallArg == "ensure-directives");
         Assert.Contains(plan, skill => skill.InstallArg == "dotnet-livecharts2");
         Assert.Contains(plan, skill => skill.InstallArg == "plugins/dotnet-test/skills/run-tests");
         Assert.DoesNotContain(plan, skill => skill.Plugin == "dotnet-aspnetcore");

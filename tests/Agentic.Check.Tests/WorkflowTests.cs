@@ -157,7 +157,6 @@ public sealed class WorkflowTests
     {
         using TempDirectory tempDirectory = new();
         tempDirectory.Write("App.csproj", "<Project />");
-        tempDirectory.Write(".agents/skills/ensure-directives/SKILL.md", "# Present");
         tempDirectory.Write(".agents/skills/dotnet-livecharts2/SKILL.md", "# Present");
         FakeCommandRunner commandRunner = new();
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
@@ -676,7 +675,6 @@ public sealed class WorkflowTests
         using TempDirectory tempDirectory = new();
         tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
         tempDirectory.Write("App.csproj", "<Project />");
-        tempDirectory.Write(".agents/skills/ensure-directives/SKILL.md", "# Present");
         tempDirectory.Write(".agents/skills/dotnet-livecharts2/SKILL.md", "# Present");
         FakeCommandRunner commandRunner = new()
         {

@@ -27,7 +27,7 @@ agentic-check must inspect the local target repo content to detect skill install
 
 2. determine and report the git repo root folder from the optionally specified target dir, or if that is not specified the working dir. if no git repo root dir is found, offer to make the specified target dir or if not specified the working dir into a repo by running `git init`, and only proceed if the user confirms and git init succeeds.
 
-3. agentic-check must detect which .NET technologies are available in the `stack`: `foundation` is always present, then detect `dotnet`, `uno` presence using the same criteria as the plugins/dotnet/skills/ensure-directives/SKILL.md skill. Detect `orleans` from the presence of any `Microsoft.Orleans.*` NuGet package references in a project.
+3. agentic-check must detect which .NET technologies are available in the `stack`: `foundation` is always present, then detect `dotnet`, `uno` presence using the same criteria as the built-in directives implementation. Detect `orleans` from the presence of any `Microsoft.Orleans.*` NuGet package references in a project.
 
 4. If `uno` is detected, agentic-check must scan the uno platform projects to detect the uno skill install gates values.
    The install gates and their possible values (each gate can have 0 or more of it's values) are:
