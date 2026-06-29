@@ -479,15 +479,19 @@ sealed class GitHubDirectiveSource(
     DirectiveCacheSettings? cacheSettings = null,
     IReporter? reporter = null) : IDirectiveSource
 {
-    static readonly Uri ListingUri = new(DirectiveInstallerListingUrl.Value);
+    static readonly Uri LatestReleaseUri = new(DirectiveInstallerUrl.LatestRelease);
+    static readonly Uri RepositoryUri = new(DirectiveInstallerUrl.Repository);
     readonly HttpClient httpClient = httpClient ?? CreateHttpClient();
     readonly DirectiveHttpCache cache = new(cacheSettings ?? DirectiveCacheSettings.FromEnvironment(), reporter);
 
     public async Task<IReadOnlyList<DirectiveSourceFile>> ListAsync(CancellationToken cancellationToken)
     {
-        string content = await GetStringAsync(ListingUri, DirectiveInstallerListingUrl.Value, "directives listing", cancellationToken).ConfigureAwait(false);
+        string directiveRef = await ResolveDirectiveRefAsync(cancellationToken).ConfigureAwait(false);
+        string listingUrl = DirectiveInstallerUrl.Listing(directiveRef);
+        Uri listingUri = new(listingUrl);
+        string content = await GetStringAsync(listingUri, listingUrl, "directives listing", cancellationToken).ConfigureAwait(false);
         var items = JsonSerializer.Deserialize<IReadOnlyList<GitHubContentItem>>(content)
-            ?? throw new DirectiveException($"Could not parse directives listing from {DirectiveInstallerListingUrl.Value}.");
+            ?? throw new DirectiveException($"Could not parse directives listing from {listingUrl}.");
 
         return [.. items
             .Where(item => item.Type.Equals("file", StringComparison.OrdinalIgnoreCase))
@@ -504,6 +508,81 @@ sealed class GitHubDirectiveSource(
         }
 
         return await GetStringAsync(downloadUri, sourceFile.DownloadUrl, $"directive from {sourceFile.DownloadUrl}", cancellationToken).ConfigureAwait(false);
+    }
+
+    async Task<string> ResolveDirectiveRefAsync(CancellationToken cancellationToken)
+    {
+        string? releaseContent = await GetOptionalStringAsync(
+            LatestReleaseUri,
+            DirectiveInstallerUrl.LatestRelease,
+            "latest directive release",
+            cancellationToken).ConfigureAwait(false);
+        if (!string.IsNullOrWhiteSpace(releaseContent))
+        {
+            var release = JsonSerializer.Deserialize<GitHubRelease>(releaseContent);
+            if (!string.IsNullOrWhiteSpace(release?.TagName))
+            {
+                return release.TagName;
+            }
+        }
+
+        string repositoryContent = await GetStringAsync(
+            RepositoryUri,
+            DirectiveInstallerUrl.Repository,
+            "directive repository metadata",
+            cancellationToken).ConfigureAwait(false);
+        var repository = JsonSerializer.Deserialize<GitHubRepository>(repositoryContent)
+            ?? throw new DirectiveException($"Could not parse repository metadata from {DirectiveInstallerUrl.Repository}.");
+        return string.IsNullOrWhiteSpace(repository.DefaultBranch)
+            ? throw new DirectiveException($"Repository metadata from {DirectiveInstallerUrl.Repository} is missing default_branch.")
+            : repository.DefaultBranch;
+    }
+
+    async Task<string?> GetOptionalStringAsync(Uri uri, string displayUrl, string description, CancellationToken cancellationToken)
+    {
+        if (cache.TryReadFresh(uri, out string? cachedContent))
+        {
+            return cachedContent;
+        }
+
+        HttpResponseMessage response;
+        try
+        {
+            response = await GetAsync(uri, cancellationToken).ConfigureAwait(false);
+        }
+        catch (HttpRequestException exception)
+        {
+            if (cache.TryReadStale(uri, displayUrl, exception.Message, out cachedContent))
+            {
+                return cachedContent;
+            }
+
+            throw new DirectiveException($"Could not fetch {displayUrl}: {exception.Message}", exception);
+        }
+
+        using (response)
+        {
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                return null;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                int statusCode = (int)response.StatusCode;
+                if (statusCode is 403 or 429
+                    && cache.TryReadStale(uri, displayUrl, $"HTTP {statusCode}", out cachedContent))
+                {
+                    return cachedContent;
+                }
+
+                throw new DirectiveException($"Could not fetch {description}: HTTP {statusCode}.");
+            }
+
+            string content = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            cache.TryWrite(uri, content);
+            return content;
+        }
     }
 
     async Task<string> GetStringAsync(Uri uri, string displayUrl, string description, CancellationToken cancellationToken)
@@ -758,10 +837,21 @@ sealed class DirectiveHttpCache(DirectiveCacheSettings settings, IReporter? repo
 
 sealed record DirectiveHttpCacheEntry(string Url, DateTimeOffset FetchedAtUtc, string Content);
 
-static class DirectiveInstallerListingUrl
+static class DirectiveInstallerUrl
 {
-    public const string Value = "https://api.github.com/repos/VincentH-Net/dotnet-agentic-engineering/contents/directives?ref=main";
+    const string RepositoryApiBase = "https://api.github.com/repos/VincentH-Net/dotnet-agentic-engineering";
+
+    public const string Repository = RepositoryApiBase;
+
+    public const string LatestRelease = RepositoryApiBase + "/releases/latest";
+
+    public static string Listing(string directiveRef)
+        => RepositoryApiBase + "/contents/directives?ref=" + Uri.EscapeDataString(directiveRef);
 }
+
+sealed record GitHubRelease([property: JsonPropertyName("tag_name")] string TagName);
+
+sealed record GitHubRepository([property: JsonPropertyName("default_branch")] string DefaultBranch);
 
 sealed record GitHubContentItem(
     [property: JsonPropertyName("name")] string Name,

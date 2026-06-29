@@ -3,6 +3,76 @@
 public sealed class DirectiveInstallerTests
 {
     [Fact]
+    public async Task GitHubDirectiveSourceListsDirectivesFromLatestReleaseTag()
+    {
+        using RecordingHttpMessageHandler handler = new();
+        handler.SetJson(
+            "https://api.github.com/repos/VincentH-Net/dotnet-agentic-engineering/releases/latest",
+            """
+            { "tag_name": "v1.2.3" }
+            """);
+        handler.SetJson(
+            "https://api.github.com/repos/VincentH-Net/dotnet-agentic-engineering/contents/directives?ref=v1.2.3",
+            """
+            [
+              {
+                "name": "foundation-prompt-log.md",
+                "download_url": "https://raw.example.test/v1.2.3/foundation-prompt-log.md",
+                "type": "file"
+              }
+            ]
+            """);
+        using HttpClient httpClient = new(handler, disposeHandler: false);
+        GitHubDirectiveSource source = new(httpClient, NoDirectiveCache(), new NullReporter());
+
+        var files = await source.ListAsync(CancellationToken.None);
+
+        var file = Assert.Single(files);
+        Assert.Equal("foundation-prompt-log.md", file.FileName);
+        Assert.Contains(
+            "https://api.github.com/repos/VincentH-Net/dotnet-agentic-engineering/contents/directives?ref=v1.2.3",
+            handler.Requests);
+        Assert.DoesNotContain(
+            "https://api.github.com/repos/VincentH-Net/dotnet-agentic-engineering",
+            handler.Requests);
+    }
+
+    [Fact]
+    public async Task GitHubDirectiveSourceFallsBackToDefaultBranchWhenNoLatestReleaseExists()
+    {
+        using RecordingHttpMessageHandler handler = new();
+        handler.SetStatus(
+            "https://api.github.com/repos/VincentH-Net/dotnet-agentic-engineering/releases/latest",
+            System.Net.HttpStatusCode.NotFound);
+        handler.SetJson(
+            "https://api.github.com/repos/VincentH-Net/dotnet-agentic-engineering",
+            """
+            { "default_branch": "trunk" }
+            """);
+        handler.SetJson(
+            "https://api.github.com/repos/VincentH-Net/dotnet-agentic-engineering/contents/directives?ref=trunk",
+            """
+            [
+              {
+                "name": "foundation-prompt-log.md",
+                "download_url": "https://raw.example.test/trunk/foundation-prompt-log.md",
+                "type": "file"
+              }
+            ]
+            """);
+        using HttpClient httpClient = new(handler, disposeHandler: false);
+        GitHubDirectiveSource source = new(httpClient, NoDirectiveCache(), new NullReporter());
+
+        var files = await source.ListAsync(CancellationToken.None);
+
+        var file = Assert.Single(files);
+        Assert.Equal("foundation-prompt-log.md", file.FileName);
+        Assert.Contains(
+            "https://api.github.com/repos/VincentH-Net/dotnet-agentic-engineering/contents/directives?ref=trunk",
+            handler.Requests);
+    }
+
+    [Fact]
     public void CurrentDirectiveStatusDisplaysAsUpToDate()
         => Assert.Equal("up to date", DirectiveInstaller.FormatDirectiveStatus(DirectiveStatuses.Current));
 
@@ -229,5 +299,40 @@ public sealed class DirectiveInstallerTests
         Assert.False(result.Success);
         string agents = await File.ReadAllTextAsync(Path.Combine(tempDirectory.Path, "AGENTS.md"), CancellationToken.None);
         Assert.Contains("Broken marker.", agents, StringComparison.Ordinal);
+    }
+
+    static DirectiveCacheSettings NoDirectiveCache()
+        => new(0, Path.Combine(Path.GetTempPath(), $"agentic-check-directives-{Guid.NewGuid():N}"), []);
+
+    sealed class RecordingHttpMessageHandler : HttpMessageHandler
+    {
+        readonly Dictionary<string, HttpResponseMessage> responses = new(StringComparer.Ordinal);
+
+        public List<string> Requests { get; } = [];
+
+        public void SetJson(string url, string json)
+            => responses[url] = new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json")
+            };
+
+        public void SetStatus(string url, System.Net.HttpStatusCode statusCode)
+            => responses[url] = new HttpResponseMessage(statusCode);
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            string url = request.RequestUri?.AbsoluteUri ?? string.Empty;
+            Requests.Add(url);
+            if (!responses.Remove(url, out var response))
+            {
+                response = new HttpResponseMessage(System.Net.HttpStatusCode.InternalServerError)
+                {
+                    Content = new StringContent($"Unexpected request: {url}")
+                };
+            }
+
+            return Task.FromResult(response);
+        }
     }
 }
