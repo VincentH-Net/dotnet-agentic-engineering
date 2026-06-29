@@ -8,7 +8,7 @@ This lets you:
   - Disable Hot Reload / Hot Design UI, which can get in the way of agents testing the app
   - Enable debug logging to specified file as early as possible during app start, so the agents can see and address any runtime warnings and errors
 
-Use the `ensure-directives` skill to install or update directives for your technology, or manually copy below markdown in your `AGENTS.MD`:
+Use the `agentic-check` tool to install or update directives for your technology, or manually copy below markdown in your `AGENTS.MD`:
 
 ~~~md
 <!-- dotnet-agentic-engineering:uno-build-and-run:start -->

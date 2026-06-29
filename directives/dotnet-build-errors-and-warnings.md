@@ -6,7 +6,7 @@ This lets you:
 - fix all errors and fix or (in rare, justified cases) suppress warnings, documenting the rationale
 - enforce concise, readable code leveraging the latest C# language features
 
-Use the `ensure-directives` skill to install or update directives for your technology, or manually copy below markdown in your `AGENTS.MD`:
+Use the `agentic-check` tool to install or update directives for your technology, or manually copy below markdown in your `AGENTS.MD`:
 
 ~~~md
 <!-- dotnet-agentic-engineering:dotnet-build-errors-and-warnings:start -->

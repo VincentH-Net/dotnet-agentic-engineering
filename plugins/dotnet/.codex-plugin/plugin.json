@@ -1,7 +1,7 @@
 {
   "name": "dotnet",
-  "version": "1.2.4",
-  "description": "Skills for .NET development including agent directives, charting with LiveCharts2 and a modern C# 14 editorconfig baseline.",
+  "version": "1.3.0",
+  "description": "Skills for .NET development including CLI end-to-end testing, charting with LiveCharts2 and a modern C# 14 editorconfig baseline.",
   "author": {
     "name": "Vincent Hoogendoorn",
     "url": "https://github.com/VincentH-Net"
@@ -13,14 +13,16 @@
     "csharp-14",
     "editorconfig",
     "code-style",
+    "cli",
+    "testing",
     "livecharts2",
     "charting"
   ],
   "skills": "./skills/",
   "interface": {
     "displayName": ".NET",
-    "shortDescription": "Reusable .NET skills — agent directives, LiveCharts2 guidance and a modern C# 14 editorconfig baseline",
-    "longDescription": "Use .NET to access reusable development skills for agent directives, charting (LiveCharts2) and for setting up an opinionated C# 14 / .NET 10 editorconfig with preview analyzers and modern code-style rules.",
+    "shortDescription": "Reusable .NET skills — CLI e2e testing, LiveCharts2 guidance and a modern C# 14 editorconfig baseline",
+    "longDescription": "Use .NET to access reusable development skills for CLI end-to-end testing, charting (LiveCharts2) and for setting up an opinionated C# 14 / .NET 10 editorconfig with preview analyzers and modern code-style rules.",
     "developerName": "Vincent Hoogendoorn",
     "category": "Coding",
     "capabilities": [
@@ -32,7 +34,7 @@
     ],
     "websiteURL": "https://github.com/VincentH-Net/dotnet-agentic-engineering",
     "defaultPrompt": [
-      "Use the .NET plugin to setup agent directives, help with LiveCharts2 implementation details or to set up a modern C# 14 editorconfig."
+      "Use the .NET plugin to build CLI end-to-end tests, help with LiveCharts2 implementation details or set up a modern C# 14 editorconfig."
     ],
     "brandColor": "#512BD4"
   }
