@@ -61,8 +61,6 @@ static class StaticSkillManifest
         VincentDotnet("dotnet-livecharts2"),
         VincentDotnet("dotnet-modern-csharp-editorconfig"),
         ..DotnetTestSkills(),
-        DotnetAspNetCore("dotnet-webapi"),
-        DotnetAspNetCore("minimal-api-file-upload"),
         VincentOrleans("orleans-result-pattern"),
         VincentOrleans("orleans-multiservice-pattern"),
         VincentUno("uno-agentic-support"),
@@ -131,17 +129,8 @@ static class StaticSkillManifest
     static SkillDependency DotnetTestDependency(string skill)
         => new(DotnetSkillsRepo, DotnetSkillInstallArg("dotnet-test", skill));
 
-    static SkillManifestEntry DotnetAspNetCore(string skill)
-        => new(
-            DotnetSkillsRepo,
-            DotnetSkillInstallArg("dotnet-aspnetcore", skill),
-            skill,
-            TechnologyNames.AspNetCore,
-            [],
-            "dotnet-aspnetcore");
-
     static string DotnetSkillInstallArg(string plugin, string skill)
-        => $"plugins/{plugin}/skills/{skill}@main";
+        => $"plugins/{plugin}/skills/{skill}";
 
     static SkillManifestEntry Entry(
         string sourceRepo,
@@ -154,13 +143,11 @@ static class StaticSkillManifest
     static IReadOnlyList<SkillManifestEntry> DotnetTestSkills()
         =>
         [
-            DotnetTest("assertion-quality"),
             DotnetTest("crap-score"),
             DotnetTest("detect-static-dependencies"),
             DotnetTest("dotnet-test-frameworks"),
             DotnetTest("filter-syntax"),
             DotnetTest("generate-testability-wrappers"),
-            DotnetTest("grade-tests"),
             DotnetTest("migrate-static-to-wrapper"),
             DotnetTest("mtp-hot-reload", [DotnetTestDependency("filter-syntax")]),
             DotnetTest("platform-detection"),
@@ -171,9 +158,6 @@ static class StaticSkillManifest
                     DotnetTestDependency("filter-syntax")
                 ]),
             DotnetTest("test-anti-patterns"),
-            DotnetTest("test-gap-analysis"),
-            DotnetTest("test-smell-detection"),
-            DotnetTest("test-tagging"),
             DotnetTest("writing-mstest-tests")
         ];
 

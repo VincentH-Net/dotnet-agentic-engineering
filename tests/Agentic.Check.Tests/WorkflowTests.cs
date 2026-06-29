@@ -637,7 +637,7 @@ public sealed class WorkflowTests
             new FakePrompts
             {
                 SelectedDirectiveNames = [],
-                SelectedSkillInstallArgs = ["plugins/dotnet-test/skills/run-tests@main"]
+                SelectedSkillInstallArgs = ["plugins/dotnet-test/skills/run-tests"]
             },
             new NullReporter(),
             new FakeDirectiveSource());
@@ -651,21 +651,21 @@ public sealed class WorkflowTests
             "skill",
             "install",
             "dotnet/skills",
-            "plugins/dotnet-test/skills/filter-syntax@main",
+            "plugins/dotnet-test/skills/filter-syntax",
             "--dir",
             Path.Combine(tempDirectory.Path, ".agents", "skills")]));
         Assert.Contains(commandRunner.Calls, call => call.Arguments.SequenceEqual([
             "skill",
             "install",
             "dotnet/skills",
-            "plugins/dotnet-test/skills/platform-detection@main",
+            "plugins/dotnet-test/skills/platform-detection",
             "--dir",
             Path.Combine(tempDirectory.Path, ".agents", "skills")]));
         Assert.Contains(commandRunner.Calls, call => call.Arguments.SequenceEqual([
             "skill",
             "install",
             "dotnet/skills",
-            "plugins/dotnet-test/skills/run-tests@main",
+            "plugins/dotnet-test/skills/run-tests",
             "--dir",
             Path.Combine(tempDirectory.Path, ".agents", "skills")]));
     }

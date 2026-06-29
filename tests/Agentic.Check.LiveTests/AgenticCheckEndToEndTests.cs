@@ -207,7 +207,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
         Assert.Contains("unoplatform/studio repo:", result.Screen, StringComparison.Ordinal);
         Assert.DoesNotContain("studio:", result.Screen, StringComparison.Ordinal);
         Assert.Contains("dotnet/skills repo:", result.Screen, StringComparison.Ordinal);
-        Assert.Contains("dotnet-aspnetcore:", result.Screen, StringComparison.Ordinal);
+        Assert.DoesNotContain("dotnet-aspnetcore:", result.Screen, StringComparison.Ordinal);
         Assert.Contains("dotnet-test:", result.Screen, StringComparison.Ordinal);
         AssertRecordingWasWritten(workspace);
     }
@@ -406,9 +406,9 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
         Assert.Equal(0, result.ExitCode);
         string ghLog = await workspace.ReadGhLogAsync().ConfigureAwait(true);
         string agentsSkillsDirectory = Path.Combine(workspace.RepoPath, ".agents", "skills");
-        Assert.Contains("skill install dotnet/skills plugins/dotnet-test/skills/filter-syntax@main --dir", ghLog, StringComparison.Ordinal);
-        Assert.Contains("skill install dotnet/skills plugins/dotnet-test/skills/platform-detection@main --dir", ghLog, StringComparison.Ordinal);
-        Assert.Contains("skill install dotnet/skills plugins/dotnet-test/skills/run-tests@main --dir", ghLog, StringComparison.Ordinal);
+        Assert.Contains("skill install dotnet/skills plugins/dotnet-test/skills/filter-syntax --dir", ghLog, StringComparison.Ordinal);
+        Assert.Contains("skill install dotnet/skills plugins/dotnet-test/skills/platform-detection --dir", ghLog, StringComparison.Ordinal);
+        Assert.Contains("skill install dotnet/skills plugins/dotnet-test/skills/run-tests --dir", ghLog, StringComparison.Ordinal);
         Assert.Contains(".agents/skills", ghLog, StringComparison.Ordinal);
         Assert.True(File.Exists(Path.Combine(agentsSkillsDirectory, "filter-syntax", "SKILL.md")));
         Assert.True(File.Exists(Path.Combine(agentsSkillsDirectory, "platform-detection", "SKILL.md")));

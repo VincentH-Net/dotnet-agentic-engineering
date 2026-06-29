@@ -18,13 +18,13 @@ public sealed class SkillPlannerTests
 
         Assert.DoesNotContain(plan, skill => skill.InstallArg == "ensure-directives");
         Assert.Contains(plan, skill => skill.InstallArg == "dotnet-livecharts2");
-        Assert.Contains(plan, skill => skill.InstallArg == "plugins/dotnet-test/skills/run-tests@main");
+        Assert.Contains(plan, skill => skill.InstallArg == "plugins/dotnet-test/skills/run-tests");
         Assert.DoesNotContain(plan, skill => skill.Plugin == "dotnet-aspnetcore");
         Assert.DoesNotContain(plan, skill => skill.Technology == TechnologyNames.Uno);
     }
 
     [Fact]
-    public void PlansAspNetCoreSkillsForAspNetCoreStack()
+    public void DoesNotPlanUnreleasedAspNetCoreSkillsForAspNetCoreStack()
     {
         StackDetectionResult stack = new(
             new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -38,8 +38,7 @@ public sealed class SkillPlannerTests
 
         var plan = SkillPlanner.Plan(StaticSkillManifest.All, stack);
 
-        Assert.Contains(plan, skill => skill.InstallArg == "plugins/dotnet-aspnetcore/skills/dotnet-webapi@main");
-        Assert.Contains(plan, skill => skill.InstallArg == "plugins/dotnet-aspnetcore/skills/minimal-api-file-upload@main");
+        Assert.DoesNotContain(plan, skill => skill.Plugin == "dotnet-aspnetcore");
     }
 
     [Fact]
@@ -47,10 +46,10 @@ public sealed class SkillPlannerTests
     {
         var runTests = Assert.Single(
             StaticSkillManifest.All,
-            skill => skill.InstallArg == "plugins/dotnet-test/skills/run-tests@main");
+            skill => skill.InstallArg == "plugins/dotnet-test/skills/run-tests");
 
-        Assert.Contains(runTests.Dependencies, dependency => dependency.InstallArg == "plugins/dotnet-test/skills/platform-detection@main");
-        Assert.Contains(runTests.Dependencies, dependency => dependency.InstallArg == "plugins/dotnet-test/skills/filter-syntax@main");
+        Assert.Contains(runTests.Dependencies, dependency => dependency.InstallArg == "plugins/dotnet-test/skills/platform-detection");
+        Assert.Contains(runTests.Dependencies, dependency => dependency.InstallArg == "plugins/dotnet-test/skills/filter-syntax");
     }
 
     [Fact]
@@ -77,8 +76,7 @@ public sealed class SkillPlannerTests
 
         Assert.True(IndexOf(plan, "VincentH-Net/dotnet-agentic-engineering", "uno-platform") < IndexOf(plan, "VincentH-Net/dotnet-agentic-engineering", "dotnet"));
         Assert.True(IndexOf(plan, "VincentH-Net/dotnet-agentic-engineering", "dotnet") < IndexOf(plan, "mtmattei/UnoPlatformSkills", "UnoPlatformSkills"));
-        Assert.True(IndexOf(plan, "mtmattei/UnoPlatformSkills", "UnoPlatformSkills") < IndexOf(plan, "dotnet/skills", "dotnet-aspnetcore"));
-        Assert.True(IndexOf(plan, "dotnet/skills", "dotnet-aspnetcore") < IndexOf(plan, "dotnet/skills", "dotnet-test"));
+        Assert.True(IndexOf(plan, "mtmattei/UnoPlatformSkills", "UnoPlatformSkills") < IndexOf(plan, "dotnet/skills", "dotnet-test"));
 
         static int IndexOf(IReadOnlyList<SkillManifestEntry> skills, string sourceRepo, string plugin)
             => Array.FindIndex(
