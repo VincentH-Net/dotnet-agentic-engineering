@@ -65,9 +65,9 @@ static class StaticSkillManifest
         VincentOrleans("orleans-result-pattern"),
         VincentOrleans("orleans-multiservice-pattern"),
         VincentUno("uno-agentic-support"),
-        VincentUno("uno-mvvm", "uno-mvvm@main", "presentation", "mvvm"),
+        VincentUno("uno-mvvm", "presentation", "mvvm"),
         VincentUno("uno-csharpmarkup2", "markup", "csharp2"),
-        VincentUno("uno-xaml", "uno-xaml@main", "markup", "xaml"),
+        VincentUno("uno-xaml", "markup", "xaml"),
         VincentUno("uno-fluent2", "theme", "fluent"),
         VincentUno("uno-hamburgermenu-databinding", "presentation", "mvvm"),
         VincentUno("uno-livecharts2-theme-switching"),
@@ -101,9 +101,6 @@ static class StaticSkillManifest
 
     static SkillManifestEntry VincentUno(string skill, string gate, string value)
         => Entry(VincentRepo, skill, TechnologyNames.Uno, [new(gate, value)], plugin: "uno-platform");
-
-    static SkillManifestEntry VincentUno(string localFolder, string installArg, string gate, string value)
-        => new(VincentRepo, installArg, localFolder, TechnologyNames.Uno, [new(gate, value)], "uno-platform");
 
     static SkillManifestEntry MattUno(string skill)
         => Entry(MattRepo, skill, TechnologyNames.Uno, plugin: "UnoPlatformSkills");
