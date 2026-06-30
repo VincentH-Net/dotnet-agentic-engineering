@@ -111,10 +111,14 @@ public sealed class WorkflowTests
             CancellationToken.None);
 
         Assert.Equal(0, result.ExitCode);
+        string expectedStableVersion = new SourceVersionInfo(
+            "VincentH-Net/dotnet-agentic-engineering",
+            "v1.2.3",
+            new DateTimeOffset(2026, 6, 29, 8, 11, 0, TimeSpan.Zero)).Display;
         Assert.Contains(result.Report.RecommendedSkills, skill =>
             skill.InstallArg == "dotnet-livecharts2"
             && skill.SourceRef.Length == 0
-            && skill.Version == "v1.2.3 @ 2026-06-29 08:11 UTC");
+            && skill.Version == expectedStableVersion);
         Assert.Contains(result.Report.Actions, action => action.Contains(
             "Would install VincentH-Net/dotnet-agentic-engineering dotnet-livecharts2",
             StringComparison.Ordinal));
@@ -160,10 +164,14 @@ public sealed class WorkflowTests
 
         Assert.Equal(0, result.ExitCode);
         Assert.DoesNotContain(commandRunner.Calls, call => call.Arguments.Contains("update"));
+        string expectedPreviewVersion = new SourceVersionInfo(
+            "dotnet/skills",
+            "main",
+            new DateTimeOffset(2026, 6, 30, 9, 12, 0, TimeSpan.Zero)).Display;
         Assert.Contains(result.Report.RecommendedSkills, skill =>
             skill.InstallArg == "plugins/dotnet-aspnetcore/skills/dotnet-webapi"
             && skill.SourceRef == "main"
-            && skill.Version == "main @ 2026-06-30 09:12 UTC");
+            && skill.Version == expectedPreviewVersion);
         Assert.DoesNotContain(result.Report.MissingSkills, skill => skill.InstallArg == "plugins/dotnet-aspnetcore/skills/dotnet-webapi");
         Assert.Contains(result.Report.Actions, action => action.Contains(
             "Would install dotnet/skills@main plugins/dotnet-aspnetcore/skills/dotnet-webapi",

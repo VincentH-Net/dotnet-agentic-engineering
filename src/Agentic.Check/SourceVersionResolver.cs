@@ -17,9 +17,24 @@ sealed record SourceVersionInfo(string SourceRepo, string Ref, DateTimeOffset La
     public string Display
         => LastChangedAtUtc == DateTimeOffset.MinValue
             ? Ref
-            : string.Create(
-                System.Globalization.CultureInfo.InvariantCulture,
-                $"{Ref} @ {LastChangedAtUtc:yyyy-MM-dd HH:mm} UTC");
+            : FormatDisplay();
+
+    string FormatDisplay()
+    {
+        var localTime = LastChangedAtUtc.ToLocalTime();
+        return string.Create(
+            System.Globalization.CultureInfo.InvariantCulture,
+            $"{Ref} @ {localTime:yyyy-MM-dd HH:mm} {FormatGmtOffset(localTime.Offset)}");
+    }
+
+    static string FormatGmtOffset(TimeSpan offset)
+    {
+        string sign = offset < TimeSpan.Zero ? "-" : "+";
+        var absoluteOffset = offset.Duration();
+        return absoluteOffset.Minutes == 0
+            ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"GMT{sign}{absoluteOffset.Hours}")
+            : string.Create(System.Globalization.CultureInfo.InvariantCulture, $"GMT{sign}{absoluteOffset.Hours}:{absoluteOffset.Minutes:00}");
+    }
 }
 
 sealed class GitHubSourceVersionResolver(HttpClient? httpClient = null, IReporter? reporter = null) : ISourceVersionResolver

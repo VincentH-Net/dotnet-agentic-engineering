@@ -29,7 +29,11 @@ public sealed class DirectiveInstallerTests
 
         var file = Assert.Single(files);
         Assert.Equal("foundation-prompt-log.md", file.FileName);
-        Assert.Equal("v1.2.3 @ 2026-06-29 18:18 UTC", file.Version);
+        string expectedVersion = new SourceVersionInfo(
+            "VincentH-Net/dotnet-agentic-engineering",
+            "v1.2.3",
+            new DateTimeOffset(2026, 6, 29, 18, 18, 0, TimeSpan.Zero)).Display;
+        Assert.Equal(expectedVersion, file.Version);
         Assert.Contains(
             "https://api.github.com/repos/VincentH-Net/dotnet-agentic-engineering/contents/directives?ref=v1.2.3",
             handler.Requests);
