@@ -269,9 +269,6 @@ sealed class CheckWorkflow(
         if (selectedSkills.Count > 0)
         {
             SkillInstaller skillInstaller = new(commandRunner, reporter);
-            var previewShasBefore = options.Preview
-                ? SkillInstaller.ReadTreeShas(selectedSkills, skillsDirectories)
-                : new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
             var firstDirectoryInstallSkills = options.Preview
                 ? selectedSkills
                 : [.. selectedSkills.Where(skill => skill.ForceInstall || SkillInstaller.IsMissing(skill, firstSkillsDirectory))];
@@ -304,23 +301,13 @@ sealed class CheckWorkflow(
                             copyableSkills,
                             firstSkillsDirectory,
                             [.. skillsDirectories.Skip(1)],
+                            targetDirectory,
                             advance,
                             overwriteExisting: options.Preview,
                             reportPreviewChangeStatus: options.Preview));
                     }
                 },
                 cancellationToken).ConfigureAwait(false);
-
-            if (options.Preview)
-            {
-                var previewShasAfter = SkillInstaller.ReadTreeShas(selectedSkills, skillsDirectories);
-                var changedPreviewSkills = FindChangedPreviewSkills(selectedSkills, previewShasBefore, previewShasAfter);
-                if (changedPreviewSkills.Count > 0)
-                {
-                    ReportSectionHeader(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Installed or updated {changedPreviewSkills.Count} preview skill(s):"));
-                    ReportSkillGroups(changedPreviewSkills, skill => $"      {skill.LocalFolder}", ItemStyle.Plain);
-                }
-            }
         }
 
         static int CountSkillInstallOperations(
@@ -378,20 +365,6 @@ sealed class CheckWorkflow(
             }
             : skill)];
     }
-
-    static IReadOnlyList<SkillManifestEntry> FindChangedPreviewSkills(
-        IReadOnlyList<SkillManifestEntry> selectedSkills,
-        IReadOnlyDictionary<string, string?> shasBefore,
-        IReadOnlyDictionary<string, string?> shasAfter)
-        => [.. selectedSkills
-            .Where(skill =>
-            {
-                _ = shasBefore.TryGetValue(skill.Key, out string? before);
-                _ = shasAfter.TryGetValue(skill.Key, out string? after);
-                return !string.IsNullOrWhiteSpace(after)
-                    && !string.Equals(before, after, StringComparison.OrdinalIgnoreCase);
-            })
-            .DistinctBy(skill => skill.Key, StringComparer.OrdinalIgnoreCase)];
 
     static DirectoryValidationResult ValidateTargetDirectory(string targetDirectory)
     {

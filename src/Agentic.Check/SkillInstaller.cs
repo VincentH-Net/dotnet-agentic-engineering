@@ -65,7 +65,7 @@ sealed class SkillInstaller(ICommandRunner commandRunner, IReporter reporter)
             {
                 reporter.Success(ActionOutputFormatter.FormatLine(
                     FormatInstallAction(skill, reportPreviewChangeStatus, beforeSha, ReadTreeSha(skillFile)),
-                    skill.LocalFolder));
+                    ActionOutputFormatter.FormatSkillName(workingDirectory, skillsDirectory, skill.LocalFolder)));
             }
             else
             {
@@ -82,6 +82,7 @@ sealed class SkillInstaller(ICommandRunner commandRunner, IReporter reporter)
         IReadOnlyList<SkillManifestEntry> skills,
         string sourceSkillsDirectory,
         IReadOnlyList<string> targetSkillsDirectories,
+        string workingDirectory,
         Action? progressAdvance = null,
         bool overwriteExisting = false,
         bool reportPreviewChangeStatus = false)
@@ -103,7 +104,7 @@ sealed class SkillInstaller(ICommandRunner commandRunner, IReporter reporter)
                     results.Add(new SkillCopyResult(sourceDirectory, targetDirectory, skill.LocalFolder, true, null));
                     reporter.Success(ActionOutputFormatter.FormatLine(
                         FormatCopyAction(skill, reportPreviewChangeStatus, beforeSha, ReadTreeSha(targetSkillFile)),
-                        skill.LocalFolder));
+                        ActionOutputFormatter.FormatSkillName(workingDirectory, targetSkillsDirectory, skill.LocalFolder)));
                 }
                 catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or DirectoryNotFoundException)
                 {
@@ -118,21 +119,6 @@ sealed class SkillInstaller(ICommandRunner commandRunner, IReporter reporter)
         }
 
         return results;
-    }
-
-    internal static IReadOnlyDictionary<string, string?> ReadTreeShas(
-        IReadOnlyList<SkillManifestEntry> skills,
-        IReadOnlyList<string> skillsDirectories)
-    {
-        Dictionary<string, string?> shas = new(StringComparer.OrdinalIgnoreCase);
-        foreach (var skill in skills)
-        {
-            shas[skill.Key] = skillsDirectories
-                .Select(directory => ReadTreeSha(Path.Combine(directory, skill.LocalFolder, "SKILL.md")))
-                .FirstOrDefault(sha => !string.IsNullOrWhiteSpace(sha));
-        }
-
-        return shas;
     }
 
     static string FormatInstallAction(

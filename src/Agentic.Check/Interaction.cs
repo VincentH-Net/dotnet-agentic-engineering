@@ -306,7 +306,7 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
     internal static string FormatSkillsDirectories(string repoRoot, IReadOnlyList<string> skillsDirectories)
         => string.Join(Environment.NewLine, skillsDirectories.Select(directory => FormatSkillsDirectory(repoRoot, directory)));
 
-    static string FormatSkillsDirectory(string repoRoot, string skillsDirectory)
+    internal static string FormatSkillsDirectory(string repoRoot, string skillsDirectory)
     {
         string relativePath = Path.GetRelativePath(repoRoot, skillsDirectory);
         return relativePath.StartsWith("..", StringComparison.Ordinal)

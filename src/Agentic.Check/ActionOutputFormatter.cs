@@ -22,4 +22,7 @@ static class ActionOutputFormatter
         string paddedAction = action.PadRight(ActionColumnWidth);
         return $"  {paddedAction}  {name}";
     }
+
+    internal static string FormatSkillName(string targetDirectory, string skillsDirectory, string localFolder)
+        => Path.Combine(SpectreReporter.FormatSkillsDirectory(targetDirectory, skillsDirectory), localFolder);
 }

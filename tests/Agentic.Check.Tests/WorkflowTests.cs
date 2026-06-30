@@ -246,8 +246,8 @@ public sealed class WorkflowTests
             "--pin",
             "main",
             "--force"]));
-        Assert.Contains("Installed or updated 1 preview skill(s):", reporter.BoldMessages);
-        Assert.Contains("      dotnet-webapi", reporter.PlainMessages);
+        Assert.DoesNotContain("Installed or updated 1 preview skill(s):", reporter.BoldMessages);
+        Assert.Contains(ActionOutputFormatter.FormatLine("Updated skill", Path.Combine(".agents", "skills", "dotnet-webapi")), reporter.Successes);
         Assert.DoesNotContain(commandRunner.Calls, call => call.Arguments.Contains("update"));
         Assert.DoesNotContain("Up to date directives:", reporter.BoldMessages);
         Assert.DoesNotContain("Up to date skills:", reporter.BoldMessages);
@@ -300,7 +300,7 @@ public sealed class WorkflowTests
         Assert.DoesNotContain(commandRunner.Calls, call => call.Arguments.Contains("--pin"));
         Assert.Contains("1 action selected", reporter.InfoMessages);
         Assert.Contains(ActionOutputFormatter.FormatHeader(), reporter.BoldMessages);
-        Assert.Contains(ActionOutputFormatter.FormatLine("Switch to stable skill", "dotnet-livecharts2"), reporter.Successes);
+        Assert.Contains(ActionOutputFormatter.FormatLine("Switch to stable skill", Path.Combine(".agents", "skills", "dotnet-livecharts2")), reporter.Successes);
     }
 
     [Fact]

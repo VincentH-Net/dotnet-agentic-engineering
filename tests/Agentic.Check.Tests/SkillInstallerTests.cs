@@ -168,11 +168,11 @@ public sealed class SkillInstallerTests
         _ = await installer.InstallAsync(
             [skill],
             skillsDirectory,
-            Environment.CurrentDirectory,
+            tempDirectory.Path,
             CancellationToken.None,
             reportPreviewChangeStatus: true);
 
-        Assert.Contains(ActionOutputFormatter.FormatLine("Updated skill", "preview-skill"), reporter.Successes);
+        Assert.Contains(ActionOutputFormatter.FormatLine("Updated skill", Path.Combine(".agents", "skills", "preview-skill")), reporter.Successes);
     }
 
     [Fact]
@@ -206,11 +206,11 @@ public sealed class SkillInstallerTests
         _ = await installer.InstallAsync(
             [skill],
             skillsDirectory,
-            Environment.CurrentDirectory,
+            tempDirectory.Path,
             CancellationToken.None,
             reportPreviewChangeStatus: true);
 
-        Assert.Contains(ActionOutputFormatter.FormatLine("Installed skill", "preview-skill"), reporter.Successes);
+        Assert.Contains(ActionOutputFormatter.FormatLine("Installed skill", Path.Combine(".agents", "skills", "preview-skill")), reporter.Successes);
     }
 
     [Fact]
@@ -251,11 +251,11 @@ public sealed class SkillInstallerTests
         _ = await installer.InstallAsync(
             [skill],
             skillsDirectory,
-            Environment.CurrentDirectory,
+            tempDirectory.Path,
             CancellationToken.None,
             reportPreviewChangeStatus: true);
 
-        Assert.Contains(ActionOutputFormatter.FormatLine("Updated skill", "preview-skill"), reporter.Successes);
+        Assert.Contains(ActionOutputFormatter.FormatLine("Updated skill", Path.Combine(".agents", "skills", "preview-skill")), reporter.Successes);
     }
 
     [Fact]
@@ -286,9 +286,10 @@ public sealed class SkillInstallerTests
             [skill],
             sourceSkillsDirectory,
             [targetSkillsDirectory],
+            tempDirectory.Path,
             overwriteExisting: true,
             reportPreviewChangeStatus: true);
 
-        Assert.Contains(ActionOutputFormatter.FormatLine("Re-installed skill", "preview-skill"), reporter.Successes);
+        Assert.Contains(ActionOutputFormatter.FormatLine("Re-installed skill", Path.Combine(".agents", "skills", "preview-skill")), reporter.Successes);
     }
 }
