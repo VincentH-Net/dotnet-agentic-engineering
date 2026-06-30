@@ -172,7 +172,7 @@ public sealed class SkillInstallerTests
             CancellationToken.None,
             reportPreviewChangeStatus: true);
 
-        Assert.Contains("(updated     ) Installed owner/repo@main preview-skill", reporter.Successes);
+        Assert.Contains(ActionOutputFormatter.FormatLine("Updated skill", "preview-skill"), reporter.Successes);
     }
 
     [Fact]
@@ -210,7 +210,7 @@ public sealed class SkillInstallerTests
             CancellationToken.None,
             reportPreviewChangeStatus: true);
 
-        Assert.Contains("(installed   ) Installed owner/repo@main preview-skill", reporter.Successes);
+        Assert.Contains(ActionOutputFormatter.FormatLine("Installed skill", "preview-skill"), reporter.Successes);
     }
 
     [Fact]
@@ -255,7 +255,7 @@ public sealed class SkillInstallerTests
             CancellationToken.None,
             reportPreviewChangeStatus: true);
 
-        Assert.Contains("(updated     ) Installed owner/repo@main preview-skill", reporter.Successes);
+        Assert.Contains(ActionOutputFormatter.FormatLine("Updated skill", "preview-skill"), reporter.Successes);
     }
 
     [Fact]
@@ -289,6 +289,6 @@ public sealed class SkillInstallerTests
             overwriteExisting: true,
             reportPreviewChangeStatus: true);
 
-        Assert.Contains($"(re-installed) Copied preview-skill to {targetSkillsDirectory}", reporter.Successes);
+        Assert.Contains(ActionOutputFormatter.FormatLine("Re-installed skill", "preview-skill"), reporter.Successes);
     }
 }

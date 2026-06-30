@@ -272,6 +272,7 @@ public sealed class WorkflowTests
         commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "No updates available.", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "installed stable", string.Empty));
+        RecordingReporter reporter = new();
         CheckWorkflow workflow = new(
             commandRunner,
             new FakePrompts
@@ -279,7 +280,7 @@ public sealed class WorkflowTests
                 SelectedDirectiveNames = [],
                 SelectedSkillInstallArgs = ["dotnet-livecharts2"]
             },
-            new NullReporter(),
+            reporter,
             new FakeDirectiveSource(),
             new FakeSourceVersionResolver());
 
@@ -297,6 +298,9 @@ public sealed class WorkflowTests
             Path.Combine(tempDirectory.Path, ".agents", "skills"),
             "--force"]));
         Assert.DoesNotContain(commandRunner.Calls, call => call.Arguments.Contains("--pin"));
+        Assert.Contains("1 action selected", reporter.InfoMessages);
+        Assert.Contains(ActionOutputFormatter.FormatHeader(), reporter.BoldMessages);
+        Assert.Contains(ActionOutputFormatter.FormatLine("Switch to stable skill", "dotnet-livecharts2"), reporter.Successes);
     }
 
     [Fact]
@@ -803,7 +807,8 @@ public sealed class WorkflowTests
             SelectedDirectiveNames = ["foundation-prompt-log"],
             SelectedSkillInstallArgs = []
         };
-        CheckWorkflow workflow = new(commandRunner, prompts, new NullReporter(), new FakeDirectiveSource());
+        RecordingReporter reporter = new();
+        CheckWorkflow workflow = new(commandRunner, prompts, reporter, new FakeDirectiveSource());
 
         var result = await workflow.RunAsync(
             new AgenticCheckOptions(tempDirectory.Path, false, false, null, null, null, false),
@@ -813,6 +818,39 @@ public sealed class WorkflowTests
         string agents = await File.ReadAllTextAsync(Path.Combine(tempDirectory.Path, "AGENTS.md"), CancellationToken.None);
         Assert.Contains("dotnet-agentic-engineering:foundation-prompt-log:start", agents, StringComparison.Ordinal);
         Assert.DoesNotContain("dotnet-agentic-engineering:dotnet-cli-run:start", agents, StringComparison.Ordinal);
+        Assert.Contains("1 action selected", reporter.InfoMessages);
+        Assert.Contains(ActionOutputFormatter.FormatHeader(), reporter.BoldMessages);
+        Assert.Contains(ActionOutputFormatter.FormatLine("Installed directive", "foundation-prompt-log"), reporter.Successes);
+    }
+
+    [Fact]
+    public async Task InteractiveSelectionReportsNoActionsSelected()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write("App.csproj", "<Project />");
+        FakeCommandRunner commandRunner = new();
+        commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "no updates", string.Empty));
+        RecordingReporter reporter = new();
+        CheckWorkflow workflow = new(
+            commandRunner,
+            new FakePrompts
+            {
+                SelectedDirectiveNames = [],
+                SelectedSkillInstallArgs = []
+            },
+            reporter,
+            new FakeDirectiveSource());
+
+        var result = await workflow.RunAsync(
+            new AgenticCheckOptions(tempDirectory.Path, false, false, null, null, "codex", false),
+            CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("No actions selected", reporter.InfoMessages);
+        Assert.DoesNotContain(ActionOutputFormatter.FormatHeader(), reporter.BoldMessages);
+        Assert.DoesNotContain(commandRunner.Calls, call => call.Arguments.Contains("install"));
     }
 
     [Fact]
@@ -918,8 +956,9 @@ public sealed class WorkflowTests
         Assert.Equal(0, result.ExitCode);
         _ = Assert.Single(commandRunner.Calls, call => call.Arguments.Contains("install"));
         Assert.True(File.Exists(Path.Combine(tempDirectory.Path, ".agents", "skills", "dotnet-modern-csharp-editorconfig", "SKILL.md")));
-        Assert.Contains("Installing skills", reporter.ProgressDescriptions);
-        Assert.Equal(2, reporter.ProgressTicksByDescription["Installing skills"]);
+        Assert.Contains(ActionOutputFormatter.ProgressIndent, reporter.ProgressDescriptions);
+        Assert.DoesNotContain("Installing skills", reporter.ProgressDescriptions);
+        Assert.Equal(2, reporter.ProgressTicksByDescription[ActionOutputFormatter.ProgressIndent]);
     }
 
     static void AssertExactlyOneBlankLineBefore(List<string> messages, string header)

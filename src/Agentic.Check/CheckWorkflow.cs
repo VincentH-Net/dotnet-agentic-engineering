@@ -224,6 +224,11 @@ sealed class CheckWorkflow(
             }
         }
 
+        if (!options.DryRun && (recommendedDirectives.Count > 0 || recommendedSkillActions.Count > 0))
+        {
+            ReportSelectedActions(selectedDirectives.Count + selectedSkills.Count);
+        }
+
         var directiveResult = await directiveInstaller
             .ApplyAsync(directivePlan, selectedDirectives.Select(directive => directive.Name), options.DryRun, cancellationToken)
             .ConfigureAwait(false);
@@ -232,6 +237,11 @@ sealed class CheckWorkflow(
         {
             await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
             return new CheckRunResult(2, report);
+        }
+
+        if (!options.DryRun)
+        {
+            ReportDirectiveApplyActions(selectedDirectives);
         }
 
         if (options.DryRun)
@@ -271,7 +281,7 @@ sealed class CheckWorkflow(
                 [.. skillsDirectories.Skip(1)],
                 options.Preview);
             await reporter.RunProgressAsync(
-                "Installing skills",
+                ActionOutputFormatter.ProgressIndent,
                 installOperationCount,
                 async advance =>
                 {
@@ -646,6 +656,32 @@ sealed class CheckWorkflow(
         ReportSectionHeader(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Found {skillUpdates.Count} skill update(s) available:"));
         ReportSkillUpdateGroups(skillUpdates, recommendedSkills);
     }
+
+    void ReportSelectedActions(int selectedActionCount)
+    {
+        reporter.Plain(string.Empty);
+        reporter.Info(ActionOutputFormatter.FormatSelectionSummary(selectedActionCount));
+        if (selectedActionCount == 0)
+        {
+            return;
+        }
+
+        reporter.Plain(string.Empty);
+        reporter.Bold(ActionOutputFormatter.FormatHeader());
+    }
+
+    void ReportDirectiveApplyActions(IReadOnlyList<DirectivePlanItem> selectedDirectives)
+    {
+        foreach (var directive in selectedDirectives)
+        {
+            reporter.Success(ActionOutputFormatter.FormatLine(
+                FormatDirectiveApplyAction(directive),
+                directive.Name));
+        }
+    }
+
+    static string FormatDirectiveApplyAction(DirectivePlanItem directive)
+        => directive.Status == DirectiveStatuses.Outdated ? "Updated directive" : "Installed directive";
 
     void ReportSectionHeader(string header)
     {

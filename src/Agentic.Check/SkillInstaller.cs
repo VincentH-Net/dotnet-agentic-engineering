@@ -63,10 +63,9 @@ sealed class SkillInstaller(ICommandRunner commandRunner, IReporter reporter)
 
             if (result.Success)
             {
-                string prefix = reportPreviewChangeStatus
-                    ? FormatPreviewChangePrefix(beforeSha, ReadTreeSha(skillFile))
-                    : string.Empty;
-                reporter.Success($"{prefix}Installed {skill.Display}");
+                reporter.Success(ActionOutputFormatter.FormatLine(
+                    FormatInstallAction(skill, reportPreviewChangeStatus, beforeSha, ReadTreeSha(skillFile)),
+                    skill.LocalFolder));
             }
             else
             {
@@ -102,10 +101,9 @@ sealed class SkillInstaller(ICommandRunner commandRunner, IReporter reporter)
                 {
                     CopyDirectory(sourceDirectory, targetDirectory);
                     results.Add(new SkillCopyResult(sourceDirectory, targetDirectory, skill.LocalFolder, true, null));
-                    string prefix = reportPreviewChangeStatus
-                        ? FormatPreviewChangePrefix(beforeSha, ReadTreeSha(targetSkillFile))
-                        : string.Empty;
-                    reporter.Success($"{prefix}Copied {skill.LocalFolder} to {targetSkillsDirectory}");
+                    reporter.Success(ActionOutputFormatter.FormatLine(
+                        FormatCopyAction(skill, reportPreviewChangeStatus, beforeSha, ReadTreeSha(targetSkillFile)),
+                        skill.LocalFolder));
                 }
                 catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or DirectoryNotFoundException)
                 {
@@ -137,21 +135,53 @@ sealed class SkillInstaller(ICommandRunner commandRunner, IReporter reporter)
         return shas;
     }
 
-    static string FormatPreviewChangePrefix(string? beforeSha, string? afterSha)
+    static string FormatInstallAction(
+        SkillManifestEntry skill,
+        bool reportPreviewChangeStatus,
+        string? beforeSha,
+        string? afterSha)
+    {
+        if (reportPreviewChangeStatus)
+        {
+            return FormatPreviewChangeAction(beforeSha, afterSha);
+        }
+
+        return skill.ForceInstall && skill.RecommendationAction.Equals("switch to stable", StringComparison.Ordinal)
+            ? "Switch to stable skill"
+            : "Installed skill";
+    }
+
+    static string FormatCopyAction(
+        SkillManifestEntry skill,
+        bool reportPreviewChangeStatus,
+        string? beforeSha,
+        string? afterSha)
+    {
+        if (reportPreviewChangeStatus)
+        {
+            return FormatPreviewChangeAction(beforeSha, afterSha);
+        }
+
+        return skill.ForceInstall && skill.RecommendationAction.Equals("switch to stable", StringComparison.Ordinal)
+            ? "Switch to stable skill"
+            : "Copied skill";
+    }
+
+    static string FormatPreviewChangeAction(string? beforeSha, string? afterSha)
     {
         if (string.IsNullOrWhiteSpace(afterSha))
         {
-            return "(re-installed) ";
+            return "Re-installed skill";
         }
 
         if (string.IsNullOrWhiteSpace(beforeSha))
         {
-            return "(installed   ) ";
+            return "Installed skill";
         }
 
         return string.Equals(beforeSha, afterSha, StringComparison.OrdinalIgnoreCase)
-            ? "(re-installed) "
-            : "(updated     ) ";
+            ? "Re-installed skill"
+            : "Updated skill";
     }
 
     static string? ReadTreeSha(string skillFile)

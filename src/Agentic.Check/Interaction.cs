@@ -1,4 +1,5 @@
 ﻿using Spectre.Console;
+using Spectre.Console.Rendering;
 
 namespace Agentic.Check;
 
@@ -183,11 +184,12 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
         CancellationToken cancellationToken)
         => await console.Progress()
             .AutoClear(false)
-            .Columns(CreateProgressColumns())
+            .Columns(CreateProgressColumns(description))
             .StartAsync(async context =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var task = context.AddTask(description, maxValue: Math.Max(total, 1));
+                string taskDescription = description == ActionOutputFormatter.ProgressIndent ? "Applying actions" : description;
+                var task = context.AddTask(taskDescription, maxValue: Math.Max(total, 1));
                 await action(() => task.Increment(1)).ConfigureAwait(false);
                 if (!task.IsFinished)
                 {
@@ -195,8 +197,22 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
                 }
             }).ConfigureAwait(false);
 
+    internal static ProgressColumn[] CreateProgressColumns(string description)
+        => description == ActionOutputFormatter.ProgressIndent
+            ? [new FixedTextProgressColumn(ActionOutputFormatter.ProgressIndent), new ProgressBarColumn(), new PercentageColumn(), new SpinnerColumn()]
+            : CreateProgressColumns();
+
     internal static ProgressColumn[] CreateProgressColumns()
         => [new TaskDescriptionColumn(), new ProgressBarColumn(), new PercentageColumn(), new SpinnerColumn()];
+
+    sealed class FixedTextProgressColumn(string text) : ProgressColumn
+    {
+        public override IRenderable Render(RenderOptions options, ProgressTask task, TimeSpan deltaTime)
+            => new Text(text);
+
+        public override int? GetColumnWidth(RenderOptions options)
+            => text.Length;
+    }
 
     internal static string FormatDirectiveSummary(DirectiveSummary directiveSummary)
         => FormatRecommendationStatus(

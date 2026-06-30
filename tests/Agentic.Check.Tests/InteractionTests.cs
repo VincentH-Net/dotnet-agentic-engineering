@@ -147,6 +147,32 @@ public sealed class InteractionTests
     }
 
     [Fact]
+    public async Task ActionProgressUsesNonEmptyInternalTaskName()
+    {
+        using StringWriter writer = new();
+        var console = AnsiConsole.Create(new AnsiConsoleSettings
+        {
+            Ansi = AnsiSupport.No,
+            Interactive = InteractionSupport.No,
+            Out = new AnsiConsoleOutput(writer)
+        });
+        SpectreReporter reporter = new(console);
+
+        var exception = await Record.ExceptionAsync(() => reporter.RunProgressAsync(
+            ActionOutputFormatter.ProgressIndent,
+            1,
+            action =>
+            {
+                action();
+                return Task.CompletedTask;
+            },
+            CancellationToken.None));
+
+        Assert.Null(exception);
+        Assert.DoesNotContain("Applying actions", writer.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void StackDisplayUsesLayerOrderAndUnoGateDetails()
     {
         HashSet<string> technologies = new(StringComparer.OrdinalIgnoreCase)
