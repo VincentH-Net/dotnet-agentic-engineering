@@ -17,7 +17,7 @@
     <PackageTags>agentic-check;agentic;dotnet-tool;dotnet;cli;skills;directives;github;repo;doctor;check;codex;claude-code;gh skills</PackageTags>
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/VincentH-Net/dotnet-agentic-engineering</RepositoryUrl>
-    <PackageReleaseNotes>Silently building in public phase - not listed / posted yet...</PackageReleaseNotes>
+    <PackageReleaseNotes>https://github.com/VincentH-Net/dotnet-agentic-engineering/releases/tag/$(Version)</PackageReleaseNotes>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
   <ItemGroup>
