@@ -508,7 +508,7 @@ sealed class GitHubDirectiveSource(
             .Select(item => new DirectiveSourceFile(
                 item.Name,
                 item.DownloadUrl,
-                sourceVersionMode == SourceVersionMode.Preview ? directiveRef.Display : directiveRef.Ref))];
+                directiveRef.Display))];
     }
 
     public async Task<string> FetchAsync(DirectiveSourceFile sourceFile, CancellationToken cancellationToken)
@@ -538,11 +538,31 @@ sealed class GitHubDirectiveSource(
             var release = JsonSerializer.Deserialize<GitHubRelease>(releaseContent);
             if (!string.IsNullOrWhiteSpace(release?.TagName))
             {
-                return new SourceVersionInfo("VincentH-Net/dotnet-agentic-engineering", release.TagName, DateTimeOffset.UtcNow);
+                return new SourceVersionInfo(
+                    "VincentH-Net/dotnet-agentic-engineering",
+                    release.TagName,
+                    ResolveReleaseDate(release, DirectiveInstallerUrl.LatestRelease).ToUniversalTime());
             }
         }
 
         return await ResolveDefaultBranchRefAsync(includeCommitDate: false, cancellationToken).ConfigureAwait(false);
+    }
+
+    static DateTimeOffset ResolveReleaseDate(GitHubRelease release, string latestReleaseUrl)
+    {
+        string? dateValue = !string.IsNullOrWhiteSpace(release.PublishedAt)
+            ? release.PublishedAt
+            : release.CreatedAt;
+        if (!DateTimeOffset.TryParse(
+            dateValue,
+            System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.AssumeUniversal,
+            out var releaseDate))
+        {
+            throw new DirectiveException($"Latest directive release metadata from {latestReleaseUrl} is missing a valid release date.");
+        }
+
+        return releaseDate;
     }
 
     async Task<SourceVersionInfo> ResolveDefaultBranchRefAsync(bool includeCommitDate, CancellationToken cancellationToken)
@@ -897,7 +917,10 @@ static class DirectiveInstallerUrl
         => RepositoryApiBase + "/branches/" + Uri.EscapeDataString(branch);
 }
 
-sealed record GitHubRelease([property: JsonPropertyName("tag_name")] string TagName);
+sealed record GitHubRelease(
+    [property: JsonPropertyName("tag_name")] string TagName,
+    [property: JsonPropertyName("published_at")] string PublishedAt,
+    [property: JsonPropertyName("created_at")] string CreatedAt);
 
 sealed record GitHubRepository([property: JsonPropertyName("default_branch")] string DefaultBranch);
 
