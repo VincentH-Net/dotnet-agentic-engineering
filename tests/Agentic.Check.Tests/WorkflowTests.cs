@@ -90,6 +90,38 @@ public sealed class WorkflowTests
     }
 
     [Fact]
+    public async Task StableDryRunAddsSkillVersionInfoWithoutPinningInstalls()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write("App.csproj", "<Project />");
+        FakeCommandRunner commandRunner = new();
+        commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "No updates available.", string.Empty));
+        FakeSourceVersionResolver sourceVersionResolver = new();
+        CheckWorkflow workflow = new(
+            commandRunner,
+            new FakePrompts(),
+            new RecordingReporter(),
+            new FakeDirectiveSource(),
+            sourceVersionResolver);
+
+        var result = await workflow.RunAsync(
+            new AgenticCheckOptions(tempDirectory.Path, true, false, null, null, "codex", false),
+            CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains(result.Report.RecommendedSkills, skill =>
+            skill.InstallArg == "dotnet-livecharts2"
+            && skill.SourceRef.Length == 0
+            && skill.Version == "v1.2.3 @ 2026-06-29 08:11 UTC");
+        Assert.Contains(result.Report.Actions, action => action.Contains(
+            "Would install VincentH-Net/dotnet-agentic-engineering dotnet-livecharts2",
+            StringComparison.Ordinal));
+        Assert.DoesNotContain(result.Report.Actions, action => action.Contains("@v1.2.3", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task PreviewDryRunSkipsSkillUpdateDetectionAndUsesDefaultBranchSources()
     {
         using TempDirectory tempDirectory = new();
@@ -589,7 +621,7 @@ public sealed class WorkflowTests
         commandRunner.Enqueue(new CommandResult(0, string.Empty, "1 update(s) available:"));
         FakePrompts prompts = new() { ConfirmResult = true };
         RecordingReporter reporter = new();
-        CheckWorkflow workflow = new(commandRunner, prompts, reporter, new FakeDirectiveSource());
+        CheckWorkflow workflow = new(commandRunner, prompts, reporter, new FakeDirectiveSource(), new FakeSourceVersionResolver());
 
         var result = await workflow.RunAsync(
             new AgenticCheckOptions(tempDirectory.Path, false, false, null, null, null, false),

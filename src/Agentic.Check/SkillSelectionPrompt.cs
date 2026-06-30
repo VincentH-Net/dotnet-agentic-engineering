@@ -392,6 +392,11 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
         string? lastSkillPlugin = null;
         bool showVersionColumn = visibleItems.Any(item => !string.IsNullOrWhiteSpace(item.Version));
         int versionColumnStart = showVersionColumn ? CalculateVersionColumnStart(state.FilteredItems) : 0;
+        if (showVersionColumn)
+        {
+            MarkupLine(FormatColumnHeader(versionColumnStart));
+        }
+
         string[] visibleSkillSourceReposWithoutPluginHeaders = [.. visibleItems
             .Select(item => item.Skill)
             .OfType<SkillManifestEntry>()
@@ -405,10 +410,6 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
             if (item.Kind != lastKind)
             {
                 MarkupLine(FormatRecommendationKindHeaderMarkup(item.Kind));
-                if (showVersionColumn)
-                {
-                    MarkupLine(FormatColumnHeader(item.Kind, versionColumnStart));
-                }
 
                 lastKind = item.Kind;
                 lastSkillSourceRepo = null;
@@ -437,7 +438,7 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
             string cursor = itemIndex == state.CursorIndex ? ">" : " ";
             string checkText = state.IsSelected(item) ? "[x]" : "[ ]";
             string check = Markup.Escape(checkText);
-            string indent = item.Skill is null ? string.Empty : "    ";
+            string indent = showVersionColumn || item.Skill is not null ? "    " : string.Empty;
             string rowPrefix = $"{indent}{cursor} {checkText} ";
             string display = Markup.Escape(item.Display);
             if (showVersionColumn)
@@ -458,15 +459,15 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
         => visibleItems
             .Select(item =>
             {
-                string indent = item.Skill is null ? string.Empty : "    ";
+                string indent = "    ";
                 return indent.Length + "> [x] ".Length + item.Display.Length + 2;
             })
             .DefaultIfEmpty(0)
             .Max();
 
-    static string FormatColumnHeader(RecommendationSelectionKind kind, int versionColumnStart)
+    static string FormatColumnHeader(int versionColumnStart)
     {
-        string prefix = kind == RecommendationSelectionKind.Skill ? "          " : "      ";
+        const string prefix = "          ";
         int padding = Math.Max(1, versionColumnStart - (prefix.Length + "Name".Length));
         return $"{prefix}[bold]Name[/]{new string(' ', padding)}[bold]Version[/]";
     }

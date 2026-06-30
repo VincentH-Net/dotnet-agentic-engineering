@@ -269,8 +269,9 @@ sealed class FakeSourceVersionResolver : ISourceVersionResolver
 {
     public List<string> RequestedSourceRepos { get; } = [];
 
-    public Task<IReadOnlyDictionary<string, SourceVersionInfo>> ResolvePreviewVersionsAsync(
+    public Task<IReadOnlyDictionary<string, SourceVersionInfo>> ResolveVersionsAsync(
         IEnumerable<string> sourceRepos,
+        SourceVersionMode sourceVersionMode,
         DirectiveCacheSettings cacheSettings,
         CancellationToken cancellationToken)
     {
@@ -279,10 +280,15 @@ sealed class FakeSourceVersionResolver : ISourceVersionResolver
         foreach (string sourceRepo in sourceRepos.Distinct(StringComparer.OrdinalIgnoreCase))
         {
             RequestedSourceRepos.Add(sourceRepo);
-            result[sourceRepo] = new SourceVersionInfo(
-                sourceRepo,
-                "main",
-                new DateTimeOffset(2026, 6, 30, 9, 12, 0, TimeSpan.Zero));
+            result[sourceRepo] = sourceVersionMode == SourceVersionMode.Preview
+                ? new SourceVersionInfo(
+                    sourceRepo,
+                    "main",
+                    new DateTimeOffset(2026, 6, 30, 9, 12, 0, TimeSpan.Zero))
+                : new SourceVersionInfo(
+                    sourceRepo,
+                    "v1.2.3",
+                    new DateTimeOffset(2026, 6, 29, 8, 11, 0, TimeSpan.Zero));
         }
 
         return Task.FromResult((IReadOnlyDictionary<string, SourceVersionInfo>)result);

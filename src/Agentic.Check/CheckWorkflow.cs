@@ -127,12 +127,11 @@ sealed class CheckWorkflow(
         string firstSkillsDirectory = skillsDirectories[0];
         report.SkillsDirectory = firstSkillsDirectory;
         report.SkillsDirectories.AddRange(skillsDirectories);
-        var manifest = options.Preview ? StaticSkillManifest.Preview : StaticSkillManifest.All;
-        if (options.Preview)
-        {
-            manifest = await AddPreviewVersionInfoAsync(manifest, directiveCacheSettings, cancellationToken)
-                .ConfigureAwait(false);
-        }
+        var manifest = await AddSourceVersionInfoAsync(
+            options.Preview ? StaticSkillManifest.Preview : StaticSkillManifest.All,
+            sourceMode,
+            directiveCacheSettings,
+            cancellationToken).ConfigureAwait(false);
 
         await reporter.RunProgressAsync(
             "Scanning target directory",
@@ -338,20 +337,30 @@ sealed class CheckWorkflow(
         return new CheckRunResult(exitCode, report);
     }
 
-    async Task<IReadOnlyList<SkillManifestEntry>> AddPreviewVersionInfoAsync(
+    async Task<IReadOnlyList<SkillManifestEntry>> AddSourceVersionInfoAsync(
         IReadOnlyList<SkillManifestEntry> manifest,
+        SourceVersionMode sourceVersionMode,
         DirectiveCacheSettings cacheSettings,
         CancellationToken cancellationToken)
     {
         var resolver = sourceVersionResolver ?? new GitHubSourceVersionResolver(reporter: reporter);
-        var versions = await resolver
-            .ResolvePreviewVersionsAsync(manifest.Select(skill => skill.SourceRepo), cacheSettings, cancellationToken)
-            .ConfigureAwait(false);
+        IReadOnlyDictionary<string, SourceVersionInfo> versions;
+        try
+        {
+            versions = await resolver
+                .ResolveVersionsAsync(manifest.Select(skill => skill.SourceRepo), sourceVersionMode, cacheSettings, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (DirectiveException exception)
+        {
+            reporter.Warning($"Could not resolve skill source versions: {exception.Message}");
+            return manifest;
+        }
 
         return [.. manifest.Select(skill => versions.TryGetValue(skill.SourceRepo, out var version)
             ? skill with
             {
-                SourceRef = version.Ref,
+                SourceRef = sourceVersionMode == SourceVersionMode.Preview ? version.Ref : string.Empty,
                 Version = version.Display
             }
             : skill)];
