@@ -18,6 +18,38 @@ public sealed class SkillInstallerTests
     }
 
     [Fact]
+    public void FindInstalledFromBranchUsesLocalSkillMetadata()
+    {
+        using TempDirectory tempDirectory = new();
+        string skillsDirectory = tempDirectory.CreateDirectory(".agents/skills");
+        tempDirectory.Write(
+            ".agents/skills/preview-skill/SKILL.md",
+            """
+            ---
+            metadata:
+                github-ref: refs/heads/main
+            ---
+            # Preview
+            """);
+        tempDirectory.Write(
+            ".agents/skills/stable-skill/SKILL.md",
+            """
+            ---
+            metadata:
+                github-ref: refs/tags/2.0.0
+            ---
+            # Stable
+            """);
+        SkillManifestEntry preview = new("owner/repo", "preview-skill", "preview-skill", TechnologyNames.Dotnet, []);
+        SkillManifestEntry stable = new("owner/repo", "stable-skill", "stable-skill", TechnologyNames.Dotnet, []);
+
+        var result = SkillInstaller.FindInstalledFromBranch([preview, stable], [skillsDirectory]);
+
+        var found = Assert.Single(result);
+        Assert.Equal("preview-skill", found.InstallArg);
+    }
+
+    [Fact]
     public async Task InstallContinuesAfterFailuresAndReportsEachResult()
     {
         FakeCommandRunner commandRunner = new();

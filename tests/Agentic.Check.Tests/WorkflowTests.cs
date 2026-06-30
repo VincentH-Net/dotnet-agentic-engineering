@@ -249,6 +249,54 @@ public sealed class WorkflowTests
         Assert.Contains("Installed or updated 1 preview skill(s):", reporter.BoldMessages);
         Assert.Contains("      dotnet-webapi", reporter.PlainMessages);
         Assert.DoesNotContain(commandRunner.Calls, call => call.Arguments.Contains("update"));
+        Assert.DoesNotContain("Up to date directives:", reporter.BoldMessages);
+        Assert.DoesNotContain("Up to date skills:", reporter.BoldMessages);
+    }
+
+    [Fact]
+    public async Task StableRunOffersBranchInstalledSkillsAsSwitchToStableActions()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write("App.csproj", "<Project />");
+        tempDirectory.Write(
+            ".agents/skills/dotnet-livecharts2/SKILL.md",
+            """
+            ---
+            github-ref: refs/heads/main
+            github-tree-sha: preview-sha
+            ---
+            # dotnet-livecharts2
+            """);
+        FakeCommandRunner commandRunner = new();
+        commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "No updates available.", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "installed stable", string.Empty));
+        CheckWorkflow workflow = new(
+            commandRunner,
+            new FakePrompts
+            {
+                SelectedDirectiveNames = [],
+                SelectedSkillInstallArgs = ["dotnet-livecharts2"]
+            },
+            new NullReporter(),
+            new FakeDirectiveSource(),
+            new FakeSourceVersionResolver());
+
+        var result = await workflow.RunAsync(
+            new AgenticCheckOptions(tempDirectory.Path, false, false, null, null, "codex", false),
+            CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains(commandRunner.Calls, call => call.Arguments.SequenceEqual([
+            "skill",
+            "install",
+            "VincentH-Net/dotnet-agentic-engineering",
+            "dotnet-livecharts2",
+            "--dir",
+            Path.Combine(tempDirectory.Path, ".agents", "skills"),
+            "--force"]));
+        Assert.DoesNotContain(commandRunner.Calls, call => call.Arguments.Contains("--pin"));
     }
 
     [Fact]

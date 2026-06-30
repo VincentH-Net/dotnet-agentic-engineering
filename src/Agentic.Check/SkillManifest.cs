@@ -11,7 +11,9 @@ sealed record SkillManifestEntry
         string plugin = "",
         IReadOnlyList<SkillDependency>? dependencies = null,
         string sourceRef = "",
-        string version = "")
+        string version = "",
+        string recommendationAction = "install",
+        bool forceInstall = false)
     {
         SourceRepo = sourceRepo;
         InstallArg = installArg;
@@ -22,6 +24,8 @@ sealed record SkillManifestEntry
         Dependencies = dependencies ?? [];
         SourceRef = sourceRef;
         Version = version;
+        RecommendationAction = recommendationAction;
+        ForceInstall = forceInstall;
     }
 
     public string SourceRepo { get; init; }
@@ -43,6 +47,10 @@ sealed record SkillManifestEntry
     public string Version { get; init; }
 
     public string SourceRef { get; init; }
+
+    public string RecommendationAction { get; init; }
+
+    public bool ForceInstall { get; init; }
 
     public string Display => $"{SourceSpec} {InstallArg}";
 

@@ -196,12 +196,15 @@ sealed class CheckWorkflow(
         }
 
         var recommendedDirectives = directivePlan.SelectableDirectives;
-        var recommendedSkillActions = options.Preview ? recommended : missing;
+        var branchInstalledSkills = FindBranchInstalledSkillActions(options.Preview, recommended, skillsDirectories);
+        var recommendedSkillActions = options.Preview
+            ? recommended
+            : BuildStableSkillActions(recommended, missing, branchInstalledSkills);
         IReadOnlyList<DirectivePlanItem> selectedDirectives = [];
         IReadOnlyList<SkillManifestEntry> selectedSkills = [];
-        if (!options.DryRun)
+        if (!options.DryRun && !options.Preview)
         {
-            ReportUpToDateItems(directivePlan.Directives, recommended, missing, skillUpdates);
+            ReportUpToDateItems(directivePlan.Directives, recommended, missing, skillUpdates, branchInstalledSkills);
         }
 
         if (recommendedDirectives.Count > 0 || recommendedSkillActions.Count > 0)
@@ -238,7 +241,7 @@ sealed class CheckWorkflow(
 
             foreach (var skill in selectedSkills)
             {
-                foreach (string skillsDirectory in skillsDirectories.Where(directory => options.Preview || SkillInstaller.IsMissing(skill, directory)))
+                foreach (string skillsDirectory in skillsDirectories.Where(directory => options.Preview || skill.ForceInstall || SkillInstaller.IsMissing(skill, directory)))
                 {
                     report.Actions.Add($"Would install {skill.SourceSpec} {skill.InstallArg} into {skillsDirectory}.");
                 }
@@ -261,7 +264,7 @@ sealed class CheckWorkflow(
                 : new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
             var firstDirectoryInstallSkills = options.Preview
                 ? selectedSkills
-                : [.. selectedSkills.Where(skill => SkillInstaller.IsMissing(skill, firstSkillsDirectory))];
+                : [.. selectedSkills.Where(skill => skill.ForceInstall || SkillInstaller.IsMissing(skill, firstSkillsDirectory))];
             int installOperationCount = CountSkillInstallOperations(
                 selectedSkills,
                 firstDirectoryInstallSkills,
@@ -286,7 +289,7 @@ sealed class CheckWorkflow(
                     if (skillsDirectories.Count > 1)
                     {
                         SkillManifestEntry[] copyableSkills = [.. selectedSkills
-                            .Where(skill => options.Preview || !SkillInstaller.IsMissing(skill, firstSkillsDirectory))];
+                            .Where(skill => options.Preview || skill.ForceInstall || !SkillInstaller.IsMissing(skill, firstSkillsDirectory))];
                         report.SkillCopyResults.AddRange(skillInstaller.CopyInstalledSkills(
                             copyableSkills,
                             firstSkillsDirectory,
@@ -321,7 +324,7 @@ sealed class CheckWorkflow(
             {
                 copyOperations += overwriteCopies
                     ? selectedSkills.Count
-                    : selectedSkills.Count(skill => SkillInstaller.IsMissing(skill, targetSkillsDirectory));
+                    : selectedSkills.Count(skill => skill.ForceInstall || SkillInstaller.IsMissing(skill, targetSkillsDirectory));
             }
 
             return firstDirectoryInstallSkills.Count + copyOperations;
@@ -590,7 +593,8 @@ sealed class CheckWorkflow(
         IReadOnlyList<DirectivePlanItem> directives,
         IReadOnlyList<SkillManifestEntry> recommendedSkills,
         IReadOnlyList<SkillManifestEntry> missingSkills,
-        IReadOnlyList<SkillUpdateCandidate> skillUpdates)
+        IReadOnlyList<SkillUpdateCandidate> skillUpdates,
+        IReadOnlyList<SkillManifestEntry> branchInstalledSkills)
     {
         DirectivePlanItem[] currentDirectives = [.. directives
             .Where(directive => directive.Status == DirectiveStatuses.Current)
@@ -598,11 +602,15 @@ sealed class CheckWorkflow(
         var missingSkillKeys = missingSkills
             .Select(SkillKey)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var branchInstalledSkillKeys = branchInstalledSkills
+            .Select(SkillKey)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var updateSkillKeys = skillUpdates
             .SelectMany(update => UpdateSkillKeys(update, recommendedSkills))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         SkillManifestEntry[] upToDateSkills = [.. recommendedSkills
             .Where(skill => !missingSkillKeys.Contains(SkillKey(skill))
+                && !branchInstalledSkillKeys.Contains(SkillKey(skill))
                 && !updateSkillKeys.Contains(SkillKey(skill)))
         ];
         if (currentDirectives.Length == 0 && upToDateSkills.Length == 0)
@@ -766,6 +774,37 @@ sealed class CheckWorkflow(
 
     static string SkillKey(string sourceRepo, string skillName)
         => $"{sourceRepo}\n{skillName}";
+
+    static IReadOnlyList<SkillManifestEntry> BuildStableSkillActions(
+        IReadOnlyList<SkillManifestEntry> recommendedSkills,
+        IReadOnlyList<SkillManifestEntry> missingSkills,
+        IReadOnlyList<SkillManifestEntry> branchInstalledSkills)
+    {
+        var missingSkillKeys = missingSkills
+            .Select(SkillKey)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var branchInstalledSkillKeys = branchInstalledSkills
+            .Select(SkillKey)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return
+        [
+            .. recommendedSkills
+                .Where(skill => missingSkillKeys.Contains(SkillKey(skill)) || branchInstalledSkillKeys.Contains(SkillKey(skill)))
+                .Select(skill => branchInstalledSkillKeys.Contains(SkillKey(skill))
+                    ? skill with
+                    {
+                        RecommendationAction = "switch to stable",
+                        ForceInstall = true
+                    }
+                    : skill)
+        ];
+    }
+
+    static IReadOnlyList<SkillManifestEntry> FindBranchInstalledSkillActions(
+        bool preview,
+        IReadOnlyList<SkillManifestEntry> recommendedSkills,
+        IReadOnlyList<string> skillsDirectories)
+        => preview ? [] : SkillInstaller.FindInstalledFromBranch(recommendedSkills, skillsDirectories);
 
     static IReadOnlyList<SkillManifestEntry> AddSelectedSkillDependencies(
         IReadOnlyList<SkillManifestEntry> selectedSkills,

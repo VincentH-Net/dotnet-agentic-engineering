@@ -8,8 +8,17 @@ sealed class SkillInstaller(ICommandRunner commandRunner, IReporter reporter)
     internal static IReadOnlyList<SkillManifestEntry> FindMissing(IReadOnlyList<SkillManifestEntry> skills, IReadOnlyList<string> skillsDirectories)
         => [.. skills.Where(skill => skillsDirectories.Any(directory => IsMissing(skill, directory)))];
 
+    internal static IReadOnlyList<SkillManifestEntry> FindInstalledFromBranch(
+        IReadOnlyList<SkillManifestEntry> skills,
+        IReadOnlyList<string> skillsDirectories)
+        => [.. skills.Where(skill => skillsDirectories.Any(directory => IsInstalledFromBranch(skill, directory)))];
+
     internal static bool IsMissing(SkillManifestEntry skill, string skillsDirectory)
         => !File.Exists(Path.Combine(skillsDirectory, skill.LocalFolder, "SKILL.md"));
+
+    internal static bool IsInstalledFromBranch(SkillManifestEntry skill, string skillsDirectory)
+        => ReadGitHubRef(Path.Combine(skillsDirectory, skill.LocalFolder, "SKILL.md")) is { } gitHubRef
+            && gitHubRef.StartsWith("refs/heads/", StringComparison.OrdinalIgnoreCase);
 
     public async Task<IReadOnlyList<SkillInstallResult>> InstallAsync(
         IReadOnlyList<SkillManifestEntry> skills,
@@ -25,9 +34,17 @@ sealed class SkillInstaller(ICommandRunner commandRunner, IReporter reporter)
         {
             string skillFile = Path.Combine(skillsDirectory, skill.LocalFolder, "SKILL.md");
             string? beforeSha = reportPreviewChangeStatus ? ReadTreeSha(skillFile) : null;
-            string[] arguments = string.IsNullOrWhiteSpace(skill.SourceRef)
-                ? ["skill", "install", skill.SourceRepo, skill.InstallArg, "--dir", skillsDirectory]
-                : ["skill", "install", skill.SourceRepo, skill.InstallArg, "--dir", skillsDirectory, "--pin", skill.SourceRef, "--force"];
+            List<string> arguments = ["skill", "install", skill.SourceRepo, skill.InstallArg, "--dir", skillsDirectory];
+            if (!string.IsNullOrWhiteSpace(skill.SourceRef))
+            {
+                arguments.AddRange(["--pin", skill.SourceRef]);
+            }
+
+            if (skill.ForceInstall || !string.IsNullOrWhiteSpace(skill.SourceRef))
+            {
+                arguments.Add("--force");
+            }
+
             var result = await commandRunner.RunAsync(
                 "gh",
                 arguments,
@@ -75,7 +92,7 @@ sealed class SkillInstaller(ICommandRunner commandRunner, IReporter reporter)
         {
             _ = Directory.CreateDirectory(targetSkillsDirectory);
 
-            foreach (var skill in skills.Where(skill => overwriteExisting || IsMissing(skill, targetSkillsDirectory)))
+            foreach (var skill in skills.Where(skill => overwriteExisting || skill.ForceInstall || IsMissing(skill, targetSkillsDirectory)))
             {
                 string sourceDirectory = Path.Combine(sourceSkillsDirectory, skill.LocalFolder);
                 string targetDirectory = Path.Combine(targetSkillsDirectory, skill.LocalFolder);
@@ -138,6 +155,12 @@ sealed class SkillInstaller(ICommandRunner commandRunner, IReporter reporter)
     }
 
     static string? ReadTreeSha(string skillFile)
+        => ReadFrontMatterValue(skillFile, "github-tree-sha:");
+
+    static string? ReadGitHubRef(string skillFile)
+        => ReadFrontMatterValue(skillFile, "github-ref:");
+
+    static string? ReadFrontMatterValue(string skillFile, string key)
     {
         if (!File.Exists(skillFile))
         {
@@ -152,7 +175,7 @@ sealed class SkillInstaller(ICommandRunner commandRunner, IReporter reporter)
                 continue;
             }
 
-            if (!trimmedLine.StartsWith("github-tree-sha:", StringComparison.OrdinalIgnoreCase))
+            if (!trimmedLine.StartsWith(key, StringComparison.OrdinalIgnoreCase))
             {
                 if (trimmedLine.Equals("---", StringComparison.Ordinal))
                 {
@@ -162,7 +185,7 @@ sealed class SkillInstaller(ICommandRunner commandRunner, IReporter reporter)
                 continue;
             }
 
-            return trimmedLine["github-tree-sha:".Length..].Trim().Trim('"', '\'');
+            return trimmedLine[key.Length..].Trim().Trim('"', '\'');
         }
 
         return null;

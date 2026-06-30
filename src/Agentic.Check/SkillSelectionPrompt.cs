@@ -305,7 +305,7 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
         };
 
     internal static string FormatSkillListItem(SkillManifestEntry skill)
-        => $"{skill.LocalFolder} (install)";
+        => $"{skill.LocalFolder} ({skill.RecommendationAction})";
 
     internal static string FormatSkillSourceHeader(SkillManifestEntry skill)
         => FormatSkillSourceHeader(skill.SourceRepo);

@@ -68,6 +68,20 @@ public sealed class SkillSelectionStateTests
     }
 
     [Fact]
+    public void SkillListItemUsesRecommendationAction()
+    {
+        SkillManifestEntry skill = new(
+            "owner/repo",
+            "preview-skill",
+            "preview-skill",
+            TechnologyNames.Dotnet,
+            [],
+            recommendationAction: "switch to stable");
+
+        Assert.Equal("preview-skill (switch to stable)", RecommendationSelectionPrompt.FormatSkillListItem(skill));
+    }
+
+    [Fact]
     public void SinglePluginHeaderThatRepeatsRepoNameIsHidden()
     {
         Assert.False(SkillGroupHeaderPolicy.ShouldShowPluginHeaders("mtmattei/UnoPlatformSkills", ["UnoPlatformSkills"]));
