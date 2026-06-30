@@ -69,7 +69,10 @@ sealed class SkillInstaller(ICommandRunner commandRunner, IReporter reporter)
             }
             else
             {
-                reporter.Error($"Failed to install {skill.Display}: {result.StandardError.Trim()}");
+                reporter.Error(ActionOutputFormatter.FormatLine(
+                    "Failed skill install",
+                    ActionOutputFormatter.FormatSkillName(workingDirectory, skillsDirectory, skill.LocalFolder)));
+                reporter.Error(ActionOutputFormatter.FormatDetail(result.StandardError.Trim()));
             }
 
             progressAdvance?.Invoke();
@@ -109,7 +112,10 @@ sealed class SkillInstaller(ICommandRunner commandRunner, IReporter reporter)
                 catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or DirectoryNotFoundException)
                 {
                     results.Add(new SkillCopyResult(sourceDirectory, targetDirectory, skill.LocalFolder, false, exception.Message));
-                    reporter.Error($"Failed to copy {skill.LocalFolder} to {targetSkillsDirectory}: {exception.Message}");
+                    reporter.Error(ActionOutputFormatter.FormatLine(
+                        "Failed skill copy",
+                        ActionOutputFormatter.FormatSkillName(workingDirectory, targetSkillsDirectory, skill.LocalFolder)));
+                    reporter.Error(ActionOutputFormatter.FormatDetail(exception.Message));
                 }
                 finally
                 {

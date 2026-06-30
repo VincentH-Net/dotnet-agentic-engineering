@@ -52,17 +52,20 @@ public sealed class SkillInstallerTests
     [Fact]
     public async Task InstallContinuesAfterFailuresAndReportsEachResult()
     {
+        using TempDirectory tempDirectory = new();
+        string skillsDirectory = tempDirectory.CreateDirectory(".agents/skills");
         FakeCommandRunner commandRunner = new();
         commandRunner.Enqueue(new CommandResult(1, string.Empty, "not found"));
         commandRunner.Enqueue(new CommandResult(0, "installed", string.Empty));
-        SkillInstaller installer = new(commandRunner, new NullReporter());
+        RecordingReporter reporter = new();
+        SkillInstaller installer = new(commandRunner, reporter);
         SkillManifestEntry missing = new("owner/repo", "missing-skill", "missing-skill", TechnologyNames.Dotnet, []);
         SkillManifestEntry valid = new("owner/repo", "valid-skill", "valid-skill", TechnologyNames.Dotnet, []);
 
         var results = await installer.InstallAsync(
             [missing, valid],
-            Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N")),
-            Environment.CurrentDirectory,
+            skillsDirectory,
+            tempDirectory.Path,
             CancellationToken.None);
 
         Assert.Collection(
@@ -78,6 +81,8 @@ public sealed class SkillInstallerTests
                 Assert.True(result.Success);
                 Assert.Equal("valid-skill", result.InstallArg);
             });
+        Assert.Contains(ActionOutputFormatter.FormatLine("Failed skill install", Path.Combine(".agents", "skills", "missing-skill")), reporter.Errors);
+        Assert.Contains(ActionOutputFormatter.FormatDetail("not found"), reporter.Errors);
     }
 
     [Fact]
@@ -291,5 +296,31 @@ public sealed class SkillInstallerTests
             reportPreviewChangeStatus: true);
 
         Assert.Contains(ActionOutputFormatter.FormatLine("Re-installed skill", Path.Combine(".agents", "skills", "preview-skill")), reporter.Successes);
+    }
+
+    [Fact]
+    public void CopyFailureUsesActionTableOutput()
+    {
+        using TempDirectory tempDirectory = new();
+        string sourceSkillsDirectory = tempDirectory.CreateDirectory(".claude/skills");
+        string targetSkillsDirectory = tempDirectory.CreateDirectory(".agents/skills");
+        RecordingReporter reporter = new();
+        SkillInstaller installer = new(new FakeCommandRunner(), reporter);
+        SkillManifestEntry skill = new(
+            "owner/repo",
+            "missing-source",
+            "missing-source",
+            TechnologyNames.Dotnet,
+            []);
+
+        _ = installer.CopyInstalledSkills(
+            [skill],
+            sourceSkillsDirectory,
+            [targetSkillsDirectory],
+            tempDirectory.Path,
+            overwriteExisting: true);
+
+        Assert.Contains(ActionOutputFormatter.FormatLine("Failed skill copy", Path.Combine(".agents", "skills", "missing-source")), reporter.Errors);
+        Assert.Contains(reporter.Errors, error => error.StartsWith("    Source skill directory was not found:", StringComparison.Ordinal));
     }
 }
