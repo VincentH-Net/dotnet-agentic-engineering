@@ -7,7 +7,7 @@
     <ToolCommandName>agentic-check</ToolCommandName>
     <PackageId>Agentic.Check</PackageId>
     <Title>Agentic Check</Title>
-    <Version>2.0.0</Version>
+    <Version>2.1.0</Version>
     <Authors>VincentH-Net</Authors>
     <Copyright>Copyright © VincentH.NET</Copyright>
     <Description>Optimizes your repo for agentic engineering with .NET - based technologies.</Description>
