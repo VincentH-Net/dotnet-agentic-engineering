@@ -16,15 +16,21 @@ sealed class SkillInstaller(ICommandRunner commandRunner, IReporter reporter)
         string skillsDirectory,
         string workingDirectory,
         CancellationToken cancellationToken,
-        Action? progressAdvance = null)
+        Action? progressAdvance = null,
+        bool reportPreviewChangeStatus = false)
     {
         _ = Directory.CreateDirectory(skillsDirectory);
         List<SkillInstallResult> results = [];
         foreach (var skill in skills)
         {
+            string skillFile = Path.Combine(skillsDirectory, skill.LocalFolder, "SKILL.md");
+            string? beforeSha = reportPreviewChangeStatus ? ReadTreeSha(skillFile) : null;
+            string[] arguments = string.IsNullOrWhiteSpace(skill.SourceRef)
+                ? ["skill", "install", skill.SourceRepo, skill.InstallArg, "--dir", skillsDirectory]
+                : ["skill", "install", skill.SourceRepo, skill.InstallArg, "--dir", skillsDirectory, "--pin", skill.SourceRef, "--force"];
             var result = await commandRunner.RunAsync(
                 "gh",
-                ["skill", "install", skill.SourceRepo, skill.InstallArg, "--dir", skillsDirectory],
+                arguments,
                 workingDirectory,
                 cancellationToken).ConfigureAwait(false);
 
@@ -40,7 +46,10 @@ sealed class SkillInstaller(ICommandRunner commandRunner, IReporter reporter)
 
             if (result.Success)
             {
-                reporter.Success($"Installed {skill.Display}");
+                string prefix = reportPreviewChangeStatus
+                    ? FormatPreviewChangePrefix(beforeSha, ReadTreeSha(skillFile))
+                    : string.Empty;
+                reporter.Success($"{prefix}Installed {skill.Display}");
             }
             else
             {
@@ -57,22 +66,29 @@ sealed class SkillInstaller(ICommandRunner commandRunner, IReporter reporter)
         IReadOnlyList<SkillManifestEntry> skills,
         string sourceSkillsDirectory,
         IReadOnlyList<string> targetSkillsDirectories,
-        Action? progressAdvance = null)
+        Action? progressAdvance = null,
+        bool overwriteExisting = false,
+        bool reportPreviewChangeStatus = false)
     {
         List<SkillCopyResult> results = [];
         foreach (string targetSkillsDirectory in targetSkillsDirectories)
         {
             _ = Directory.CreateDirectory(targetSkillsDirectory);
 
-            foreach (var skill in skills.Where(skill => IsMissing(skill, targetSkillsDirectory)))
+            foreach (var skill in skills.Where(skill => overwriteExisting || IsMissing(skill, targetSkillsDirectory)))
             {
                 string sourceDirectory = Path.Combine(sourceSkillsDirectory, skill.LocalFolder);
                 string targetDirectory = Path.Combine(targetSkillsDirectory, skill.LocalFolder);
+                string targetSkillFile = Path.Combine(targetDirectory, "SKILL.md");
+                string? beforeSha = reportPreviewChangeStatus ? ReadTreeSha(targetSkillFile) : null;
                 try
                 {
                     CopyDirectory(sourceDirectory, targetDirectory);
                     results.Add(new SkillCopyResult(sourceDirectory, targetDirectory, skill.LocalFolder, true, null));
-                    reporter.Success($"Copied {skill.LocalFolder} to {targetSkillsDirectory}");
+                    string prefix = reportPreviewChangeStatus
+                        ? FormatPreviewChangePrefix(beforeSha, ReadTreeSha(targetSkillFile))
+                        : string.Empty;
+                    reporter.Success($"{prefix}Copied {skill.LocalFolder} to {targetSkillsDirectory}");
                 }
                 catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or DirectoryNotFoundException)
                 {
@@ -87,6 +103,69 @@ sealed class SkillInstaller(ICommandRunner commandRunner, IReporter reporter)
         }
 
         return results;
+    }
+
+    internal static IReadOnlyDictionary<string, string?> ReadTreeShas(
+        IReadOnlyList<SkillManifestEntry> skills,
+        IReadOnlyList<string> skillsDirectories)
+    {
+        Dictionary<string, string?> shas = new(StringComparer.OrdinalIgnoreCase);
+        foreach (var skill in skills)
+        {
+            shas[skill.Key] = skillsDirectories
+                .Select(directory => ReadTreeSha(Path.Combine(directory, skill.LocalFolder, "SKILL.md")))
+                .FirstOrDefault(sha => !string.IsNullOrWhiteSpace(sha));
+        }
+
+        return shas;
+    }
+
+    static string FormatPreviewChangePrefix(string? beforeSha, string? afterSha)
+    {
+        if (string.IsNullOrWhiteSpace(afterSha))
+        {
+            return "(re-installed) ";
+        }
+
+        if (string.IsNullOrWhiteSpace(beforeSha))
+        {
+            return "(installed   ) ";
+        }
+
+        return string.Equals(beforeSha, afterSha, StringComparison.OrdinalIgnoreCase)
+            ? "(re-installed) "
+            : "(updated     ) ";
+    }
+
+    static string? ReadTreeSha(string skillFile)
+    {
+        if (!File.Exists(skillFile))
+        {
+            return null;
+        }
+
+        foreach (string line in File.ReadLines(skillFile))
+        {
+            string trimmedLine = line.Trim();
+            if (trimmedLine.Equals("---", StringComparison.Ordinal) && line.Length == 3)
+            {
+                continue;
+            }
+
+            if (!trimmedLine.StartsWith("github-tree-sha:", StringComparison.OrdinalIgnoreCase))
+            {
+                if (trimmedLine.Equals("---", StringComparison.Ordinal))
+                {
+                    return null;
+                }
+
+                continue;
+            }
+
+            return trimmedLine["github-tree-sha:".Length..].Trim().Trim('"', '\'');
+        }
+
+        return null;
     }
 
     static void CopyDirectory(string sourceDirectory, string targetDirectory)

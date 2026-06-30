@@ -28,7 +28,8 @@ sealed record RecommendationSelectionItem(
     string Display,
     RecommendationSelectionKind Kind,
     DirectivePlanItem? Directive,
-    SkillManifestEntry? Skill);
+    SkillManifestEntry? Skill,
+    string Version = "");
 
 sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionItem> items)
 {
@@ -189,6 +190,7 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
 
     static bool MatchesFilter(RecommendationSelectionItem item, string filter)
         => item.Display.Contains(filter, StringComparison.OrdinalIgnoreCase)
+            || item.Version.Contains(filter, StringComparison.OrdinalIgnoreCase)
             || item.Skill?.SourceRepo.Contains(filter, StringComparison.OrdinalIgnoreCase) == true
             || item.Skill?.Plugin.Contains(filter, StringComparison.OrdinalIgnoreCase) == true;
 
@@ -279,13 +281,15 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
             FormatDirectiveListItem(directive),
             RecommendationSelectionKind.Directive,
             directive,
-            null)));
+            null,
+            directive.Version)));
         items.AddRange(missingSkills.Select(skill => new RecommendationSelectionItem(
             RecommendationSelectionState.FormatSkillKey(skill.SourceRepo, skill.InstallArg),
             FormatSkillListItem(skill),
             RecommendationSelectionKind.Skill,
             null,
-            skill)));
+            skill,
+            skill.Version)));
         return items;
     }
 
@@ -386,6 +390,8 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
         RecommendationSelectionKind? lastKind = null;
         string? lastSkillSourceRepo = null;
         string? lastSkillPlugin = null;
+        bool showVersionColumn = visibleItems.Any(item => !string.IsNullOrWhiteSpace(item.Version));
+        int versionColumnStart = showVersionColumn ? CalculateVersionColumnStart(state.FilteredItems) : 0;
         string[] visibleSkillSourceReposWithoutPluginHeaders = [.. visibleItems
             .Select(item => item.Skill)
             .OfType<SkillManifestEntry>()
@@ -399,6 +405,11 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
             if (item.Kind != lastKind)
             {
                 MarkupLine(FormatRecommendationKindHeaderMarkup(item.Kind));
+                if (showVersionColumn)
+                {
+                    MarkupLine(FormatColumnHeader(item.Kind, versionColumnStart));
+                }
+
                 lastKind = item.Kind;
                 lastSkillSourceRepo = null;
                 lastSkillPlugin = null;
@@ -424,13 +435,40 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
             }
 
             string cursor = itemIndex == state.CursorIndex ? ">" : " ";
-            string check = state.IsSelected(item) ? "[[x]]" : "[[ ]]";
-            string display = Markup.Escape(item.Display);
+            string checkText = state.IsSelected(item) ? "[x]" : "[ ]";
+            string check = Markup.Escape(checkText);
             string indent = item.Skill is null ? string.Empty : "    ";
-            MarkupLine($"{indent}{cursor} {check} {display}");
+            string rowPrefix = $"{indent}{cursor} {checkText} ";
+            string display = Markup.Escape(item.Display);
+            if (showVersionColumn)
+            {
+                int padding = Math.Max(1, versionColumnStart - (rowPrefix.Length + item.Display.Length));
+                MarkupLine($"{indent}{cursor} {check} {display}{new string(' ', padding)}{Markup.Escape(item.Version)}");
+            }
+            else
+            {
+                MarkupLine($"{indent}{cursor} {check} {display}");
+            }
         }
 
         FinishRender(lineCount);
+    }
+
+    static int CalculateVersionColumnStart(IReadOnlyList<RecommendationSelectionItem> visibleItems)
+        => visibleItems
+            .Select(item =>
+            {
+                string indent = item.Skill is null ? string.Empty : "    ";
+                return indent.Length + "> [x] ".Length + item.Display.Length + 2;
+            })
+            .DefaultIfEmpty(0)
+            .Max();
+
+    static string FormatColumnHeader(RecommendationSelectionKind kind, int versionColumnStart)
+    {
+        string prefix = kind == RecommendationSelectionKind.Skill ? "          " : "      ";
+        int padding = Math.Max(1, versionColumnStart - (prefix.Length + "Name".Length));
+        return $"{prefix}[bold]Name[/]{new string(' ', padding)}[bold]Version[/]";
     }
 
     internal static (int StartIndex, IReadOnlyList<RecommendationSelectionItem> Items) GetVisibleItems(

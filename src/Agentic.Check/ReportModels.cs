@@ -65,10 +65,12 @@ sealed record SkillReportItem(
     string InstallArg,
     string LocalFolder,
     string Plugin,
+    string SourceRef,
+    string Version,
     IReadOnlyList<SkillDependency> Dependencies)
 {
     internal static SkillReportItem FromManifestEntry(SkillManifestEntry entry)
-        => new(entry.SourceRepo, entry.InstallArg, entry.LocalFolder, entry.Plugin, entry.Dependencies);
+        => new(entry.SourceRepo, entry.InstallArg, entry.LocalFolder, entry.Plugin, entry.SourceRef, entry.Version, entry.Dependencies);
 }
 
 sealed record CommandReport(int ExitCode, string StandardOutput, string StandardError)

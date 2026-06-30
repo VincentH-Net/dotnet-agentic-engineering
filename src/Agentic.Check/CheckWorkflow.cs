@@ -23,7 +23,8 @@ sealed class CheckWorkflow(
     ICommandRunner commandRunner,
     IUserPrompts prompts,
     IReporter reporter,
-    IDirectiveSource? directiveSource = null)
+    IDirectiveSource? directiveSource = null,
+    ISourceVersionResolver? sourceVersionResolver = null)
 {
     static readonly JsonSerializerOptions ReportSerializerOptions = new(JsonSerializerDefaults.Web)
     {
@@ -119,12 +120,19 @@ sealed class CheckWorkflow(
         IReadOnlyList<SkillUpdateCandidate> skillUpdates = [];
         var directiveCacheSettings = DirectiveCacheSettings.FromEnvironment();
         report.Warnings.AddRange(directiveCacheSettings.ConfigurationWarnings);
+        var sourceMode = options.Preview ? SourceVersionMode.Preview : SourceVersionMode.Stable;
         DirectiveInstaller directiveInstaller = new(
-            directiveSource ?? new GitHubDirectiveSource(cacheSettings: directiveCacheSettings, reporter: reporter),
+            directiveSource ?? new GitHubDirectiveSource(cacheSettings: directiveCacheSettings, reporter: reporter, sourceVersionMode: sourceMode),
             reporter);
         string firstSkillsDirectory = skillsDirectories[0];
         report.SkillsDirectory = firstSkillsDirectory;
         report.SkillsDirectories.AddRange(skillsDirectories);
+        var manifest = options.Preview ? StaticSkillManifest.Preview : StaticSkillManifest.All;
+        if (options.Preview)
+        {
+            manifest = await AddPreviewVersionInfoAsync(manifest, directiveCacheSettings, cancellationToken)
+                .ConfigureAwait(false);
+        }
 
         await reporter.RunProgressAsync(
             "Scanning target directory",
@@ -143,15 +151,19 @@ sealed class CheckWorkflow(
                     .ConfigureAwait(false);
                 advance();
 
-                recommended = SkillPlanner.Plan(StaticSkillManifest.All, detectedStack);
+                recommended = SkillPlanner.Plan(manifest, detectedStack);
                 report.RecommendedSkills.AddRange(recommended.Select(SkillReportItem.FromManifestEntry));
 
                 missing = SkillInstaller.FindMissing(recommended, skillsDirectories);
                 report.MissingSkills.AddRange(missing.Select(SkillReportItem.FromManifestEntry));
 
-                await RunSkillUpdateDryRunAsync(skillsDirectories, targetDirectory, report, cancellationToken).ConfigureAwait(false);
-                skillUpdates = ExtractDistinctSkillUpdates(report.SkillUpdateDryRuns, recommended);
-                report.OutdatedSkills = skillUpdates.Count;
+                if (!options.Preview)
+                {
+                    await RunSkillUpdateDryRunAsync(skillsDirectories, targetDirectory, report, cancellationToken).ConfigureAwait(false);
+                    skillUpdates = ExtractDistinctSkillUpdates(report.SkillUpdateDryRuns, recommended);
+                    report.OutdatedSkills = skillUpdates.Count;
+                }
+
                 advance();
             },
             cancellationToken).ConfigureAwait(false);
@@ -185,6 +197,7 @@ sealed class CheckWorkflow(
         }
 
         var recommendedDirectives = directivePlan.SelectableDirectives;
+        var recommendedSkillActions = options.Preview ? recommended : missing;
         IReadOnlyList<DirectivePlanItem> selectedDirectives = [];
         IReadOnlyList<SkillManifestEntry> selectedSkills = [];
         if (!options.DryRun)
@@ -192,20 +205,20 @@ sealed class CheckWorkflow(
             ReportUpToDateItems(directivePlan.Directives, recommended, missing, skillUpdates);
         }
 
-        if (recommendedDirectives.Count > 0 || missing.Count > 0)
+        if (recommendedDirectives.Count > 0 || recommendedSkillActions.Count > 0)
         {
             if (options.DryRun || options.Yes)
             {
                 selectedDirectives = recommendedDirectives;
-                selectedSkills = missing;
+                selectedSkills = recommendedSkillActions;
             }
             else
             {
                 var selection = await prompts
-                    .SelectRecommendationsAsync(recommendedDirectives, missing, cancellationToken)
+                    .SelectRecommendationsAsync(recommendedDirectives, recommendedSkillActions, cancellationToken)
                     .ConfigureAwait(false);
                 selectedDirectives = selection.SelectedDirectives;
-                selectedSkills = AddSelectedSkillDependencies(selection.SelectedSkills, missing);
+                selectedSkills = AddSelectedSkillDependencies(selection.SelectedSkills, recommendedSkillActions);
             }
         }
 
@@ -226,13 +239,16 @@ sealed class CheckWorkflow(
 
             foreach (var skill in selectedSkills)
             {
-                foreach (string skillsDirectory in skillsDirectories.Where(directory => SkillInstaller.IsMissing(skill, directory)))
+                foreach (string skillsDirectory in skillsDirectories.Where(directory => options.Preview || SkillInstaller.IsMissing(skill, directory)))
                 {
-                    report.Actions.Add($"Would install {skill.SourceRepo} {skill.InstallArg} into {skillsDirectory}.");
+                    report.Actions.Add($"Would install {skill.SourceSpec} {skill.InstallArg} into {skillsDirectory}.");
                 }
             }
 
-            ReportSkillUpdateDryRunActions(report.SkillUpdateDryRuns, recommended);
+            if (!options.Preview)
+            {
+                ReportSkillUpdateDryRunActions(report.SkillUpdateDryRuns, recommended);
+            }
 
             await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
             return new CheckRunResult(0, report);
@@ -241,52 +257,119 @@ sealed class CheckWorkflow(
         if (selectedSkills.Count > 0)
         {
             SkillInstaller skillInstaller = new(commandRunner, reporter);
-            IReadOnlyList<SkillManifestEntry> firstDirectoryMissingSkills = [.. selectedSkills.Where(skill => SkillInstaller.IsMissing(skill, firstSkillsDirectory))];
-            int installOperationCount = CountSkillInstallOperations(selectedSkills, firstDirectoryMissingSkills, [.. skillsDirectories.Skip(1)]);
+            var previewShasBefore = options.Preview
+                ? SkillInstaller.ReadTreeShas(selectedSkills, skillsDirectories)
+                : new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+            var firstDirectoryInstallSkills = options.Preview
+                ? selectedSkills
+                : [.. selectedSkills.Where(skill => SkillInstaller.IsMissing(skill, firstSkillsDirectory))];
+            int installOperationCount = CountSkillInstallOperations(
+                selectedSkills,
+                firstDirectoryInstallSkills,
+                [.. skillsDirectories.Skip(1)],
+                options.Preview);
             await reporter.RunProgressAsync(
                 "Installing skills",
                 installOperationCount,
                 async advance =>
                 {
                     var installResults = await skillInstaller
-                        .InstallAsync(firstDirectoryMissingSkills, firstSkillsDirectory, targetDirectory, cancellationToken, advance)
+                        .InstallAsync(
+                            firstDirectoryInstallSkills,
+                            firstSkillsDirectory,
+                            targetDirectory,
+                            cancellationToken,
+                            advance,
+                            reportPreviewChangeStatus: options.Preview)
                         .ConfigureAwait(false);
                     report.InstallResults.AddRange(installResults);
 
                     if (skillsDirectories.Count > 1)
                     {
                         SkillManifestEntry[] copyableSkills = [.. selectedSkills
-                            .Where(skill => !SkillInstaller.IsMissing(skill, firstSkillsDirectory))];
+                            .Where(skill => options.Preview || !SkillInstaller.IsMissing(skill, firstSkillsDirectory))];
                         report.SkillCopyResults.AddRange(skillInstaller.CopyInstalledSkills(
                             copyableSkills,
                             firstSkillsDirectory,
                             [.. skillsDirectories.Skip(1)],
-                            advance));
+                            advance,
+                            overwriteExisting: options.Preview,
+                            reportPreviewChangeStatus: options.Preview));
                     }
                 },
                 cancellationToken).ConfigureAwait(false);
+
+            if (options.Preview)
+            {
+                var previewShasAfter = SkillInstaller.ReadTreeShas(selectedSkills, skillsDirectories);
+                var changedPreviewSkills = FindChangedPreviewSkills(selectedSkills, previewShasBefore, previewShasAfter);
+                if (changedPreviewSkills.Count > 0)
+                {
+                    ReportSectionHeader(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Installed or updated {changedPreviewSkills.Count} preview skill(s):"));
+                    ReportSkillGroups(changedPreviewSkills, skill => $"      {skill.LocalFolder}", ItemStyle.Plain);
+                }
+            }
         }
 
         static int CountSkillInstallOperations(
             IReadOnlyList<SkillManifestEntry> selectedSkills,
-            IReadOnlyList<SkillManifestEntry> firstDirectoryMissingSkills,
-            IReadOnlyList<string> targetSkillsDirectories)
+            IReadOnlyList<SkillManifestEntry> firstDirectoryInstallSkills,
+            IReadOnlyList<string> targetSkillsDirectories,
+            bool overwriteCopies)
         {
             int copyOperations = 0;
             foreach (string targetSkillsDirectory in targetSkillsDirectories)
             {
-                copyOperations += selectedSkills.Count(skill => SkillInstaller.IsMissing(skill, targetSkillsDirectory));
+                copyOperations += overwriteCopies
+                    ? selectedSkills.Count
+                    : selectedSkills.Count(skill => SkillInstaller.IsMissing(skill, targetSkillsDirectory));
             }
 
-            return firstDirectoryMissingSkills.Count + copyOperations;
+            return firstDirectoryInstallSkills.Count + copyOperations;
         }
 
-        await RunSkillUpdateAsync(options, skillsDirectories, targetDirectory, report, skillUpdates, cancellationToken).ConfigureAwait(false);
+        if (!options.Preview)
+        {
+            await RunSkillUpdateAsync(options, skillsDirectories, targetDirectory, report, skillUpdates, cancellationToken).ConfigureAwait(false);
+        }
 
         int exitCode = report.InstallResults.Any(result => !result.Success) || report.SkillCopyResults.Any(result => !result.Success) ? 1 : 0;
         await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
         return new CheckRunResult(exitCode, report);
     }
+
+    async Task<IReadOnlyList<SkillManifestEntry>> AddPreviewVersionInfoAsync(
+        IReadOnlyList<SkillManifestEntry> manifest,
+        DirectiveCacheSettings cacheSettings,
+        CancellationToken cancellationToken)
+    {
+        var resolver = sourceVersionResolver ?? new GitHubSourceVersionResolver(reporter: reporter);
+        var versions = await resolver
+            .ResolvePreviewVersionsAsync(manifest.Select(skill => skill.SourceRepo), cacheSettings, cancellationToken)
+            .ConfigureAwait(false);
+
+        return [.. manifest.Select(skill => versions.TryGetValue(skill.SourceRepo, out var version)
+            ? skill with
+            {
+                SourceRef = version.Ref,
+                Version = version.Display
+            }
+            : skill)];
+    }
+
+    static IReadOnlyList<SkillManifestEntry> FindChangedPreviewSkills(
+        IReadOnlyList<SkillManifestEntry> selectedSkills,
+        IReadOnlyDictionary<string, string?> shasBefore,
+        IReadOnlyDictionary<string, string?> shasAfter)
+        => [.. selectedSkills
+            .Where(skill =>
+            {
+                _ = shasBefore.TryGetValue(skill.Key, out string? before);
+                _ = shasAfter.TryGetValue(skill.Key, out string? after);
+                return !string.IsNullOrWhiteSpace(after)
+                    && !string.Equals(before, after, StringComparison.OrdinalIgnoreCase);
+            })
+            .DistinctBy(skill => skill.Key, StringComparer.OrdinalIgnoreCase)];
 
     static DirectoryValidationResult ValidateTargetDirectory(string targetDirectory)
     {

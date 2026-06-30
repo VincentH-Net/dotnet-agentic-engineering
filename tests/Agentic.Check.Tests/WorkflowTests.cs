@@ -90,6 +90,128 @@ public sealed class WorkflowTests
     }
 
     [Fact]
+    public async Task PreviewDryRunSkipsSkillUpdateDetectionAndUsesDefaultBranchSources()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write(
+            "App.csproj",
+            """
+            <Project Sdk="Microsoft.NET.Sdk.Web">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+        tempDirectory.Write(
+            ".agents/skills/dotnet-webapi/SKILL.md",
+            """
+            ---
+            github-tree-sha: old-sha
+            ---
+            # dotnet-webapi
+            """);
+        FakeCommandRunner commandRunner = new();
+        commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
+        FakeSourceVersionResolver sourceVersionResolver = new();
+        RecordingReporter reporter = new();
+        CheckWorkflow workflow = new(
+            commandRunner,
+            new FakePrompts(),
+            reporter,
+            new FakeDirectiveSource(),
+            sourceVersionResolver);
+
+        var result = await workflow.RunAsync(
+            new AgenticCheckOptions(tempDirectory.Path, true, false, null, null, "codex", false, true),
+            CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.DoesNotContain(commandRunner.Calls, call => call.Arguments.Contains("update"));
+        Assert.Contains(result.Report.RecommendedSkills, skill =>
+            skill.InstallArg == "plugins/dotnet-aspnetcore/skills/dotnet-webapi"
+            && skill.SourceRef == "main"
+            && skill.Version == "main @ 2026-06-30 09:12 UTC");
+        Assert.DoesNotContain(result.Report.MissingSkills, skill => skill.InstallArg == "plugins/dotnet-aspnetcore/skills/dotnet-webapi");
+        Assert.Contains(result.Report.Actions, action => action.Contains(
+            "Would install dotnet/skills@main plugins/dotnet-aspnetcore/skills/dotnet-webapi",
+            StringComparison.Ordinal));
+        Assert.Contains("dotnet/skills", sourceVersionResolver.RequestedSourceRepos);
+    }
+
+    [Fact]
+    public async Task PreviewInstallReportsChangedSkillTreeShas()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write(
+            "App.csproj",
+            """
+            <Project Sdk="Microsoft.NET.Sdk.Web">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+        tempDirectory.Write(
+            ".agents/skills/dotnet-webapi/SKILL.md",
+            """
+            ---
+            github-tree-sha: old-sha
+            ---
+            # dotnet-webapi
+            """);
+        FakeCommandRunner commandRunner = new()
+        {
+            OnRun = call =>
+            {
+                if (call.Arguments.Contains("install"))
+                {
+                    tempDirectory.Write(
+                        ".agents/skills/dotnet-webapi/SKILL.md",
+                        """
+                        ---
+                        github-tree-sha: new-sha
+                        ---
+                        # dotnet-webapi
+                        """);
+                }
+            }
+        };
+        commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "installed", string.Empty));
+        RecordingReporter reporter = new();
+        CheckWorkflow workflow = new(
+            commandRunner,
+            new FakePrompts
+            {
+                SelectedSkillInstallArgs = ["plugins/dotnet-aspnetcore/skills/dotnet-webapi"]
+            },
+            reporter,
+            new FakeDirectiveSource(),
+            new FakeSourceVersionResolver());
+
+        var result = await workflow.RunAsync(
+            new AgenticCheckOptions(tempDirectory.Path, false, false, null, null, "codex", false, true),
+            CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains(commandRunner.Calls, call => call.Arguments.SequenceEqual([
+            "skill",
+            "install",
+            "dotnet/skills",
+            "plugins/dotnet-aspnetcore/skills/dotnet-webapi",
+            "--dir",
+            Path.Combine(tempDirectory.Path, ".agents", "skills"),
+            "--pin",
+            "main",
+            "--force"]));
+        Assert.Contains("Installed or updated 1 preview skill(s):", reporter.BoldMessages);
+        Assert.Contains("      dotnet-webapi", reporter.PlainMessages);
+        Assert.DoesNotContain(commandRunner.Calls, call => call.Arguments.Contains("update"));
+    }
+
+    [Fact]
     public async Task DryRunDoesNotAbortWhenGhSkillHelpFails()
     {
         using TempDirectory tempDirectory = new();

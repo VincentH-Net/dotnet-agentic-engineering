@@ -15,9 +15,15 @@ interface IDirectiveSource
     Task<string> FetchAsync(DirectiveSourceFile sourceFile, CancellationToken cancellationToken);
 }
 
-sealed record DirectiveSourceFile(string FileName, string DownloadUrl);
+enum SourceVersionMode
+{
+    Stable,
+    Preview
+}
 
-sealed record DirectiveBlock(string Name, string Content);
+sealed record DirectiveSourceFile(string FileName, string DownloadUrl, string Version = "");
+
+sealed record DirectiveBlock(string Name, string Content, string Version = "");
 
 sealed record DirectiveResult(
     bool Success,
@@ -51,7 +57,7 @@ sealed record DirectivePlanResult(
         => [.. Directives.Where(directive => directive.Status is DirectiveStatuses.Missing or DirectiveStatuses.Outdated)];
 }
 
-sealed record DirectivePlanItem(string Name, string Status, string Content);
+sealed record DirectivePlanItem(string Name, string Status, string Content, string Version = "");
 
 static class DirectiveStatuses
 {
@@ -230,7 +236,7 @@ sealed partial class DirectiveInstaller(IDirectiveSource source, IReporter repor
             throw new DirectiveException($"Directive block from {sourceFile.DownloadUrl} is missing expected stable markers for {directiveName}.");
         }
 
-        return new DirectiveBlock(directiveName, block);
+        return new DirectiveBlock(directiveName, block, sourceFile.Version);
     }
 
     static DirectivePlanItem PlanDirective(string agentsContent, DirectiveBlock directive)
@@ -247,7 +253,7 @@ sealed partial class DirectiveInstaller(IDirectiveSource source, IReporter repor
 
         if (startCount == 0)
         {
-            return new DirectivePlanItem(directive.Name, DirectiveStatuses.Missing, directive.Content);
+            return new DirectivePlanItem(directive.Name, DirectiveStatuses.Missing, directive.Content, directive.Version);
         }
 
         int startIndex = content.IndexOf(startMarker, StringComparison.Ordinal);
@@ -256,7 +262,7 @@ sealed partial class DirectiveInstaller(IDirectiveSource source, IReporter repor
         string status = existingBlock.Equals(directive.Content, StringComparison.Ordinal)
             ? DirectiveStatuses.Current
             : DirectiveStatuses.Outdated;
-        return new DirectivePlanItem(directive.Name, status, directive.Content);
+        return new DirectivePlanItem(directive.Name, status, directive.Content, directive.Version);
     }
 
     static string ApplyDirectiveBlocks(
@@ -477,17 +483,19 @@ sealed partial class DirectiveInstaller(IDirectiveSource source, IReporter repor
 sealed class GitHubDirectiveSource(
     HttpClient? httpClient = null,
     DirectiveCacheSettings? cacheSettings = null,
-    IReporter? reporter = null) : IDirectiveSource
+    IReporter? reporter = null,
+    SourceVersionMode sourceVersionMode = SourceVersionMode.Stable) : IDirectiveSource
 {
     static readonly Uri LatestReleaseUri = new(DirectiveInstallerUrl.LatestRelease);
     static readonly Uri RepositoryUri = new(DirectiveInstallerUrl.Repository);
     readonly HttpClient httpClient = httpClient ?? CreateHttpClient();
     readonly DirectiveHttpCache cache = new(cacheSettings ?? DirectiveCacheSettings.FromEnvironment(), reporter);
+    readonly SourceVersionMode sourceVersionMode = sourceVersionMode;
 
     public async Task<IReadOnlyList<DirectiveSourceFile>> ListAsync(CancellationToken cancellationToken)
     {
-        string directiveRef = await ResolveDirectiveRefAsync(cancellationToken).ConfigureAwait(false);
-        string listingUrl = DirectiveInstallerUrl.Listing(directiveRef);
+        var directiveRef = await ResolveDirectiveRefAsync(cancellationToken).ConfigureAwait(false);
+        string listingUrl = DirectiveInstallerUrl.Listing(directiveRef.Ref);
         Uri listingUri = new(listingUrl);
         string content = await GetStringAsync(listingUri, listingUrl, "directives listing", cancellationToken).ConfigureAwait(false);
         var items = JsonSerializer.Deserialize<IReadOnlyList<GitHubContentItem>>(content)
@@ -497,7 +505,10 @@ sealed class GitHubDirectiveSource(
             .Where(item => item.Type.Equals("file", StringComparison.OrdinalIgnoreCase))
             .Where(item => item.Name.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
             .Where(item => !string.IsNullOrWhiteSpace(item.DownloadUrl))
-            .Select(item => new DirectiveSourceFile(item.Name, item.DownloadUrl))];
+            .Select(item => new DirectiveSourceFile(
+                item.Name,
+                item.DownloadUrl,
+                sourceVersionMode == SourceVersionMode.Preview ? directiveRef.Display : directiveRef.Ref))];
     }
 
     public async Task<string> FetchAsync(DirectiveSourceFile sourceFile, CancellationToken cancellationToken)
@@ -510,8 +521,13 @@ sealed class GitHubDirectiveSource(
         return await GetStringAsync(downloadUri, sourceFile.DownloadUrl, $"directive from {sourceFile.DownloadUrl}", cancellationToken).ConfigureAwait(false);
     }
 
-    async Task<string> ResolveDirectiveRefAsync(CancellationToken cancellationToken)
+    async Task<SourceVersionInfo> ResolveDirectiveRefAsync(CancellationToken cancellationToken)
     {
+        if (sourceVersionMode == SourceVersionMode.Preview)
+        {
+            return await ResolveDefaultBranchRefAsync(includeCommitDate: true, cancellationToken).ConfigureAwait(false);
+        }
+
         string? releaseContent = await GetOptionalStringAsync(
             LatestReleaseUri,
             DirectiveInstallerUrl.LatestRelease,
@@ -522,10 +538,15 @@ sealed class GitHubDirectiveSource(
             var release = JsonSerializer.Deserialize<GitHubRelease>(releaseContent);
             if (!string.IsNullOrWhiteSpace(release?.TagName))
             {
-                return release.TagName;
+                return new SourceVersionInfo("VincentH-Net/dotnet-agentic-engineering", release.TagName, DateTimeOffset.UtcNow);
             }
         }
 
+        return await ResolveDefaultBranchRefAsync(includeCommitDate: false, cancellationToken).ConfigureAwait(false);
+    }
+
+    async Task<SourceVersionInfo> ResolveDefaultBranchRefAsync(bool includeCommitDate, CancellationToken cancellationToken)
+    {
         string repositoryContent = await GetStringAsync(
             RepositoryUri,
             DirectiveInstallerUrl.Repository,
@@ -533,9 +554,33 @@ sealed class GitHubDirectiveSource(
             cancellationToken).ConfigureAwait(false);
         var repository = JsonSerializer.Deserialize<GitHubRepository>(repositoryContent)
             ?? throw new DirectiveException($"Could not parse repository metadata from {DirectiveInstallerUrl.Repository}.");
-        return string.IsNullOrWhiteSpace(repository.DefaultBranch)
+        string defaultBranch = string.IsNullOrWhiteSpace(repository.DefaultBranch)
             ? throw new DirectiveException($"Repository metadata from {DirectiveInstallerUrl.Repository} is missing default_branch.")
             : repository.DefaultBranch;
+        if (!includeCommitDate)
+        {
+            return new SourceVersionInfo("VincentH-Net/dotnet-agentic-engineering", defaultBranch, DateTimeOffset.MinValue);
+        }
+
+        string branchUrl = DirectiveInstallerUrl.Branch(defaultBranch);
+        string branchContent = await GetStringAsync(
+            new Uri(branchUrl),
+            branchUrl,
+            "directive repository default branch metadata",
+            cancellationToken).ConfigureAwait(false);
+        using var branchDocument = JsonDocument.Parse(branchContent);
+        var commit = branchDocument.RootElement.GetProperty("commit").GetProperty("commit");
+        string? dateValue = commit.GetProperty("committer").GetProperty("date").GetString();
+        if (!DateTimeOffset.TryParse(
+            dateValue,
+            System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.AssumeUniversal,
+            out var lastChangedAtUtc))
+        {
+            throw new DirectiveException($"Default branch metadata from {branchUrl} is missing a valid commit date.");
+        }
+
+        return new SourceVersionInfo("VincentH-Net/dotnet-agentic-engineering", defaultBranch, lastChangedAtUtc.ToUniversalTime());
     }
 
     async Task<string?> GetOptionalStringAsync(Uri uri, string displayUrl, string description, CancellationToken cancellationToken)
@@ -847,6 +892,9 @@ static class DirectiveInstallerUrl
 
     public static string Listing(string directiveRef)
         => RepositoryApiBase + "/contents/directives?ref=" + Uri.EscapeDataString(directiveRef);
+
+    public static string Branch(string branch)
+        => RepositoryApiBase + "/branches/" + Uri.EscapeDataString(branch);
 }
 
 sealed record GitHubRelease([property: JsonPropertyName("tag_name")] string TagName);

@@ -264,3 +264,27 @@ sealed class FakeDirectiveSource : IDirectiveSource
             ~~~
             """;
 }
+
+sealed class FakeSourceVersionResolver : ISourceVersionResolver
+{
+    public List<string> RequestedSourceRepos { get; } = [];
+
+    public Task<IReadOnlyDictionary<string, SourceVersionInfo>> ResolvePreviewVersionsAsync(
+        IEnumerable<string> sourceRepos,
+        DirectiveCacheSettings cacheSettings,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        Dictionary<string, SourceVersionInfo> result = new(StringComparer.OrdinalIgnoreCase);
+        foreach (string sourceRepo in sourceRepos.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            RequestedSourceRepos.Add(sourceRepo);
+            result[sourceRepo] = new SourceVersionInfo(
+                sourceRepo,
+                "main",
+                new DateTimeOffset(2026, 6, 30, 9, 12, 0, TimeSpan.Zero));
+        }
+
+        return Task.FromResult((IReadOnlyDictionary<string, SourceVersionInfo>)result);
+    }
+}

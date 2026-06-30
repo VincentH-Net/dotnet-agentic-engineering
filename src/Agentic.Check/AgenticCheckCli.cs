@@ -10,6 +10,7 @@ static class AgenticCheckCli
         "--agents",
         "--skills-dir",
         "--dry-run",
+        "--preview",
         "--yes",
         "--report",
         "--verbose",
@@ -54,6 +55,10 @@ static class AgenticCheckCli
         Option<bool> dryRunOption = new("--dry-run")
         {
             Description = "Report recommended actions without applying them."
+        };
+        Option<bool> previewOption = new("--preview")
+        {
+            Description = "Install preview directives and skills from source repo default branches."
         };
         Option<bool> yesOption = new("--yes")
         {
@@ -117,6 +122,7 @@ static class AgenticCheckCli
         rootCommand.Options.Add(agentsOption);
         rootCommand.Options.Add(skillsDirectoryOption);
         rootCommand.Options.Add(dryRunOption);
+        rootCommand.Options.Add(previewOption);
         rootCommand.Options.Add(yesOption);
         rootCommand.Options.Add(reportOption);
         rootCommand.Options.Add(verboseOption);
@@ -132,6 +138,7 @@ static class AgenticCheckCli
                     var targetDirectory = parseResult.GetValue(targetDirectoryArgument)
                         ?? new DirectoryInfo(Environment.CurrentDirectory);
                     bool dryRun = parseResult.GetValue(dryRunOption);
+                    bool preview = parseResult.GetValue(previewOption);
                     bool yes = parseResult.GetValue(yesOption);
                     var report = parseResult.GetValue(reportOption);
                     var skillsDirectory = parseResult.GetValue(skillsDirectoryOption);
@@ -155,7 +162,8 @@ static class AgenticCheckCli
                         report?.FullName,
                         skillsDirectory?.FullName,
                         effectiveAgents,
-                        verbose);
+                        verbose,
+                        preview);
 
                     var workflow = new CheckWorkflow(
                         new ProcessCommandRunner(),

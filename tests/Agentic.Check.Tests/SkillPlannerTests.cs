@@ -67,6 +67,25 @@ public sealed class SkillPlannerTests
     }
 
     [Fact]
+    public void PreviewPlansAspNetCoreDefaultBranchSkillsForAspNetCoreStack()
+    {
+        StackDetectionResult stack = new(
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                TechnologyNames.Foundation,
+                TechnologyNames.Dotnet,
+                TechnologyNames.AspNetCore
+            },
+            [],
+            []);
+
+        var plan = SkillPlanner.Plan(StaticSkillManifest.Preview, stack);
+
+        Assert.Contains(plan, skill => skill.InstallArg == "plugins/dotnet-aspnetcore/skills/dotnet-webapi");
+        Assert.Contains(plan, skill => skill.InstallArg == "plugins/dotnet-aspnetcore/skills/minimal-api-file-upload");
+    }
+
+    [Fact]
     public void DotnetTestRunTestsDeclaresDependencies()
     {
         var runTests = Assert.Single(
