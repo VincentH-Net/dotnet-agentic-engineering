@@ -31,11 +31,16 @@ static class ToolHeader
         """;
 
     public static string ProductLine
-        => $"\n✓ .NET Agentic Engineering Check {Version}";
+        => "\n" + ProductLineContent;
+
+    public static string ProductLineContent
+        => $"✓ .NET Agentic Engineering Check {Version}";
 
     public static string ProductLineMarkup
-        => "\n"
-            + Styled($"{CheckColor}", "✓ ")
+        => "\n" + ProductLineMarkupContent;
+
+    public static string ProductLineMarkupContent
+        => Styled($"{CheckColor}", "✓ ")
             + Styled($"underline {DotNetColor}", ".NET ")
             + Styled($"underline {AgenticColor}", "Agentic")
             + Styled($"underline {DotNetColor}", " Engineering ")
@@ -67,12 +72,23 @@ static class ToolHeader
         => Description.Split('\n');
 
     public static int HeaderContentWidth
-        => Math.Max(
-            DescriptionLines
-                .Select(line => line.Length)
-                .DefaultIfEmpty(0)
-                .Max(),
-            RepositoryHelp.Length);
+        => new[]
+            {
+                HeaderArtWidth,
+                ProductLineContent.Length,
+                RepositoryHelp.Length,
+                DescriptionLines
+                    .Select(line => line.Length)
+                    .DefaultIfEmpty(0)
+                    .Max()
+            }
+            .Max();
+
+    public static int HeaderArtWidth
+        => Lines
+            .Select(line => line.Agentic.Length + line.Separator.Length + line.Check.Length)
+            .DefaultIfEmpty(0)
+            .Max();
 
     public static string SeparatorMarkup(int width)
         => $"[bold]{Markup.Escape(new string('─', Math.Clamp(width, 1, MaxSeparatorWidth)))}[/]";

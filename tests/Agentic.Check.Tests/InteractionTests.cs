@@ -16,8 +16,10 @@ public sealed class InteractionTests
         Assert.Contains(ToolHeader.Lines, line => !string.IsNullOrWhiteSpace(line.Separator));
         Assert.All(ToolHeader.Lines, line => Assert.NotEmpty(line.Check));
         Assert.StartsWith("✓ .NET Agentic Engineering Check ", ToolHeader.ProductLine.TrimStart(), StringComparison.Ordinal);
+        Assert.StartsWith("✓ .NET Agentic Engineering Check ", ToolHeader.ProductLineContent, StringComparison.Ordinal);
         Assert.DoesNotContain("unknown", ToolHeader.ProductLine, StringComparison.OrdinalIgnoreCase);
         Assert.StartsWith($"\n[bold {ToolHeader.CheckColor}]✓ [/]", ToolHeader.ProductLineMarkup, StringComparison.Ordinal);
+        Assert.StartsWith($"[bold {ToolHeader.CheckColor}]✓ [/]", ToolHeader.ProductLineMarkupContent, StringComparison.Ordinal);
         Assert.Contains($"[bold underline {ToolHeader.DotNetColor}].NET [/]", ToolHeader.ProductLineMarkup, StringComparison.Ordinal);
         Assert.Contains($"[bold underline {ToolHeader.AgenticColor}]Agentic[/]", ToolHeader.ProductLineMarkup, StringComparison.Ordinal);
         Assert.Contains($"[bold underline {ToolHeader.DotNetColor}] Engineering [/]", ToolHeader.ProductLineMarkup, StringComparison.Ordinal);
@@ -32,7 +34,11 @@ public sealed class InteractionTests
         Assert.Contains(" to learn more at ", ToolHeader.RepositoryHelpMarkup, StringComparison.Ordinal);
         Assert.Contains($"[link={ToolHeader.RepositoryUrl}]", ToolHeader.RepositoryHelpMarkup, StringComparison.Ordinal);
         Assert.Contains($"{ToolHeader.RepositoryUrl}[/]", ToolHeader.RepositoryHelpMarkup, StringComparison.Ordinal);
-        Assert.Equal(ToolHeader.RepositoryHelp.Length, ToolHeader.HeaderContentWidth);
+        Assert.Equal(
+            ToolHeader.Lines.Max(line => line.Agentic.Length + line.Separator.Length + line.Check.Length),
+            ToolHeader.HeaderArtWidth);
+        Assert.True(ToolHeader.HeaderContentWidth >= ToolHeader.HeaderArtWidth);
+        Assert.True(ToolHeader.HeaderContentWidth >= ToolHeader.RepositoryHelp.Length);
         Assert.Equal($"[bold]{new string('─', 12)}[/]", ToolHeader.SeparatorMarkup(12));
         Assert.Equal("[bold]─[/]", ToolHeader.SeparatorMarkup(0));
         Assert.Equal($"[bold]{new string('─', ToolHeader.MaxSeparatorWidth)}[/]", ToolHeader.SeparatorMarkup(120));

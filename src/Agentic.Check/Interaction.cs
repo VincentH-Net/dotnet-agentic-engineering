@@ -72,7 +72,11 @@ sealed class SpectreUserPrompts(IAnsiConsole console) : IUserPrompts
             return;
         }
 
-        if (key?.Key == ConsoleKey.F2)
+        if (key?.Key == ConsoleKey.F1)
+        {
+            _ = BrowserLauncher.Open(ToolHeader.RepositoryUrl);
+        }
+        else if (key?.Key == ConsoleKey.F2)
         {
             _ = BrowserLauncher.Open(url);
         }
@@ -121,16 +125,20 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
 
     public void Header()
     {
+        int headerContentWidth = ToolHeader.HeaderContentWidth;
         foreach (var line in ToolHeader.Lines)
         {
             console.MarkupLine(
-                Styled(ToolHeader.AgenticColor, line.Agentic)
-                + Markup.Escape(line.Separator)
-                + Styled(ToolHeader.CheckColor, line.Check));
+                CenterMarkup(
+                    Styled(ToolHeader.AgenticColor, line.Agentic)
+                    + Markup.Escape(line.Separator)
+                    + Styled(ToolHeader.CheckColor, line.Check),
+                    ToolHeader.HeaderArtWidth,
+                    headerContentWidth));
         }
 
-        console.MarkupLine(ToolHeader.ProductLineMarkup);
-        int headerContentWidth = ToolHeader.HeaderContentWidth;
+        console.WriteLine();
+        console.MarkupLine(CenterMarkup(ToolHeader.ProductLineMarkupContent, ToolHeader.ProductLineContent.Length, headerContentWidth));
         console.MarkupLine(ToolHeader.SeparatorMarkup(headerContentWidth));
         foreach (string line in ToolHeader.DescriptionLines)
         {
