@@ -63,10 +63,12 @@ static class ToolHeader
     public static string RepositoryHelpMarkup
         => $"{KeyMarkup("F1")} to learn more at [link={RepositoryUrl}]{Markup.Escape(RepositoryUrl)}[/]";
 
+    public static IReadOnlyList<string> DescriptionLines
+        => Description.Split('\n');
+
     public static int HeaderContentWidth
         => Math.Max(
-            Description
-                .Split('\n')
+            DescriptionLines
                 .Select(line => line.Length)
                 .DefaultIfEmpty(0)
                 .Max(),

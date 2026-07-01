@@ -858,7 +858,7 @@ sealed class DirectiveHttpCache(DirectiveCacheSettings settings, IReporter? repo
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException or NotSupportedException)
         {
-            reporter?.Warning($"Configuration warning: could not write directive cache in {settings.CacheDirectory}: {exception.Message}");
+            reporter?.Warning($"Configuration warning: could not write github cache in {settings.CacheDirectory}: {exception.Message}");
         }
     }
 
@@ -887,7 +887,7 @@ sealed class DirectiveHttpCache(DirectiveCacheSettings settings, IReporter? repo
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException or NotSupportedException)
         {
-            reporter?.Warning($"Configuration warning: could not read directive cache in {settings.CacheDirectory}: {exception.Message}");
+            reporter?.Warning($"Configuration warning: could not read github cache in {settings.CacheDirectory}: {exception.Message}");
             return false;
         }
     }

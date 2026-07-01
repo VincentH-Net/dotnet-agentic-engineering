@@ -52,8 +52,8 @@ sealed class SpectreUserPrompts(IAnsiConsole console) : IUserPrompts
     public async Task WaitForHelpKeyAsync(string url, string purpose, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        console.MarkupLine($"{ToolHeader.KeyMarkup("F1")}: open [link={url}]{Markup.Escape(url)}[/] for {Markup.Escape(purpose)}");
-        console.MarkupLine($"[{SpectreReporter.InfoColor}]Press F1 to open, or any other key to exit.[/]");
+        console.MarkupLine(ToolHeader.KeyMarkup("F2") + $" to open [link={url}]{Markup.Escape(url)}[/] for {Markup.Escape(purpose)}");
+        console.MarkupLine($"[{SpectreReporter.InfoColor}]Press any other key to exit[/]");
         if (!console.Profile.Capabilities.Interactive)
         {
             return;
@@ -64,7 +64,7 @@ sealed class SpectreUserPrompts(IAnsiConsole console) : IUserPrompts
         {
             key = await console.Input
                 .ReadKeyAsync(true, cancellationToken)
-                .WaitAsync(TimeSpan.FromSeconds(8), cancellationToken)
+                .WaitAsync(TimeSpan.FromSeconds(30), cancellationToken)
                 .ConfigureAwait(false);
         }
         catch (TimeoutException)
@@ -72,7 +72,7 @@ sealed class SpectreUserPrompts(IAnsiConsole console) : IUserPrompts
             return;
         }
 
-        if (key?.Key == ConsoleKey.F1)
+        if (key?.Key == ConsoleKey.F2)
         {
             _ = BrowserLauncher.Open(url);
         }
@@ -130,11 +130,22 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
         }
 
         console.MarkupLine(ToolHeader.ProductLineMarkup);
-        console.MarkupLine(ToolHeader.SeparatorMarkup(ToolHeader.HeaderContentWidth));
-        console.MarkupLine(Markup.Escape(ToolHeader.Description));
-        console.MarkupLine(ToolHeader.RepositoryHelpMarkup);
-        console.MarkupLine(ToolHeader.SeparatorMarkup(ToolHeader.HeaderContentWidth));
+        int headerContentWidth = ToolHeader.HeaderContentWidth;
+        console.MarkupLine(ToolHeader.SeparatorMarkup(headerContentWidth));
+        foreach (string line in ToolHeader.DescriptionLines)
+        {
+            console.MarkupLine(CenterMarkup(Markup.Escape(line), line.Length, headerContentWidth));
+        }
+
+        console.MarkupLine(CenterMarkup(ToolHeader.RepositoryHelpMarkup, ToolHeader.RepositoryHelp.Length, headerContentWidth));
+        console.MarkupLine(ToolHeader.SeparatorMarkup(headerContentWidth));
         console.WriteLine();
+    }
+
+    static string CenterMarkup(string markup, int visibleLength, int width)
+    {
+        int padding = Math.Max(0, (width - visibleLength) / 2);
+        return new string(' ', padding) + markup;
     }
 
     static string Styled(string color, string value)

@@ -78,7 +78,7 @@ sealed class CheckWorkflow(
 
         if (!prerequisites.IsSuccessful(options.DryRun))
         {
-            reporter.Error("Required tools are missing or too old. Update GitHub CLI and confirm `gh skill --help` or `gh skills --help` works.");
+            reporter.Error("GitHub CLI is missing or too old. Update GitHub CLI and confirm `gh skill --help` or `gh skills --help` works.");
             await prompts.WaitForHelpKeyAsync("https://cli.github.com/", "how to install GitHub CLI", cancellationToken).ConfigureAwait(false);
             await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
             return new CheckRunResult(2, report);
@@ -189,7 +189,7 @@ sealed class CheckWorkflow(
         report.DirectiveSummary = directiveSummary;
 
         reporter.Summary(targetDirectory, stack.Technologies, stack.InstallGates, targetAgents, skillsDirectories, directiveSummary, recommended.Count, missing.Count, report.OutdatedSkills);
-        reporter.Info($"Directive cache duration: {directiveCacheSettings.DurationDescription}");
+        reporter.Info($"GitHub cache duration: {directiveCacheSettings.DurationDescription}");
 
         foreach (string warning in report.Warnings)
         {

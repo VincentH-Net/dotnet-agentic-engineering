@@ -537,10 +537,22 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
 
         using var normalWorkspace = await TestWorkspace.CreateAsync($"{nameof(GhSkillHelpFailureIsWarningInDryRunButFatalInNormalMode)}Normal").ConfigureAwait(true);
         await normalWorkspace.SetGhSkillHelpFailureAsync().ConfigureAwait(true);
-        var normal = await RunCommandAsync(normalWorkspace, Quote(normalWorkspace.RepoPath), expectedExitCode: 2).ConfigureAwait(true);
+        var normal = await RunInteractiveCommandAsync(
+            normalWorkspace,
+            Quote(normalWorkspace.RepoPath),
+            async auto =>
+            {
+                await auto.WaitUntilTextAsync("F1 to learn more at https://github.com/VincentH-Net/dotnet-agentic-engineering", timeout: TimeSpan.FromSeconds(30)).ConfigureAwait(true);
+                await auto.WaitUntilTextAsync("F2 to open https://cli.github.com/ for how to install GitHub CLI", timeout: TimeSpan.FromSeconds(30)).ConfigureAwait(true);
+                await auto.WaitUntilTextAsync("Press any other key to exit", timeout: TimeSpan.FromSeconds(30)).ConfigureAwait(true);
+                await auto.EnterAsync().ConfigureAwait(true);
+            },
+            expectedExitCode: 2).ConfigureAwait(true);
 
         Assert.Equal(2, normal.ExitCode);
-        Assert.Contains("Required tools are missing or too old", normal.Screen, StringComparison.Ordinal);
+        Assert.Contains("GitHub CLI is missing or too old", normal.Screen, StringComparison.Ordinal);
+        Assert.Contains("F2 to open https://cli.github.com/ for how to install GitHub CLI", normal.Screen, StringComparison.Ordinal);
+        Assert.Contains("Press any other key to exit", normal.Screen, StringComparison.Ordinal);
         Assert.DoesNotContain("Recommend ", normal.Screen, StringComparison.Ordinal);
         AssertRecordingWasWritten(normalWorkspace);
     }

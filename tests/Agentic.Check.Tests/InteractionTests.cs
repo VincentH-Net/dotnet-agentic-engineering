@@ -27,9 +27,9 @@ public sealed class InteractionTests
         Assert.StartsWith("Optimizes your repo for agentic engineering with .NET - based technologies\n", ToolHeader.Description, StringComparison.Ordinal);
         Assert.DoesNotContain("technologies.", ToolHeader.Description, StringComparison.Ordinal);
         Assert.DoesNotContain(ToolHeader.RepositoryUrl, ToolHeader.Description, StringComparison.Ordinal);
-        Assert.StartsWith("F1: to learn more at ", ToolHeader.RepositoryHelp, StringComparison.Ordinal);
+        Assert.StartsWith("F1 to learn more at ", ToolHeader.RepositoryHelp, StringComparison.Ordinal);
         Assert.Contains(ToolHeader.KeyMarkup("F1"), ToolHeader.RepositoryHelpMarkup, StringComparison.Ordinal);
-        Assert.Contains(": to learn more at ", ToolHeader.RepositoryHelpMarkup, StringComparison.Ordinal);
+        Assert.Contains(" to learn more at ", ToolHeader.RepositoryHelpMarkup, StringComparison.Ordinal);
         Assert.Contains($"[link={ToolHeader.RepositoryUrl}]", ToolHeader.RepositoryHelpMarkup, StringComparison.Ordinal);
         Assert.Contains($"{ToolHeader.RepositoryUrl}[/]", ToolHeader.RepositoryHelpMarkup, StringComparison.Ordinal);
         Assert.Equal(ToolHeader.RepositoryHelp.Length, ToolHeader.HeaderContentWidth);

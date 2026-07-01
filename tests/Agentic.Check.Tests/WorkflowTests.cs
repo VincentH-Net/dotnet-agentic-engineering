@@ -82,7 +82,7 @@ public sealed class WorkflowTests
         Assert.Contains("      dotnet-livecharts2", reporter.Infos);
         Assert.Contains("      dotnet-modern-csharp-editorconfig", reporter.Infos);
         Assert.DoesNotContain(reporter.Infos, message => message.Contains("Would update target-local skills", StringComparison.Ordinal));
-        Assert.Contains("Directive cache duration: 30 minute(s)", reporter.Infos);
+        Assert.Contains("GitHub cache duration: 30 minute(s)", reporter.Infos);
         Assert.DoesNotContain(reporter.Infos, IsLegacyDirectiveStatusMessage);
         Assert.Equal("claude-code,codex", reporter.TargetAgents);
         Assert.Contains("Scanning target directory", reporter.ProgressDescriptions);
@@ -324,7 +324,7 @@ public sealed class WorkflowTests
 
         Assert.Equal(0, result.ExitCode);
         Assert.Contains(result.Report.Prerequisites, check => check.Name == "gh skill" && !check.Success);
-        Assert.DoesNotContain(reporter.Errors, error => error.Contains("Required tools are missing", StringComparison.Ordinal));
+        Assert.DoesNotContain(reporter.Errors, error => error.Contains("GitHub CLI is missing", StringComparison.Ordinal));
         Assert.Contains("Would install skills into skills directories:", reporter.BoldMessages);
         Assert.Contains(reporter.Warnings, warning => warning.Contains("Could not check target-local skills for updates", StringComparison.Ordinal));
     }
@@ -706,7 +706,7 @@ public sealed class WorkflowTests
         Assert.Contains("    dotnet:", reporter.Infos);
         Assert.Contains("      ✓ dotnet-livecharts2", reporter.Successes);
         Assert.Contains("      ✓ dotnet-modern-csharp-editorconfig", reporter.Successes);
-        Assert.Contains("Directive cache duration: 30 minute(s)", reporter.Infos);
+        Assert.Contains("GitHub cache duration: 30 minute(s)", reporter.Infos);
         Assert.DoesNotContain(reporter.Infos, IsLegacyDirectiveStatusMessage);
     }
 
@@ -1038,5 +1038,5 @@ public sealed class WorkflowTests
 
     static bool IsLegacyDirectiveStatusMessage(string message)
         => message.StartsWith("Directive ", StringComparison.Ordinal)
-            && !message.StartsWith("Directive cache duration:", StringComparison.Ordinal);
+            && !message.StartsWith("GitHub cache duration:", StringComparison.Ordinal);
 }
