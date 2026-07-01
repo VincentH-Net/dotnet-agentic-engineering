@@ -110,6 +110,8 @@ sealed class FakePrompts : IUserPrompts
     public Task<RecommendationSelectionResult> SelectRecommendationsAsync(
         IReadOnlyList<DirectivePlanItem> recommendedDirectives,
         IReadOnlyList<SkillManifestEntry> missingSkills,
+        string targetDirectory,
+        IReadOnlyList<string> skillsDirectories,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -120,6 +122,12 @@ sealed class FakePrompts : IUserPrompts
             ? missingSkills
             : [.. missingSkills.Where(skill => SelectedSkillInstallArgs.Contains(skill.InstallArg, StringComparer.Ordinal))];
         return Task.FromResult(new RecommendationSelectionResult(selectedDirectives, selectedSkills));
+    }
+
+    public Task WaitForHelpKeyAsync(string url, string purpose, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.CompletedTask;
     }
 }
 
@@ -263,4 +271,34 @@ sealed class FakeDirectiveSource : IDirectiveSource
             <!-- dotnet-agentic-engineering:{directiveName}:end -->
             ~~~
             """;
+}
+
+sealed class FakeSourceVersionResolver : ISourceVersionResolver
+{
+    public List<string> RequestedSourceRepos { get; } = [];
+
+    public Task<IReadOnlyDictionary<string, SourceVersionInfo>> ResolveVersionsAsync(
+        IEnumerable<string> sourceRepos,
+        SourceVersionMode sourceVersionMode,
+        DirectiveCacheSettings cacheSettings,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        Dictionary<string, SourceVersionInfo> result = new(StringComparer.OrdinalIgnoreCase);
+        foreach (string sourceRepo in sourceRepos.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            RequestedSourceRepos.Add(sourceRepo);
+            result[sourceRepo] = sourceVersionMode == SourceVersionMode.Preview
+                ? new SourceVersionInfo(
+                    sourceRepo,
+                    "main",
+                    new DateTimeOffset(2026, 6, 30, 9, 12, 0, TimeSpan.Zero))
+                : new SourceVersionInfo(
+                    sourceRepo,
+                    "v1.2.3",
+                    new DateTimeOffset(2026, 6, 29, 8, 11, 0, TimeSpan.Zero));
+        }
+
+        return Task.FromResult((IReadOnlyDictionary<string, SourceVersionInfo>)result);
+    }
 }

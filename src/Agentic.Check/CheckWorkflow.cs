@@ -23,7 +23,8 @@ sealed class CheckWorkflow(
     ICommandRunner commandRunner,
     IUserPrompts prompts,
     IReporter reporter,
-    IDirectiveSource? directiveSource = null)
+    IDirectiveSource? directiveSource = null,
+    ISourceVersionResolver? sourceVersionResolver = null)
 {
     static readonly JsonSerializerOptions ReportSerializerOptions = new(JsonSerializerDefaults.Web)
     {
@@ -62,7 +63,7 @@ sealed class CheckWorkflow(
             return new CheckRunResult(2, report);
         }
 
-        var skillsDirectoryValidation = ValidateSkillsDirectory(options.SkillsDirectory);
+        var skillsDirectoryValidation = ValidateSkillsDirectory(options.SkillsDirectory, targetDirectoryResolution.Directory);
         if (!skillsDirectoryValidation.Success)
         {
             reporter.Error(skillsDirectoryValidation.Error ?? "Invalid --skills-dir value.");
@@ -77,7 +78,8 @@ sealed class CheckWorkflow(
 
         if (!prerequisites.IsSuccessful(options.DryRun))
         {
-            reporter.Error("Required tools are missing or too old. Update GitHub CLI and confirm `gh skill --help` or `gh skills --help` works.");
+            reporter.Error("GitHub CLI is missing or too old. Update GitHub CLI and confirm `gh skill --help` or `gh skills --help` works.");
+            await prompts.WaitForHelpKeyAsync("https://cli.github.com/", "how to install GitHub CLI", cancellationToken).ConfigureAwait(false);
             await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
             return new CheckRunResult(2, report);
         }
@@ -119,12 +121,18 @@ sealed class CheckWorkflow(
         IReadOnlyList<SkillUpdateCandidate> skillUpdates = [];
         var directiveCacheSettings = DirectiveCacheSettings.FromEnvironment();
         report.Warnings.AddRange(directiveCacheSettings.ConfigurationWarnings);
+        var sourceMode = options.Preview ? SourceVersionMode.Preview : SourceVersionMode.Stable;
         DirectiveInstaller directiveInstaller = new(
-            directiveSource ?? new GitHubDirectiveSource(cacheSettings: directiveCacheSettings, reporter: reporter),
+            directiveSource ?? new GitHubDirectiveSource(cacheSettings: directiveCacheSettings, reporter: reporter, sourceVersionMode: sourceMode),
             reporter);
         string firstSkillsDirectory = skillsDirectories[0];
         report.SkillsDirectory = firstSkillsDirectory;
         report.SkillsDirectories.AddRange(skillsDirectories);
+        var manifest = await AddSourceVersionInfoAsync(
+            options.Preview ? StaticSkillManifest.Preview : StaticSkillManifest.All,
+            sourceMode,
+            directiveCacheSettings,
+            cancellationToken).ConfigureAwait(false);
 
         await reporter.RunProgressAsync(
             "Scanning target directory",
@@ -143,15 +151,19 @@ sealed class CheckWorkflow(
                     .ConfigureAwait(false);
                 advance();
 
-                recommended = SkillPlanner.Plan(StaticSkillManifest.All, detectedStack);
+                recommended = SkillPlanner.Plan(manifest, detectedStack);
                 report.RecommendedSkills.AddRange(recommended.Select(SkillReportItem.FromManifestEntry));
 
                 missing = SkillInstaller.FindMissing(recommended, skillsDirectories);
                 report.MissingSkills.AddRange(missing.Select(SkillReportItem.FromManifestEntry));
 
-                await RunSkillUpdateDryRunAsync(skillsDirectories, targetDirectory, report, cancellationToken).ConfigureAwait(false);
-                skillUpdates = ExtractDistinctSkillUpdates(report.SkillUpdateDryRuns, recommended);
-                report.OutdatedSkills = skillUpdates.Count;
+                if (!options.Preview)
+                {
+                    await RunSkillUpdateDryRunAsync(skillsDirectories, targetDirectory, report, cancellationToken).ConfigureAwait(false);
+                    skillUpdates = ExtractDistinctSkillUpdates(report.SkillUpdateDryRuns, recommended);
+                    report.OutdatedSkills = skillUpdates.Count;
+                }
+
                 advance();
             },
             cancellationToken).ConfigureAwait(false);
@@ -177,7 +189,7 @@ sealed class CheckWorkflow(
         report.DirectiveSummary = directiveSummary;
 
         reporter.Summary(targetDirectory, stack.Technologies, stack.InstallGates, targetAgents, skillsDirectories, directiveSummary, recommended.Count, missing.Count, report.OutdatedSkills);
-        reporter.Info($"Directive cache duration: {directiveCacheSettings.DurationDescription}");
+        reporter.Info($"GitHub cache duration: {directiveCacheSettings.DurationDescription}");
 
         foreach (string warning in report.Warnings)
         {
@@ -185,28 +197,37 @@ sealed class CheckWorkflow(
         }
 
         var recommendedDirectives = directivePlan.SelectableDirectives;
+        var branchInstalledSkills = FindBranchInstalledSkillActions(options.Preview, recommended, skillsDirectories);
+        var recommendedSkillActions = options.Preview
+            ? recommended
+            : BuildStableSkillActions(recommended, missing, branchInstalledSkills);
         IReadOnlyList<DirectivePlanItem> selectedDirectives = [];
         IReadOnlyList<SkillManifestEntry> selectedSkills = [];
-        if (!options.DryRun)
+        if (!options.DryRun && !options.Preview)
         {
-            ReportUpToDateItems(directivePlan.Directives, recommended, missing, skillUpdates);
+            ReportUpToDateItems(directivePlan.Directives, recommended, missing, skillUpdates, branchInstalledSkills);
         }
 
-        if (recommendedDirectives.Count > 0 || missing.Count > 0)
+        if (recommendedDirectives.Count > 0 || recommendedSkillActions.Count > 0)
         {
             if (options.DryRun || options.Yes)
             {
                 selectedDirectives = recommendedDirectives;
-                selectedSkills = missing;
+                selectedSkills = recommendedSkillActions;
             }
             else
             {
                 var selection = await prompts
-                    .SelectRecommendationsAsync(recommendedDirectives, missing, cancellationToken)
+                    .SelectRecommendationsAsync(recommendedDirectives, recommendedSkillActions, targetDirectory, skillsDirectories, cancellationToken)
                     .ConfigureAwait(false);
                 selectedDirectives = selection.SelectedDirectives;
-                selectedSkills = AddSelectedSkillDependencies(selection.SelectedSkills, missing);
+                selectedSkills = AddSelectedSkillDependencies(selection.SelectedSkills, recommendedSkillActions);
             }
+        }
+
+        if (!options.DryRun && (recommendedDirectives.Count > 0 || recommendedSkillActions.Count > 0))
+        {
+            ReportSelectedActions(selectedDirectives.Count + selectedSkills.Count);
         }
 
         var directiveResult = await directiveInstaller
@@ -219,6 +240,11 @@ sealed class CheckWorkflow(
             return new CheckRunResult(2, report);
         }
 
+        if (!options.DryRun)
+        {
+            ReportDirectiveApplyActions(selectedDirectives);
+        }
+
         if (options.DryRun)
         {
             ReportDirectiveDryRunActions(selectedDirectives, report.AgentsFile);
@@ -226,13 +252,16 @@ sealed class CheckWorkflow(
 
             foreach (var skill in selectedSkills)
             {
-                foreach (string skillsDirectory in skillsDirectories.Where(directory => SkillInstaller.IsMissing(skill, directory)))
+                foreach (string skillsDirectory in skillsDirectories.Where(directory => options.Preview || skill.ForceInstall || SkillInstaller.IsMissing(skill, directory)))
                 {
-                    report.Actions.Add($"Would install {skill.SourceRepo} {skill.InstallArg} into {skillsDirectory}.");
+                    report.Actions.Add($"Would install {skill.SourceSpec} {skill.InstallArg} into {skillsDirectory}.");
                 }
             }
 
-            ReportSkillUpdateDryRunActions(report.SkillUpdateDryRuns, recommended);
+            if (!options.Preview)
+            {
+                ReportSkillUpdateDryRunActions(report.SkillUpdateDryRuns, recommended);
+            }
 
             await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
             return new CheckRunResult(0, report);
@@ -241,27 +270,42 @@ sealed class CheckWorkflow(
         if (selectedSkills.Count > 0)
         {
             SkillInstaller skillInstaller = new(commandRunner, reporter);
-            IReadOnlyList<SkillManifestEntry> firstDirectoryMissingSkills = [.. selectedSkills.Where(skill => SkillInstaller.IsMissing(skill, firstSkillsDirectory))];
-            int installOperationCount = CountSkillInstallOperations(selectedSkills, firstDirectoryMissingSkills, [.. skillsDirectories.Skip(1)]);
+            var firstDirectoryInstallSkills = options.Preview
+                ? selectedSkills
+                : [.. selectedSkills.Where(skill => skill.ForceInstall || SkillInstaller.IsMissing(skill, firstSkillsDirectory))];
+            int installOperationCount = CountSkillInstallOperations(
+                selectedSkills,
+                firstDirectoryInstallSkills,
+                [.. skillsDirectories.Skip(1)],
+                options.Preview);
             await reporter.RunProgressAsync(
-                "Installing skills",
+                ActionOutputFormatter.ProgressIndent,
                 installOperationCount,
                 async advance =>
                 {
                     var installResults = await skillInstaller
-                        .InstallAsync(firstDirectoryMissingSkills, firstSkillsDirectory, targetDirectory, cancellationToken, advance)
+                        .InstallAsync(
+                            firstDirectoryInstallSkills,
+                            firstSkillsDirectory,
+                            targetDirectory,
+                            cancellationToken,
+                            advance,
+                            reportPreviewChangeStatus: options.Preview)
                         .ConfigureAwait(false);
                     report.InstallResults.AddRange(installResults);
 
                     if (skillsDirectories.Count > 1)
                     {
                         SkillManifestEntry[] copyableSkills = [.. selectedSkills
-                            .Where(skill => !SkillInstaller.IsMissing(skill, firstSkillsDirectory))];
+                            .Where(skill => options.Preview || skill.ForceInstall || !SkillInstaller.IsMissing(skill, firstSkillsDirectory))];
                         report.SkillCopyResults.AddRange(skillInstaller.CopyInstalledSkills(
                             copyableSkills,
                             firstSkillsDirectory,
                             [.. skillsDirectories.Skip(1)],
-                            advance));
+                            targetDirectory,
+                            advance,
+                            overwriteExisting: options.Preview,
+                            reportPreviewChangeStatus: options.Preview));
                     }
                 },
                 cancellationToken).ConfigureAwait(false);
@@ -269,23 +313,58 @@ sealed class CheckWorkflow(
 
         static int CountSkillInstallOperations(
             IReadOnlyList<SkillManifestEntry> selectedSkills,
-            IReadOnlyList<SkillManifestEntry> firstDirectoryMissingSkills,
-            IReadOnlyList<string> targetSkillsDirectories)
+            IReadOnlyList<SkillManifestEntry> firstDirectoryInstallSkills,
+            IReadOnlyList<string> targetSkillsDirectories,
+            bool overwriteCopies)
         {
             int copyOperations = 0;
             foreach (string targetSkillsDirectory in targetSkillsDirectories)
             {
-                copyOperations += selectedSkills.Count(skill => SkillInstaller.IsMissing(skill, targetSkillsDirectory));
+                copyOperations += overwriteCopies
+                    ? selectedSkills.Count
+                    : selectedSkills.Count(skill => skill.ForceInstall || SkillInstaller.IsMissing(skill, targetSkillsDirectory));
             }
 
-            return firstDirectoryMissingSkills.Count + copyOperations;
+            return firstDirectoryInstallSkills.Count + copyOperations;
         }
 
-        await RunSkillUpdateAsync(options, skillsDirectories, targetDirectory, report, skillUpdates, cancellationToken).ConfigureAwait(false);
+        if (!options.Preview)
+        {
+            await RunSkillUpdateAsync(options, skillsDirectories, targetDirectory, report, skillUpdates, cancellationToken).ConfigureAwait(false);
+        }
 
         int exitCode = report.InstallResults.Any(result => !result.Success) || report.SkillCopyResults.Any(result => !result.Success) ? 1 : 0;
         await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
         return new CheckRunResult(exitCode, report);
+    }
+
+    async Task<IReadOnlyList<SkillManifestEntry>> AddSourceVersionInfoAsync(
+        IReadOnlyList<SkillManifestEntry> manifest,
+        SourceVersionMode sourceVersionMode,
+        DirectiveCacheSettings cacheSettings,
+        CancellationToken cancellationToken)
+    {
+        var resolver = sourceVersionResolver ?? new GitHubSourceVersionResolver(reporter: reporter);
+        IReadOnlyDictionary<string, SourceVersionInfo> versions;
+        try
+        {
+            versions = await resolver
+                .ResolveVersionsAsync(manifest.Select(skill => skill.SourceRepo), sourceVersionMode, cacheSettings, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (DirectiveException exception)
+        {
+            reporter.Warning($"Could not resolve skill source versions: {exception.Message}");
+            return manifest;
+        }
+
+        return [.. manifest.Select(skill => versions.TryGetValue(skill.SourceRepo, out var version)
+            ? skill with
+            {
+                SourceRef = sourceVersionMode == SourceVersionMode.Preview ? version.Ref : string.Empty,
+                Version = version.Display
+            }
+            : skill)];
     }
 
     static DirectoryValidationResult ValidateTargetDirectory(string targetDirectory)
@@ -314,23 +393,50 @@ sealed class CheckWorkflow(
             $"Target directory does not exist: {fullTargetDirectory}.");
     }
 
-    static DirectoryValidationResult ValidateSkillsDirectory(string? skillsDirectory)
+    static DirectoryValidationResult ValidateSkillsDirectory(string? skillsDirectory, string targetDirectory)
     {
         if (string.IsNullOrWhiteSpace(skillsDirectory))
         {
             return DirectoryValidationResult.Valid(string.Empty, []);
         }
 
-        var pathValidation = TryGetFullPath(skillsDirectory, "skills directory");
+        if (Path.IsPathRooted(skillsDirectory))
+        {
+            return DirectoryValidationResult.Invalid(
+                skillsDirectory,
+                $"Invalid skills directory: {skillsDirectory} must be relative to the target directory.");
+        }
+
+        var pathValidation = TryGetFullPath(Path.Combine(targetDirectory, skillsDirectory), "skills directory");
         if (!pathValidation.Success)
         {
             return DirectoryValidationResult.Invalid(skillsDirectory, pathValidation.Error);
         }
 
         string fullSkillsDirectory = pathValidation.Directory;
-        return File.Exists(fullSkillsDirectory)
-            ? DirectoryValidationResult.Invalid(fullSkillsDirectory, $"Invalid skills directory: {fullSkillsDirectory} is a file.")
-            : DirectoryValidationResult.Valid(fullSkillsDirectory, []);
+        if (!IsPathBelowDirectory(targetDirectory, fullSkillsDirectory))
+        {
+            return DirectoryValidationResult.Invalid(
+                fullSkillsDirectory,
+                $"Invalid skills directory: {skillsDirectory} must resolve below the target directory.");
+        }
+
+        if (File.Exists(fullSkillsDirectory))
+        {
+            return DirectoryValidationResult.Invalid(fullSkillsDirectory, $"Invalid skills directory: {fullSkillsDirectory} is a file.");
+        }
+
+        return Directory.Exists(fullSkillsDirectory)
+            ? DirectoryValidationResult.Valid(fullSkillsDirectory, [])
+            : DirectoryValidationResult.Invalid(fullSkillsDirectory, $"Skills directory does not exist: {fullSkillsDirectory}.");
+    }
+
+    static bool IsPathBelowDirectory(string parentDirectory, string childPath)
+    {
+        string parent = Path.TrimEndingDirectorySeparator(Path.GetFullPath(parentDirectory));
+        string child = Path.TrimEndingDirectorySeparator(Path.GetFullPath(childPath));
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        return child.StartsWith(parent + Path.DirectorySeparatorChar, comparison);
     }
 
     static DirectoryValidationResult TryGetFullPath(string path, string parameterName)
@@ -498,7 +604,8 @@ sealed class CheckWorkflow(
         IReadOnlyList<DirectivePlanItem> directives,
         IReadOnlyList<SkillManifestEntry> recommendedSkills,
         IReadOnlyList<SkillManifestEntry> missingSkills,
-        IReadOnlyList<SkillUpdateCandidate> skillUpdates)
+        IReadOnlyList<SkillUpdateCandidate> skillUpdates,
+        IReadOnlyList<SkillManifestEntry> branchInstalledSkills)
     {
         DirectivePlanItem[] currentDirectives = [.. directives
             .Where(directive => directive.Status == DirectiveStatuses.Current)
@@ -506,11 +613,15 @@ sealed class CheckWorkflow(
         var missingSkillKeys = missingSkills
             .Select(SkillKey)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var branchInstalledSkillKeys = branchInstalledSkills
+            .Select(SkillKey)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var updateSkillKeys = skillUpdates
             .SelectMany(update => UpdateSkillKeys(update, recommendedSkills))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         SkillManifestEntry[] upToDateSkills = [.. recommendedSkills
             .Where(skill => !missingSkillKeys.Contains(SkillKey(skill))
+                && !branchInstalledSkillKeys.Contains(SkillKey(skill))
                 && !updateSkillKeys.Contains(SkillKey(skill)))
         ];
         if (currentDirectives.Length == 0 && upToDateSkills.Length == 0)
@@ -546,6 +657,32 @@ sealed class CheckWorkflow(
         ReportSectionHeader(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Found {skillUpdates.Count} skill update(s) available:"));
         ReportSkillUpdateGroups(skillUpdates, recommendedSkills);
     }
+
+    void ReportSelectedActions(int selectedActionCount)
+    {
+        reporter.Plain(string.Empty);
+        reporter.Info(ActionOutputFormatter.FormatSelectionSummary(selectedActionCount));
+        if (selectedActionCount == 0)
+        {
+            return;
+        }
+
+        reporter.Plain(string.Empty);
+        reporter.Bold(ActionOutputFormatter.FormatHeader());
+    }
+
+    void ReportDirectiveApplyActions(IReadOnlyList<DirectivePlanItem> selectedDirectives)
+    {
+        foreach (var directive in selectedDirectives)
+        {
+            reporter.Success(ActionOutputFormatter.FormatLine(
+                FormatDirectiveApplyAction(directive),
+                directive.Name));
+        }
+    }
+
+    static string FormatDirectiveApplyAction(DirectivePlanItem directive)
+        => directive.Status == DirectiveStatuses.Outdated ? "Updated directive" : "Installed directive";
 
     void ReportSectionHeader(string header)
     {
@@ -674,6 +811,37 @@ sealed class CheckWorkflow(
 
     static string SkillKey(string sourceRepo, string skillName)
         => $"{sourceRepo}\n{skillName}";
+
+    static IReadOnlyList<SkillManifestEntry> BuildStableSkillActions(
+        IReadOnlyList<SkillManifestEntry> recommendedSkills,
+        IReadOnlyList<SkillManifestEntry> missingSkills,
+        IReadOnlyList<SkillManifestEntry> branchInstalledSkills)
+    {
+        var missingSkillKeys = missingSkills
+            .Select(SkillKey)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var branchInstalledSkillKeys = branchInstalledSkills
+            .Select(SkillKey)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return
+        [
+            .. recommendedSkills
+                .Where(skill => missingSkillKeys.Contains(SkillKey(skill)) || branchInstalledSkillKeys.Contains(SkillKey(skill)))
+                .Select(skill => branchInstalledSkillKeys.Contains(SkillKey(skill))
+                    ? skill with
+                    {
+                        RecommendationAction = "switch to stable",
+                        ForceInstall = true
+                    }
+                    : skill)
+        ];
+    }
+
+    static IReadOnlyList<SkillManifestEntry> FindBranchInstalledSkillActions(
+        bool preview,
+        IReadOnlyList<SkillManifestEntry> recommendedSkills,
+        IReadOnlyList<string> skillsDirectories)
+        => preview ? [] : SkillInstaller.FindInstalledFromBranch(recommendedSkills, skillsDirectories);
 
     static IReadOnlyList<SkillManifestEntry> AddSelectedSkillDependencies(
         IReadOnlyList<SkillManifestEntry> selectedSkills,

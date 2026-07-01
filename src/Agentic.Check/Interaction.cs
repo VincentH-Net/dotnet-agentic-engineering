@@ -1,4 +1,5 @@
 ﻿using Spectre.Console;
+using Spectre.Console.Rendering;
 
 namespace Agentic.Check;
 
@@ -9,7 +10,11 @@ interface IUserPrompts
     Task<RecommendationSelectionResult> SelectRecommendationsAsync(
         IReadOnlyList<DirectivePlanItem> recommendedDirectives,
         IReadOnlyList<SkillManifestEntry> missingSkills,
+        string targetDirectory,
+        IReadOnlyList<string> skillsDirectories,
         CancellationToken cancellationToken);
+
+    Task WaitForHelpKeyAsync(string url, string purpose, CancellationToken cancellationToken);
 }
 
 sealed record RecommendationSelectionResult(
@@ -31,10 +36,50 @@ sealed class SpectreUserPrompts(IAnsiConsole console) : IUserPrompts
     public Task<RecommendationSelectionResult> SelectRecommendationsAsync(
         IReadOnlyList<DirectivePlanItem> recommendedDirectives,
         IReadOnlyList<SkillManifestEntry> missingSkills,
+        string targetDirectory,
+        IReadOnlyList<string> skillsDirectories,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return new RecommendationSelectionPrompt(console).PromptAsync(recommendedDirectives, missingSkills, cancellationToken);
+        return new RecommendationSelectionPrompt(console).PromptAsync(
+            recommendedDirectives,
+            missingSkills,
+            targetDirectory,
+            skillsDirectories,
+            cancellationToken);
+    }
+
+    public async Task WaitForHelpKeyAsync(string url, string purpose, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        console.MarkupLine(ToolHeader.KeyMarkup("F2") + $" to open [link={url}]{Markup.Escape(url)}[/] for {Markup.Escape(purpose)}");
+        console.MarkupLine($"[{SpectreReporter.InfoColor}]Press any other key to exit[/]");
+        if (!console.Profile.Capabilities.Interactive)
+        {
+            return;
+        }
+
+        ConsoleKeyInfo? key;
+        try
+        {
+            key = await console.Input
+                .ReadKeyAsync(true, cancellationToken)
+                .WaitAsync(TimeSpan.FromSeconds(30), cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (TimeoutException)
+        {
+            return;
+        }
+
+        if (key?.Key == ConsoleKey.F1)
+        {
+            _ = BrowserLauncher.Open(ToolHeader.RepositoryUrl);
+        }
+        else if (key?.Key == ConsoleKey.F2)
+        {
+            _ = BrowserLauncher.Open(url);
+        }
     }
 }
 
@@ -80,20 +125,35 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
 
     public void Header()
     {
+        int headerContentWidth = ToolHeader.HeaderContentWidth;
         foreach (var line in ToolHeader.Lines)
         {
             console.MarkupLine(
-                Styled(ToolHeader.AgenticColor, line.Agentic)
-                + Markup.Escape(line.Separator)
-                + Styled(ToolHeader.CheckColor, line.Check));
+                CenterMarkup(
+                    Styled(ToolHeader.AgenticColor, line.Agentic)
+                    + Markup.Escape(line.Separator)
+                    + Styled(ToolHeader.CheckColor, line.Check),
+                    ToolHeader.HeaderArtWidth,
+                    headerContentWidth));
         }
 
-        console.MarkupLine(ToolHeader.ProductLineMarkup);
-        console.MarkupLine(ToolHeader.SeparatorMarkup(console.Profile.Width));
-        console.MarkupLine(Markup.Escape(ToolHeader.Description));
-        console.MarkupLine(ToolHeader.RepositoryLinkMarkup);
-        console.MarkupLine(ToolHeader.SeparatorMarkup(console.Profile.Width));
         console.WriteLine();
+        console.MarkupLine(CenterMarkup(ToolHeader.ProductLineMarkupContent, ToolHeader.ProductLineContent.Length, headerContentWidth));
+        console.MarkupLine(ToolHeader.SeparatorMarkup(headerContentWidth));
+        foreach (string line in ToolHeader.DescriptionLines)
+        {
+            console.MarkupLine(CenterMarkup(Markup.Escape(line), line.Length, headerContentWidth));
+        }
+
+        console.MarkupLine(CenterMarkup(ToolHeader.RepositoryHelpMarkup, ToolHeader.RepositoryHelp.Length, headerContentWidth));
+        console.MarkupLine(ToolHeader.SeparatorMarkup(headerContentWidth));
+        console.WriteLine();
+    }
+
+    static string CenterMarkup(string markup, int visibleLength, int width)
+    {
+        int padding = Math.Max(0, (width - visibleLength) / 2);
+        return new string(' ', padding) + markup;
     }
 
     static string Styled(string color, string value)
@@ -183,11 +243,12 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
         CancellationToken cancellationToken)
         => await console.Progress()
             .AutoClear(false)
-            .Columns(CreateProgressColumns())
+            .Columns(CreateProgressColumns(description))
             .StartAsync(async context =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var task = context.AddTask(description, maxValue: Math.Max(total, 1));
+                string taskDescription = description == ActionOutputFormatter.ProgressIndent ? "Applying actions" : description;
+                var task = context.AddTask(taskDescription, maxValue: Math.Max(total, 1));
                 await action(() => task.Increment(1)).ConfigureAwait(false);
                 if (!task.IsFinished)
                 {
@@ -195,8 +256,22 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
                 }
             }).ConfigureAwait(false);
 
+    internal static ProgressColumn[] CreateProgressColumns(string description)
+        => description == ActionOutputFormatter.ProgressIndent
+            ? [new FixedTextProgressColumn(ActionOutputFormatter.ProgressIndent), new ProgressBarColumn(), new PercentageColumn(), new SpinnerColumn()]
+            : CreateProgressColumns();
+
     internal static ProgressColumn[] CreateProgressColumns()
         => [new TaskDescriptionColumn(), new ProgressBarColumn(), new PercentageColumn(), new SpinnerColumn()];
+
+    sealed class FixedTextProgressColumn(string text) : ProgressColumn
+    {
+        public override IRenderable Render(RenderOptions options, ProgressTask task, TimeSpan deltaTime)
+            => new Text(text);
+
+        public override int? GetColumnWidth(RenderOptions options)
+            => text.Length;
+    }
 
     internal static string FormatDirectiveSummary(DirectiveSummary directiveSummary)
         => FormatRecommendationStatus(
@@ -290,7 +365,7 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
     internal static string FormatSkillsDirectories(string repoRoot, IReadOnlyList<string> skillsDirectories)
         => string.Join(Environment.NewLine, skillsDirectories.Select(directory => FormatSkillsDirectory(repoRoot, directory)));
 
-    static string FormatSkillsDirectory(string repoRoot, string skillsDirectory)
+    internal static string FormatSkillsDirectory(string repoRoot, string skillsDirectory)
     {
         string relativePath = Path.GetRelativePath(repoRoot, skillsDirectory);
         return relativePath.StartsWith("..", StringComparison.Ordinal)

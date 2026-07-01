@@ -10,23 +10,35 @@ public sealed class InteractionTests
         Assert.Equal("cyan", ToolHeader.AgenticColor);
         Assert.Equal("green", ToolHeader.CheckColor);
         Assert.Equal("#b197fc", ToolHeader.DotNetColor);
-        Assert.Equal(75, ToolHeader.MaxSeparatorWidth);
+        Assert.Equal(100, ToolHeader.MaxSeparatorWidth);
         Assert.Equal(6, ToolHeader.Lines.Count);
         Assert.All(ToolHeader.Lines, line => Assert.NotEmpty(line.Agentic));
         Assert.Contains(ToolHeader.Lines, line => !string.IsNullOrWhiteSpace(line.Separator));
         Assert.All(ToolHeader.Lines, line => Assert.NotEmpty(line.Check));
         Assert.StartsWith("✓ .NET Agentic Engineering Check ", ToolHeader.ProductLine.TrimStart(), StringComparison.Ordinal);
+        Assert.StartsWith("✓ .NET Agentic Engineering Check ", ToolHeader.ProductLineContent, StringComparison.Ordinal);
         Assert.DoesNotContain("unknown", ToolHeader.ProductLine, StringComparison.OrdinalIgnoreCase);
         Assert.StartsWith($"\n[bold {ToolHeader.CheckColor}]✓ [/]", ToolHeader.ProductLineMarkup, StringComparison.Ordinal);
+        Assert.StartsWith($"[bold {ToolHeader.CheckColor}]✓ [/]", ToolHeader.ProductLineMarkupContent, StringComparison.Ordinal);
         Assert.Contains($"[bold underline {ToolHeader.DotNetColor}].NET [/]", ToolHeader.ProductLineMarkup, StringComparison.Ordinal);
         Assert.Contains($"[bold underline {ToolHeader.AgenticColor}]Agentic[/]", ToolHeader.ProductLineMarkup, StringComparison.Ordinal);
         Assert.Contains($"[bold underline {ToolHeader.DotNetColor}] Engineering [/]", ToolHeader.ProductLineMarkup, StringComparison.Ordinal);
         Assert.Contains($"[bold underline {ToolHeader.CheckColor}]Check[/]", ToolHeader.ProductLineMarkup, StringComparison.Ordinal);
         Assert.Contains("[grey] ", ToolHeader.ProductLineMarkup, StringComparison.Ordinal);
         Assert.NotEmpty(ToolHeader.Description.Trim());
+        Assert.StartsWith("Optimizes your repo for agentic engineering with .NET - based technologies\n", ToolHeader.Description, StringComparison.Ordinal);
+        Assert.DoesNotContain("technologies.", ToolHeader.Description, StringComparison.Ordinal);
         Assert.DoesNotContain(ToolHeader.RepositoryUrl, ToolHeader.Description, StringComparison.Ordinal);
-        Assert.Contains($"[link={ToolHeader.RepositoryUrl}]", ToolHeader.RepositoryLinkMarkup, StringComparison.Ordinal);
-        Assert.Contains($"{ToolHeader.RepositoryUrl}[/]", ToolHeader.RepositoryLinkMarkup, StringComparison.Ordinal);
+        Assert.StartsWith("F1 to learn more at ", ToolHeader.RepositoryHelp, StringComparison.Ordinal);
+        Assert.Contains(ToolHeader.KeyMarkup("F1"), ToolHeader.RepositoryHelpMarkup, StringComparison.Ordinal);
+        Assert.Contains(" to learn more at ", ToolHeader.RepositoryHelpMarkup, StringComparison.Ordinal);
+        Assert.Contains($"[link={ToolHeader.RepositoryUrl}]", ToolHeader.RepositoryHelpMarkup, StringComparison.Ordinal);
+        Assert.Contains($"{ToolHeader.RepositoryUrl}[/]", ToolHeader.RepositoryHelpMarkup, StringComparison.Ordinal);
+        Assert.Equal(
+            ToolHeader.Lines.Max(line => line.Agentic.Length + line.Separator.Length + line.Check.Length),
+            ToolHeader.HeaderArtWidth);
+        Assert.True(ToolHeader.HeaderContentWidth >= ToolHeader.HeaderArtWidth);
+        Assert.True(ToolHeader.HeaderContentWidth >= ToolHeader.RepositoryHelp.Length);
         Assert.Equal($"[bold]{new string('─', 12)}[/]", ToolHeader.SeparatorMarkup(12));
         Assert.Equal("[bold]─[/]", ToolHeader.SeparatorMarkup(0));
         Assert.Equal($"[bold]{new string('─', ToolHeader.MaxSeparatorWidth)}[/]", ToolHeader.SeparatorMarkup(120));
@@ -144,6 +156,32 @@ public sealed class InteractionTests
         Assert.True(table.ShowRowSeparators);
         Assert.Same(TableBorder.HeavyHead, table.Border);
         Assert.Equal(Style.Parse(SpectreReporter.InfoColor), table.BorderStyle);
+    }
+
+    [Fact]
+    public async Task ActionProgressUsesNonEmptyInternalTaskName()
+    {
+        using StringWriter writer = new();
+        var console = AnsiConsole.Create(new AnsiConsoleSettings
+        {
+            Ansi = AnsiSupport.No,
+            Interactive = InteractionSupport.No,
+            Out = new AnsiConsoleOutput(writer)
+        });
+        SpectreReporter reporter = new(console);
+
+        var exception = await Record.ExceptionAsync(() => reporter.RunProgressAsync(
+            ActionOutputFormatter.ProgressIndent,
+            1,
+            action =>
+            {
+                action();
+                return Task.CompletedTask;
+            },
+            CancellationToken.None));
+
+        Assert.Null(exception);
+        Assert.DoesNotContain("Applying actions", writer.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]

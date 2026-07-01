@@ -9,7 +9,11 @@ sealed record SkillManifestEntry
         string technology,
         IReadOnlyList<GateRequirement> gateRequirements,
         string plugin = "",
-        IReadOnlyList<SkillDependency>? dependencies = null)
+        IReadOnlyList<SkillDependency>? dependencies = null,
+        string sourceRef = "",
+        string version = "",
+        string recommendationAction = "install",
+        bool forceInstall = false)
     {
         SourceRepo = sourceRepo;
         InstallArg = installArg;
@@ -18,6 +22,10 @@ sealed record SkillManifestEntry
         GateRequirements = gateRequirements;
         Plugin = plugin;
         Dependencies = dependencies ?? [];
+        SourceRef = sourceRef;
+        Version = version;
+        RecommendationAction = recommendationAction;
+        ForceInstall = forceInstall;
     }
 
     public string SourceRepo { get; init; }
@@ -34,7 +42,17 @@ sealed record SkillManifestEntry
 
     public IReadOnlyList<SkillDependency> Dependencies { get; init; }
 
-    public string Display => $"{SourceRepo} {InstallArg}";
+    public string SourceSpec => string.IsNullOrWhiteSpace(SourceRef) ? SourceRepo : $"{SourceRepo}@{SourceRef}";
+
+    public string Version { get; init; }
+
+    public string SourceRef { get; init; }
+
+    public string RecommendationAction { get; init; }
+
+    public bool ForceInstall { get; init; }
+
+    public string Display => $"{SourceSpec} {InstallArg}";
 
     public string Key => SkillDependency.CreateKey(SourceRepo, InstallArg);
 }
@@ -87,6 +105,13 @@ static class StaticSkillManifest
         ..UnoStudioToolkitUngated()
     ];
 
+    internal static IReadOnlyList<SkillManifestEntry> Preview { get; } =
+    [
+        ..All,
+        DotnetAspNetCore("dotnet-webapi"),
+        DotnetAspNetCore("minimal-api-file-upload")
+    ];
+
     static SkillManifestEntry VincentDotnet(string skill)
         => Entry(VincentRepo, skill, TechnologyNames.Dotnet, plugin: "dotnet");
 
@@ -126,6 +151,15 @@ static class StaticSkillManifest
             [],
             "dotnet-test",
             dependencies);
+
+    static SkillManifestEntry DotnetAspNetCore(string skill)
+        => new(
+            DotnetSkillsRepo,
+            DotnetSkillInstallArg("dotnet-aspnetcore", skill),
+            skill,
+            TechnologyNames.AspNetCore,
+            [],
+            "dotnet-aspnetcore");
 
     static SkillDependency DotnetTestDependency(string skill)
         => new(DotnetSkillsRepo, DotnetSkillInstallArg("dotnet-test", skill));

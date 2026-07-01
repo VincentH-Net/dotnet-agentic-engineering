@@ -7,4 +7,5 @@ sealed record AgenticCheckOptions(
     string? ReportPath,
     string? SkillsDirectory,
     string? Agents,
-    bool Verbose);
+    bool Verbose,
+    bool Preview = false);

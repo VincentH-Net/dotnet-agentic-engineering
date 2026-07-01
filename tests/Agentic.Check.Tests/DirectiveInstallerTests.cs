@@ -9,7 +9,7 @@ public sealed class DirectiveInstallerTests
         handler.SetJson(
             "https://api.github.com/repos/VincentH-Net/dotnet-agentic-engineering/releases/latest",
             """
-            { "tag_name": "v1.2.3" }
+            { "tag_name": "v1.2.3", "published_at": "2026-06-29T18:18:00Z" }
             """);
         handler.SetJson(
             "https://api.github.com/repos/VincentH-Net/dotnet-agentic-engineering/contents/directives?ref=v1.2.3",
@@ -29,6 +29,11 @@ public sealed class DirectiveInstallerTests
 
         var file = Assert.Single(files);
         Assert.Equal("foundation-prompt-log.md", file.FileName);
+        string expectedVersion = new SourceVersionInfo(
+            "VincentH-Net/dotnet-agentic-engineering",
+            "v1.2.3",
+            new DateTimeOffset(2026, 6, 29, 18, 18, 0, TimeSpan.Zero)).Display;
+        Assert.Equal(expectedVersion, file.Version);
         Assert.Contains(
             "https://api.github.com/repos/VincentH-Net/dotnet-agentic-engineering/contents/directives?ref=v1.2.3",
             handler.Requests);

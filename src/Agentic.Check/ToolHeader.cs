@@ -10,7 +10,7 @@ static class ToolHeader
     public const string AgenticColor = "cyan";
     public const string CheckColor = "green";
     public const string DotNetColor = "#b197fc";
-    public const int MaxSeparatorWidth = 75;
+    public const int MaxSeparatorWidth = 100;
     public const string RepositoryUrl = "https://github.com/VincentH-Net/dotnet-agentic-engineering";
 
     public static IReadOnlyList<ToolHeaderLine> Lines { get; } =
@@ -24,18 +24,23 @@ static class ToolHeader
     ];
 
     public static string Description => """
-        Optimizes your repo for agentic engineering with .NET - based technologies.
+        Optimizes your repo for agentic engineering with .NET - based technologies
 
-        - Use 'agentic-check -h' for full tool description and parameter usage
+        Use 'agentic-check -h' for full tool description and parameter usage
 
         """;
 
     public static string ProductLine
-        => $"\n✓ .NET Agentic Engineering Check {Version}";
+        => "\n" + ProductLineContent;
+
+    public static string ProductLineContent
+        => $"✓ .NET Agentic Engineering Check {Version}";
 
     public static string ProductLineMarkup
-        => "\n"
-            + Styled($"{CheckColor}", "✓ ")
+        => "\n" + ProductLineMarkupContent;
+
+    public static string ProductLineMarkupContent
+        => Styled($"{CheckColor}", "✓ ")
             + Styled($"underline {DotNetColor}", ".NET ")
             + Styled($"underline {AgenticColor}", "Agentic")
             + Styled($"underline {DotNetColor}", " Engineering ")
@@ -57,11 +62,39 @@ static class ToolHeader
         }
     }
 
-    public static string RepositoryLinkMarkup
-        => $"- Learn more at [link={RepositoryUrl}]{Markup.Escape(RepositoryUrl)}[/]";
+    public static string RepositoryHelp
+        => $"F1 to learn more at {RepositoryUrl}";
+
+    public static string RepositoryHelpMarkup
+        => $"{KeyMarkup("F1")} to learn more at [link={RepositoryUrl}]{Markup.Escape(RepositoryUrl)}[/]";
+
+    public static IReadOnlyList<string> DescriptionLines
+        => Description.Split('\n');
+
+    public static int HeaderContentWidth
+        => new[]
+            {
+                HeaderArtWidth,
+                ProductLineContent.Length,
+                RepositoryHelp.Length,
+                DescriptionLines
+                    .Select(line => line.Length)
+                    .DefaultIfEmpty(0)
+                    .Max()
+            }
+            .Max();
+
+    public static int HeaderArtWidth
+        => Lines
+            .Select(line => line.Agentic.Length + line.Separator.Length + line.Check.Length)
+            .DefaultIfEmpty(0)
+            .Max();
 
     public static string SeparatorMarkup(int width)
         => $"[bold]{Markup.Escape(new string('─', Math.Clamp(width, 1, MaxSeparatorWidth)))}[/]";
+
+    public static string KeyMarkup(string value)
+        => $"[black on white]{Markup.Escape(value)}[/]";
 
     static string Styled(string style, string value)
         => $"[bold {style}]{Markup.Escape(value)}[/]";

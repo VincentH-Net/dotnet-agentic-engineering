@@ -10,6 +10,7 @@ static class AgenticCheckCli
         "--agents",
         "--skills-dir",
         "--dry-run",
+        "--preview",
         "--yes",
         "--report",
         "--verbose",
@@ -55,6 +56,10 @@ static class AgenticCheckCli
         {
             Description = "Report recommended actions without applying them."
         };
+        Option<bool> previewOption = new("--preview")
+        {
+            Description = "Install preview directives and skills from source repo default branches."
+        };
         Option<bool> yesOption = new("--yes")
         {
             Description = "Apply all recommended actions."
@@ -63,9 +68,9 @@ static class AgenticCheckCli
         {
             Description = "Write a JSON report to this path."
         };
-        Option<DirectoryInfo?> skillsDirectoryOption = new("--skills-dir")
+        Option<string?> skillsDirectoryOption = new("--skills-dir")
         {
-            Description = "Target-local skills directory. Overrides directories implied by --agents."
+            Description = "Target-contained relative skills directory below the target directory, for example .agents/skills or .claude/skills. Absolute paths and paths that escape the target directory are not allowed. Overrides directories implied by --agents."
         };
         Option<string?> agentsOption = new("--agents")
         {
@@ -112,11 +117,30 @@ static class AgenticCheckCli
         - Pure XAML markup or XAML combined with either Uno C# Markup or C# Markup 2
         - Fluent / Material / Cupertino design system
 
+        Folder Specializing
+        
+        agentic-check supports specializing folders in your repo, e.g. to have common
+        directives and skills in the repo root, but additional and different ones in
+        backend and frontend subfolders:
+        1. Start agentic-check in the repo root and select the common set of directives
+           and skills to install there
+        2. Start agentic-check in the backend subfolder and select the additional
+           specialized set of directives and skills for that subfolder - agentic-check
+           will automatically deselect any directives and skills that are already
+           installed above or below the target folder. For agentic-check, above
+           terminates at the repo root or else the drive root.
+        3. Start agentic-check in the frontend subfolder and select the specialized
+           set of directives and skills for that subfolder
+        4. Start your agent in a (sub)folder of choice to use that specialized set of
+           instructions. Multiple harnesses support this, including Codex CLI (composes 
+           above) and Claude Code CLI (composes above, as well as below when working on
+           files below it's working dir).
         """);
         rootCommand.Arguments.Add(targetDirectoryArgument);
         rootCommand.Options.Add(agentsOption);
         rootCommand.Options.Add(skillsDirectoryOption);
         rootCommand.Options.Add(dryRunOption);
+        rootCommand.Options.Add(previewOption);
         rootCommand.Options.Add(yesOption);
         rootCommand.Options.Add(reportOption);
         rootCommand.Options.Add(verboseOption);
@@ -132,9 +156,10 @@ static class AgenticCheckCli
                     var targetDirectory = parseResult.GetValue(targetDirectoryArgument)
                         ?? new DirectoryInfo(Environment.CurrentDirectory);
                     bool dryRun = parseResult.GetValue(dryRunOption);
+                    bool preview = parseResult.GetValue(previewOption);
                     bool yes = parseResult.GetValue(yesOption);
                     var report = parseResult.GetValue(reportOption);
-                    var skillsDirectory = parseResult.GetValue(skillsDirectoryOption);
+                    string? skillsDirectory = parseResult.GetValue(skillsDirectoryOption);
                     string? agents = parseResult.GetValue(agentsOption);
                     bool verbose = parseResult.GetValue(verboseOption);
 
@@ -153,9 +178,10 @@ static class AgenticCheckCli
                         dryRun,
                         yes,
                         report?.FullName,
-                        skillsDirectory?.FullName,
+                        skillsDirectory,
                         effectiveAgents,
-                        verbose);
+                        verbose,
+                        preview);
 
                     var workflow = new CheckWorkflow(
                         new ProcessCommandRunner(),
