@@ -117,6 +117,24 @@ static class AgenticCheckCli
         - Pure XAML markup or XAML combined with either Uno C# Markup or C# Markup 2
         - Fluent / Material / Cupertino design system
 
+        Folder Specializing
+        
+        agentic-check supports specializing folders in your repo, e.g. to have common
+        directives and skills in the repo root, but additional and different ones in
+        backend and frontend subfolders:
+        1. Start agentic-check in the repo root and select the common set of directives
+           and skills to install there
+        2. Start agentic-check in the backend subfolder and select the additional
+           specialized set of directives and skills for that subfolder - agentic-check
+           will automatically deselect any directives and skills that are already
+           installed above or below the target folder. For agentic-check, above
+           terminates at the repo root or else the drive root.
+        3. Start agentic-check in the frontend subfolder and select the specialized
+           set of directives and skills for that subfolder
+        4. Start your agent in a (sub)folder of choice to use that specialized set of
+           instructions. Multiple harnesses support this, including Codex CLI (composes 
+           above) and Claude Code CLI (composes above, as well as below when working on
+           files below it's working dir).
         """);
         rootCommand.Arguments.Add(targetDirectoryArgument);
         rootCommand.Options.Add(agentsOption);
