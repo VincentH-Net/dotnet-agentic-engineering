@@ -123,6 +123,12 @@ sealed class FakePrompts : IUserPrompts
             : [.. missingSkills.Where(skill => SelectedSkillInstallArgs.Contains(skill.InstallArg, StringComparer.Ordinal))];
         return Task.FromResult(new RecommendationSelectionResult(selectedDirectives, selectedSkills));
     }
+
+    public Task WaitForHelpKeyAsync(string url, string purpose, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.CompletedTask;
+    }
 }
 
 sealed class RecordingReporter : IReporter

@@ -13,6 +13,7 @@ enum SkillSelectionCommand
     ClearFilter,
     Confirm,
     Specialize,
+    OpenHelp,
     Character
 }
 
@@ -38,7 +39,7 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
     readonly Dictionary<string, IReadOnlyList<string>> dependencyKeysByKey = BuildDependencyKeysByKey(items);
     readonly Dictionary<string, IReadOnlyList<string>> dependentKeysByKey = BuildDependentKeysByKey(items);
     readonly HashSet<string> selectedKeys = items.Select(item => item.Key).ToHashSet(StringComparer.Ordinal);
-    HashSet<string>? selectionBeforeSpecialization;
+    HashSet<string>? specializedDefaultSelectedKeys;
 
     public IReadOnlyList<RecommendationSelectionItem> FilteredItems { get; private set; } = items;
 
@@ -56,6 +57,9 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
 
     public IReadOnlyDictionary<string, IReadOnlyList<string>> DuplicateLocationsByKey { get; private set; }
         = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
+
+    public IReadOnlyDictionary<string, int> DuplicateScopeCountsByKey { get; private set; }
+        = new Dictionary<string, int>(StringComparer.Ordinal);
 
     public IReadOnlyList<DirectivePlanItem> SelectedDirectives
         => [.. items
@@ -75,11 +79,15 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
     public IReadOnlyList<string> GetDuplicateLocations(RecommendationSelectionItem item)
         => DuplicateLocationsByKey.GetValueOrDefault(item.Key, []);
 
+    public int GetDuplicateScopeCount(RecommendationSelectionItem item)
+        => DuplicateScopeCountsByKey.GetValueOrDefault(item.Key);
+
     public bool HasSpecializationScanResult { get; private set; }
 
     public void BeginSpecializationScan()
     {
         IsSpecializationScanning = true;
+        IsSpecialized = true;
         SpecializationScanCurrent = 0;
         SpecializationScanTotal = 0;
     }
@@ -95,6 +103,8 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
         IsSpecializationScanning = false;
         HasSpecializationScanResult = true;
         DuplicateLocationsByKey = result.LocationsByKey;
+        DuplicateScopeCountsByKey = result.ScopeCountsByKey;
+        specializedDefaultSelectedKeys = BuildSpecializedDefaultSelection();
         EnableSpecialization();
     }
 
@@ -139,6 +149,7 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
                 break;
             case SkillSelectionCommand.Confirm:
             case SkillSelectionCommand.Specialize:
+            case SkillSelectionCommand.OpenHelp:
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(input), input.Command, "Unsupported selection input.");
@@ -190,32 +201,46 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
 
     void EnableSpecialization()
     {
-        selectionBeforeSpecialization = selectedKeys.ToHashSet(StringComparer.Ordinal);
-        foreach (var item in items.Where(item => DuplicateLocationsByKey.ContainsKey(item.Key) && !IsTargetLocalRepair(item)))
+        specializedDefaultSelectedKeys ??= BuildSpecializedDefaultSelection();
+        selectedKeys.Clear();
+        foreach (string key in specializedDefaultSelectedKeys)
         {
-            DeselectWithDependents(item.Key);
+            _ = selectedKeys.Add(key);
         }
 
         IsSpecialized = true;
     }
 
     void DisableSpecialization()
-    {
-        if (selectionBeforeSpecialization is not null)
-        {
-            selectedKeys.Clear();
-            foreach (string key in selectionBeforeSpecialization)
-            {
-                _ = selectedKeys.Add(key);
-            }
-        }
-
-        IsSpecialized = false;
-    }
+        => IsSpecialized = false;
 
     static bool IsTargetLocalRepair(RecommendationSelectionItem item)
         => item.Directive?.Status == DirectiveStatuses.Outdated
             || item.Skill?.ForceInstall == true;
+
+    HashSet<string> BuildSpecializedDefaultSelection()
+    {
+        var specializedSelection = selectedKeys.ToHashSet(StringComparer.Ordinal);
+        foreach (var item in items.Where(item => DuplicateLocationsByKey.ContainsKey(item.Key) && !IsTargetLocalRepair(item)))
+        {
+            RemoveWithDependents(specializedSelection, item.Key);
+        }
+
+        return specializedSelection;
+    }
+
+    void RemoveWithDependents(HashSet<string> selection, string key)
+    {
+        if (!selection.Remove(key))
+        {
+            return;
+        }
+
+        foreach (string dependentKey in dependentKeysByKey.GetValueOrDefault(key, []))
+        {
+            RemoveWithDependents(selection, dependentKey);
+        }
+    }
 
     void SelectWithDependencies(string key)
     {
@@ -333,6 +358,8 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
     {
         var items = BuildItems(recommendedDirectives, missingSkills);
         RecommendationSelectionState state = new(items);
+        await ScanSpecializationAsync(items, state, targetDirectory, skillsDirectories, cancellationToken)
+            .ConfigureAwait(false);
 
         while (true)
         {
@@ -357,26 +384,43 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
                     continue;
                 }
 
-                state.BeginSpecializationScan();
-                Render(items.Count, state);
-                var result = await ScopeDuplicateScanner
-                    .ScanAsync(
-                        items,
-                        targetDirectory,
-                        skillsDirectories,
-                        (current, total) =>
-                        {
-                            state.UpdateSpecializationScanProgress(current, total);
-                            Render(items.Count, state);
-                        },
-                        cancellationToken)
+                await ScanSpecializationAsync(items, state, targetDirectory, skillsDirectories, cancellationToken)
                     .ConfigureAwait(false);
-                state.ApplySpecializationScanResult(result);
+                continue;
+            }
+
+            if (input.Command == SkillSelectionCommand.OpenHelp)
+            {
+                _ = BrowserLauncher.Open(ToolHeader.RepositoryUrl);
                 continue;
             }
 
             state.Apply(input);
         }
+    }
+
+    async Task ScanSpecializationAsync(
+        List<RecommendationSelectionItem> items,
+        RecommendationSelectionState state,
+        string targetDirectory,
+        IReadOnlyList<string> skillsDirectories,
+        CancellationToken cancellationToken)
+    {
+        state.BeginSpecializationScan();
+        Render(items.Count, state);
+        var result = await ScopeDuplicateScanner
+            .ScanAsync(
+                items,
+                targetDirectory,
+                skillsDirectories,
+                (current, total) =>
+                {
+                    state.UpdateSpecializationScanProgress(current, total);
+                    Render(items.Count, state);
+                },
+                cancellationToken)
+            .ConfigureAwait(false);
+        state.ApplySpecializationScanResult(result);
     }
 
     static List<RecommendationSelectionItem> BuildItems(
@@ -451,6 +495,7 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
             ConsoleKey.Escape => new(SkillSelectionCommand.ClearFilter),
             ConsoleKey.Enter => new(SkillSelectionCommand.Confirm),
             ConsoleKey.Tab => new(SkillSelectionCommand.Specialize),
+            ConsoleKey.F1 => new(SkillSelectionCommand.OpenHelp),
             _ => new(SkillSelectionCommand.Character, key.KeyChar)
         };
 
@@ -473,9 +518,8 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
         console.WriteLine();
         lineCount++;
         MarkupLine($"[bold]{Markup.Escape(FormatRecommendationPromptHeading(itemCount))}[/]");
-        MarkupLine("[grey][[Use arrows to move, space to select, <right> to all, <left> to none, type to filter]][/]");
         MarkupLine(FormatSpecializationHelpLine(state));
-        MarkupLine("[grey][[Enter to confirm]][/]");
+        MarkupLine(FormatKeyHelpLine());
 
         if (state.Filter.Length > 0)
         {
@@ -492,7 +536,7 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
         var (visibleStartIndex, visibleItems) = GetVisibleItems(
             state.FilteredItems,
             state.CursorIndex,
-            item => 1 + (state.GetDuplicateLocations(item).Count == 0 ? 0 : 1 + state.GetDuplicateLocations(item).Count));
+            item => 1 + (ShouldShowDuplicateDetails(state, item) ? 1 + state.GetDuplicateLocations(item).Count : 0));
         if (visibleItems.Count < state.FilteredItems.Count)
         {
             int visibleEndIndex = visibleStartIndex + visibleItems.Count;
@@ -560,15 +604,15 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
                 int padding = Math.Max(1, versionColumnStart - (rowPrefix.Length + item.Display.Length));
                 MarkupLine(FormatItemLine(
                     $"{indent}{cursor} {check} {display}{new string(' ', padding)}{Markup.Escape(item.Version)}",
-                    state.GetDuplicateLocations(item).Count > 0));
+                    ShouldShowDuplicateWarning(state, item)));
             }
             else
             {
-                MarkupLine(FormatItemLine($"{indent}{cursor} {check} {display}", state.GetDuplicateLocations(item).Count > 0));
+                MarkupLine(FormatItemLine($"{indent}{cursor} {check} {display}", ShouldShowDuplicateWarning(state, item)));
             }
 
             var duplicateLocations = state.GetDuplicateLocations(item);
-            if (duplicateLocations.Count > 0)
+            if (ShouldShowDuplicateDetails(state, item))
             {
                 MarkupLine($"[yellow]{Markup.Escape($"{indent}    Duplicate(s) that prevent specialization:")}[/]");
                 foreach (string location in duplicateLocations)
@@ -601,6 +645,14 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
     static string FormatItemLine(string markup, bool warning)
         => warning ? $"[yellow]{markup}[/]" : markup;
 
+    static bool ShouldShowDuplicateWarning(RecommendationSelectionState state, RecommendationSelectionItem item)
+        => state.IsSpecialized && state.GetDuplicateLocations(item).Count > 0;
+
+    static bool ShouldShowDuplicateDetails(RecommendationSelectionState state, RecommendationSelectionItem item)
+        => state.IsSpecialized
+            && state.GetDuplicateLocations(item).Count > 0
+            && (state.IsSelected(item) || state.GetDuplicateScopeCount(item) > 1);
+
     static string FormatSpecializationHelpLine(RecommendationSelectionState state)
     {
         string suffix = string.Empty;
@@ -608,17 +660,36 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
         {
             suffix = " " + FormatSpecializationProgress(state.SpecializationScanCurrent, state.SpecializationScanTotal);
         }
-        else if (state.HasSpecializationScanResult)
+        else if (state.IsSpecialized)
         {
-            suffix = state.DuplicateLocationsByKey.Count == 0
-                ? " (no actions already present upwards / downwards)"
-                : string.Create(
-                    System.Globalization.CultureInfo.InvariantCulture,
-                    $" ({state.DuplicateLocationsByKey.Count} actions already present upwards / downwards)");
+            suffix = string.Create(
+                System.Globalization.CultureInfo.InvariantCulture,
+                $" ({state.DuplicateLocationsByKey.Count} actions already present above / below)");
         }
 
-        return $"[grey][[Tab to specialize target directory{Markup.Escape(suffix)}]][/]";
+        string status = state.IsSpecialized ? "ON" : "OFF";
+        return $"Target directory specialization: [bold]{status}[/] "
+            + ToolHeader.KeyMarkup("Tab")
+            + InfoText($" to toggle{suffix}");
     }
+
+    static string FormatKeyHelpLine()
+        => InfoText("Use ")
+            + ToolHeader.KeyMarkup("↑")
+            + InfoText(" ")
+            + ToolHeader.KeyMarkup("↓")
+            + InfoText(" to move, ")
+            + ToolHeader.KeyMarkup("space")
+            + InfoText(" to select, ")
+            + ToolHeader.KeyMarkup("←")
+            + InfoText(" to none, ")
+            + ToolHeader.KeyMarkup("→")
+            + InfoText(" to all, type to filter, ")
+            + ToolHeader.KeyMarkup("Enter")
+            + InfoText(" to confirm");
+
+    static string InfoText(string value)
+        => $"[{SpectreReporter.InfoColor}]{Markup.Escape(value)}[/]";
 
     static string FormatSpecializationProgress(int current, int total)
     {

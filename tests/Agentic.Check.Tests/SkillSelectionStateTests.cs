@@ -213,7 +213,7 @@ public sealed class SkillSelectionStateTests
     }
 
     [Fact]
-    public void SpecializationDeselectsDuplicatesAndRestoresPreviousSelection()
+    public void SpecializationToggleOffKeepsCurrentSelectionAndToggleOnRestoresSpecializedDefault()
     {
         var directive = new DirectivePlanItem("foundation-prompt-log", DirectiveStatuses.Missing, "content");
         var outdatedDirective = new DirectivePlanItem("dotnet-cli-run", DirectiveStatuses.Outdated, "content");
@@ -247,8 +247,20 @@ public sealed class SkillSelectionStateTests
 
         state.ToggleCachedSpecialization();
 
-        Assert.Equal(["foundation-prompt-log", "dotnet-cli-run"], state.SelectedDirectives.Select(directive => directive.Name));
-        Assert.Equal(["missing-skill", "repair-skill"], state.SelectedSkills.Select(skill => skill.LocalFolder));
+        Assert.False(state.IsSpecialized);
+        Assert.Equal(["dotnet-cli-run"], state.SelectedDirectives.Select(directive => directive.Name));
+        Assert.Equal(["repair-skill"], state.SelectedSkills.Select(skill => skill.LocalFolder));
+
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.SelectNone));
+
+        Assert.Empty(state.SelectedDirectives);
+        Assert.Empty(state.SelectedSkills);
+
+        state.ToggleCachedSpecialization();
+
+        Assert.True(state.IsSpecialized);
+        Assert.Equal(["dotnet-cli-run"], state.SelectedDirectives.Select(directive => directive.Name));
+        Assert.Equal(["repair-skill"], state.SelectedSkills.Select(skill => skill.LocalFolder));
     }
 
     static IReadOnlyList<RecommendationSelectionItem> CreateItems(string[] directiveNames, string[] skillNames)

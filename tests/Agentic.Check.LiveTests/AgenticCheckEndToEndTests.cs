@@ -342,6 +342,14 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
             """);
         workspace.WriteRepoFile(Path.Combine(".agents", "skills", "dotnet-livecharts2", "SKILL.md"), "# parent skill");
         workspace.WriteRepoFile(
+            Path.Combine("backend", "api", "AGENTS.md"),
+            """
+            <!-- dotnet-agentic-engineering:foundation-prompt-log:start -->
+            # foundation-prompt-log
+            <!-- dotnet-agentic-engineering:foundation-prompt-log:end -->
+            """);
+        workspace.WriteRepoFile(Path.Combine("backend", "api", ".agents", "skills", "dotnet-livecharts2", "SKILL.md"), "# descendant skill");
+        workspace.WriteRepoFile(
             Path.Combine("backend", "App.csproj"),
             """
             <Project Sdk="Microsoft.NET.Sdk">
@@ -357,17 +365,20 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
             async auto =>
             {
                 await auto.WaitUntilTextAsync("Recommend ", timeout: TimeSpan.FromSeconds(45)).ConfigureAwait(true);
-                await auto.WaitUntilTextAsync("Tab to specialize target directory", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
-                await auto.TabAsync().ConfigureAwait(true);
-                await auto.WaitUntilTextAsync("actions already present upwards / downwards", timeout: TimeSpan.FromSeconds(20)).ConfigureAwait(true);
+                await auto.WaitUntilTextAsync("Target directory specialization: ON", timeout: TimeSpan.FromSeconds(20)).ConfigureAwait(true);
+                await auto.WaitUntilTextAsync("Tab to toggle", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
+                await auto.WaitUntilTextAsync("actions already present above / below", timeout: TimeSpan.FromSeconds(20)).ConfigureAwait(true);
                 await auto.WaitUntilTextAsync("Duplicate(s) that prevent specialization:", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
                 await auto.WaitUntilTextAsync("../AGENTS.md", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
+                await auto.WaitUntilTextAsync(Path.Combine("api", "AGENTS.md"), timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
                 await auto.WaitUntilTextAsync(Path.Combine("..", ".agents", "skills", "dotnet-livecharts2", "SKILL.md"), timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
+                await auto.WaitUntilTextAsync(Path.Combine("api", ".agents", "skills", "dotnet-livecharts2", "SKILL.md"), timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
                 await auto.EnterAsync().ConfigureAwait(true);
             }).ConfigureAwait(true);
 
         Assert.Equal(0, result.ExitCode);
-        Assert.Contains("actions already present upwards / downwards", result.Screen, StringComparison.Ordinal);
+        Assert.Contains("Target directory specialization: ON", result.Screen, StringComparison.Ordinal);
+        Assert.Contains("actions already present above / below", result.Screen, StringComparison.Ordinal);
         Assert.Contains("Duplicate(s) that prevent specialization:", result.Screen, StringComparison.Ordinal);
         string ghLog = await workspace.ReadGhLogAsync().ConfigureAwait(true);
         Assert.DoesNotContain("dotnet-livecharts2", ghLog, StringComparison.Ordinal);

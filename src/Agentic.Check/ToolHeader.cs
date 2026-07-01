@@ -10,7 +10,7 @@ static class ToolHeader
     public const string AgenticColor = "cyan";
     public const string CheckColor = "green";
     public const string DotNetColor = "#b197fc";
-    public const int MaxSeparatorWidth = 75;
+    public const int MaxSeparatorWidth = 100;
     public const string RepositoryUrl = "https://github.com/VincentH-Net/dotnet-agentic-engineering";
 
     public static IReadOnlyList<ToolHeaderLine> Lines { get; } =
@@ -24,9 +24,9 @@ static class ToolHeader
     ];
 
     public static string Description => """
-        Optimizes your repo for agentic engineering with .NET - based technologies.
+        Optimizes your repo for agentic engineering with .NET - based technologies
 
-        - Use 'agentic-check -h' for full tool description and parameter usage
+        Use 'agentic-check -h' for full tool description and parameter usage
 
         """;
 
@@ -57,11 +57,26 @@ static class ToolHeader
         }
     }
 
-    public static string RepositoryLinkMarkup
-        => $"- Learn more at [link={RepositoryUrl}]{Markup.Escape(RepositoryUrl)}[/]";
+    public static string RepositoryHelp
+        => $"F1 to learn more at {RepositoryUrl}";
+
+    public static string RepositoryHelpMarkup
+        => $"{KeyMarkup("F1")} to learn more at [link={RepositoryUrl}]{Markup.Escape(RepositoryUrl)}[/]";
+
+    public static int HeaderContentWidth
+        => Math.Max(
+            Description
+                .Split('\n')
+                .Select(line => line.Length)
+                .DefaultIfEmpty(0)
+                .Max(),
+            RepositoryHelp.Length);
 
     public static string SeparatorMarkup(int width)
         => $"[bold]{Markup.Escape(new string('─', Math.Clamp(width, 1, MaxSeparatorWidth)))}[/]";
+
+    public static string KeyMarkup(string value)
+        => $"[black on white]{Markup.Escape(value)}[/]";
 
     static string Styled(string style, string value)
         => $"[bold {style}]{Markup.Escape(value)}[/]";

@@ -8,6 +8,7 @@ public sealed class ScopeDuplicateScannerTests
         using TempDirectory tempDirectory = new();
         string targetDirectory = tempDirectory.CreateDirectory("repo/backend");
         string skillsDirectory = tempDirectory.CreateDirectory("repo/backend/.agents/skills");
+        string claudeSkillsDirectory = tempDirectory.CreateDirectory("repo/backend/.claude/skills");
         _ = tempDirectory.CreateDirectory("repo/.git");
         tempDirectory.Write(
             "repo/AGENTS.md",
@@ -17,6 +18,7 @@ public sealed class ScopeDuplicateScannerTests
             <!-- dotnet-agentic-engineering:foundation-prompt-log:end -->
             """);
         tempDirectory.Write("repo/.agents/skills/dotnet-livecharts2/SKILL.md", "# parent skill");
+        tempDirectory.Write("repo/.claude/skills/dotnet-livecharts2/SKILL.md", "# parent claude skill");
         tempDirectory.Write(
             "repo/backend/api/AGENTS.md",
             """
@@ -36,7 +38,7 @@ public sealed class ScopeDuplicateScannerTests
         };
 
         var result = await ScopeDuplicateScanner
-            .ScanAsync(items, targetDirectory, [skillsDirectory], null, CancellationToken.None)
+            .ScanAsync(items, targetDirectory, [skillsDirectory, claudeSkillsDirectory], null, CancellationToken.None)
             .ConfigureAwait(true);
 
         Assert.Equal(2, result.ActionCount);
@@ -44,7 +46,12 @@ public sealed class ScopeDuplicateScannerTests
             ["../AGENTS.md", Path.Combine("api", "AGENTS.md")],
             result.LocationsByKey["directive:foundation-prompt-log"]);
         Assert.Equal(
-            [Path.Combine("..", ".agents", "skills", "dotnet-livecharts2", "SKILL.md"), Path.Combine("api", ".agents", "skills", "dotnet-livecharts2", "SKILL.md")],
+            [
+                Path.Combine("..", ".agents", "skills", "dotnet-livecharts2", "SKILL.md"),
+                Path.Combine("..", ".claude", "skills", "dotnet-livecharts2", "SKILL.md"),
+                Path.Combine("api", ".agents", "skills", "dotnet-livecharts2", "SKILL.md")
+            ],
             result.LocationsByKey[RecommendationSelectionState.FormatSkillKey(skill.SourceRepo, skill.InstallArg)]);
+        Assert.Equal(2, result.ScopeCountsByKey[RecommendationSelectionState.FormatSkillKey(skill.SourceRepo, skill.InstallArg)]);
     }
 }

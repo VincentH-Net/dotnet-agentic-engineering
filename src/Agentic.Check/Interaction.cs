@@ -13,6 +13,8 @@ interface IUserPrompts
         string targetDirectory,
         IReadOnlyList<string> skillsDirectories,
         CancellationToken cancellationToken);
+
+    Task WaitForHelpKeyAsync(string url, string purpose, CancellationToken cancellationToken);
 }
 
 sealed record RecommendationSelectionResult(
@@ -45,6 +47,35 @@ sealed class SpectreUserPrompts(IAnsiConsole console) : IUserPrompts
             targetDirectory,
             skillsDirectories,
             cancellationToken);
+    }
+
+    public async Task WaitForHelpKeyAsync(string url, string purpose, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        console.MarkupLine($"{ToolHeader.KeyMarkup("F1")}: open [link={url}]{Markup.Escape(url)}[/] for {Markup.Escape(purpose)}");
+        console.MarkupLine($"[{SpectreReporter.InfoColor}]Press F1 to open, or any other key to exit.[/]");
+        if (!console.Profile.Capabilities.Interactive)
+        {
+            return;
+        }
+
+        ConsoleKeyInfo? key;
+        try
+        {
+            key = await console.Input
+                .ReadKeyAsync(true, cancellationToken)
+                .WaitAsync(TimeSpan.FromSeconds(8), cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (TimeoutException)
+        {
+            return;
+        }
+
+        if (key?.Key == ConsoleKey.F1)
+        {
+            _ = BrowserLauncher.Open(url);
+        }
     }
 }
 
@@ -99,10 +130,10 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
         }
 
         console.MarkupLine(ToolHeader.ProductLineMarkup);
-        console.MarkupLine(ToolHeader.SeparatorMarkup(console.Profile.Width));
+        console.MarkupLine(ToolHeader.SeparatorMarkup(ToolHeader.HeaderContentWidth));
         console.MarkupLine(Markup.Escape(ToolHeader.Description));
-        console.MarkupLine(ToolHeader.RepositoryLinkMarkup);
-        console.MarkupLine(ToolHeader.SeparatorMarkup(console.Profile.Width));
+        console.MarkupLine(ToolHeader.RepositoryHelpMarkup);
+        console.MarkupLine(ToolHeader.SeparatorMarkup(ToolHeader.HeaderContentWidth));
         console.WriteLine();
     }
 

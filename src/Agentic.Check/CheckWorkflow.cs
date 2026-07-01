@@ -79,6 +79,7 @@ sealed class CheckWorkflow(
         if (!prerequisites.IsSuccessful(options.DryRun))
         {
             reporter.Error("Required tools are missing or too old. Update GitHub CLI and confirm `gh skill --help` or `gh skills --help` works.");
+            await prompts.WaitForHelpKeyAsync("https://cli.github.com/", "how to install GitHub CLI", cancellationToken).ConfigureAwait(false);
             await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
             return new CheckRunResult(2, report);
         }

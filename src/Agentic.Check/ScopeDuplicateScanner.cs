@@ -1,7 +1,26 @@
 namespace Agentic.Check;
 
-sealed record ScopeDuplicateScanResult(IReadOnlyDictionary<string, IReadOnlyList<string>> LocationsByKey)
+sealed record ScopeDuplicateScanResult
 {
+    public ScopeDuplicateScanResult(IReadOnlyDictionary<string, IReadOnlyList<string>> locationsByKey)
+        : this(
+            locationsByKey,
+            locationsByKey.ToDictionary(pair => pair.Key, pair => pair.Value.Count, StringComparer.Ordinal))
+    {
+    }
+
+    public ScopeDuplicateScanResult(
+        IReadOnlyDictionary<string, IReadOnlyList<string>> locationsByKey,
+        IReadOnlyDictionary<string, int> scopeCountsByKey)
+    {
+        LocationsByKey = locationsByKey;
+        ScopeCountsByKey = scopeCountsByKey;
+    }
+
+    public IReadOnlyDictionary<string, IReadOnlyList<string>> LocationsByKey { get; }
+
+    public IReadOnlyDictionary<string, int> ScopeCountsByKey { get; }
+
     public int ActionCount => LocationsByKey.Count;
 }
 
@@ -32,11 +51,12 @@ static class ScopeDuplicateScanner
             .Distinct(StringComparer.OrdinalIgnoreCase)];
         string[] candidateDirectories = [.. EnumerateCandidateDirectories(fullTargetDirectory)];
         Dictionary<string, HashSet<string>> locationsByKey = new(StringComparer.Ordinal);
+        Dictionary<string, HashSet<string>> scopeKeysByKey = new(StringComparer.Ordinal);
 
         for (int index = 0; index < candidateDirectories.Length; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            ScanDirectory(items, fullTargetDirectory, candidateDirectories[index], relativeSkillsDirectories, locationsByKey);
+            ScanDirectory(items, fullTargetDirectory, candidateDirectories[index], relativeSkillsDirectories, locationsByKey, scopeKeysByKey);
             progress?.Invoke(index + 1, candidateDirectories.Length);
         }
 
@@ -44,7 +64,8 @@ static class ScopeDuplicateScanner
             locationsByKey.ToDictionary(
                 pair => pair.Key,
                 pair => (IReadOnlyList<string>)[.. pair.Value.Order(StringComparer.OrdinalIgnoreCase)],
-                StringComparer.Ordinal)));
+                StringComparer.Ordinal),
+            scopeKeysByKey.ToDictionary(pair => pair.Key, pair => pair.Value.Count, StringComparer.Ordinal)));
     }
 
     static void ScanDirectory(
@@ -52,7 +73,8 @@ static class ScopeDuplicateScanner
         string targetDirectory,
         string candidateDirectory,
         IReadOnlyList<string> relativeSkillsDirectories,
-        Dictionary<string, HashSet<string>> locationsByKey)
+        Dictionary<string, HashSet<string>> locationsByKey,
+        Dictionary<string, HashSet<string>> scopeKeysByKey)
     {
         string agentsFile = Path.Combine(candidateDirectory, "AGENTS.md");
         string? agentsContent = File.Exists(agentsFile) ? File.ReadAllText(agentsFile) : null;
@@ -62,7 +84,7 @@ static class ScopeDuplicateScanner
             {
                 if (agentsContent?.Contains($"dotnet-agentic-engineering:{item.Directive.Name}:", StringComparison.Ordinal) == true)
                 {
-                    AddLocation(locationsByKey, item.Key, targetDirectory, agentsFile);
+                    AddDuplicate(locationsByKey, scopeKeysByKey, item.Key, targetDirectory, candidateDirectory, agentsFile);
                 }
 
                 continue;
@@ -78,16 +100,18 @@ static class ScopeDuplicateScanner
                 string skillFile = Path.Combine(candidateDirectory, relativeSkillsDirectory, item.Skill.LocalFolder, "SKILL.md");
                 if (File.Exists(skillFile))
                 {
-                    AddLocation(locationsByKey, item.Key, targetDirectory, skillFile);
+                    AddDuplicate(locationsByKey, scopeKeysByKey, item.Key, targetDirectory, candidateDirectory, skillFile);
                 }
             }
         }
     }
 
-    static void AddLocation(
+    static void AddDuplicate(
         Dictionary<string, HashSet<string>> locationsByKey,
+        Dictionary<string, HashSet<string>> scopeKeysByKey,
         string key,
         string targetDirectory,
+        string scopeDirectory,
         string location)
     {
         if (!locationsByKey.TryGetValue(key, out var locations))
@@ -97,6 +121,14 @@ static class ScopeDuplicateScanner
         }
 
         _ = locations.Add(Path.GetRelativePath(targetDirectory, location));
+
+        if (!scopeKeysByKey.TryGetValue(key, out var scopeKeys))
+        {
+            scopeKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            scopeKeysByKey[key] = scopeKeys;
+        }
+
+        _ = scopeKeys.Add(Path.GetRelativePath(targetDirectory, scopeDirectory));
     }
 
     static IEnumerable<string> EnumerateCandidateDirectories(string targetDirectory)
