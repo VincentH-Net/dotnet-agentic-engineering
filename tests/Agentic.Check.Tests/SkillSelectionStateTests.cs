@@ -212,6 +212,45 @@ public sealed class SkillSelectionStateTests
         Assert.Empty(state.SelectedSkills);
     }
 
+    [Fact]
+    public void SpecializationDeselectsDuplicatesAndRestoresPreviousSelection()
+    {
+        var directive = new DirectivePlanItem("foundation-prompt-log", DirectiveStatuses.Missing, "content");
+        var outdatedDirective = new DirectivePlanItem("dotnet-cli-run", DirectiveStatuses.Outdated, "content");
+        SkillManifestEntry missingSkill = new("owner/repo", "missing-skill", "missing-skill", TechnologyNames.Dotnet, []);
+        SkillManifestEntry repairSkill = new(
+            "owner/repo",
+            "repair-skill",
+            "repair-skill",
+            TechnologyNames.Dotnet,
+            [],
+            recommendationAction: "switch to stable",
+            forceInstall: true);
+        RecommendationSelectionState state = new([
+            new RecommendationSelectionItem("directive:foundation-prompt-log", "foundation-prompt-log (install)", RecommendationSelectionKind.Directive, directive, null),
+            new RecommendationSelectionItem("directive:dotnet-cli-run", "dotnet-cli-run (update)", RecommendationSelectionKind.Directive, outdatedDirective, null),
+            CreateSkillItem(missingSkill),
+            CreateSkillItem(repairSkill)
+        ]);
+
+        state.ApplySpecializationScanResult(new ScopeDuplicateScanResult(
+            new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
+            {
+                ["directive:foundation-prompt-log"] = ["../AGENTS.md"],
+                ["directive:dotnet-cli-run"] = ["../AGENTS.md"],
+                [RecommendationSelectionState.FormatSkillKey(missingSkill.SourceRepo, missingSkill.InstallArg)] = ["../.agents/skills/missing-skill/SKILL.md"],
+                [RecommendationSelectionState.FormatSkillKey(repairSkill.SourceRepo, repairSkill.InstallArg)] = ["../.agents/skills/repair-skill/SKILL.md"]
+            }));
+
+        Assert.Equal(["dotnet-cli-run"], state.SelectedDirectives.Select(directive => directive.Name));
+        Assert.Equal(["repair-skill"], state.SelectedSkills.Select(skill => skill.LocalFolder));
+
+        state.ToggleCachedSpecialization();
+
+        Assert.Equal(["foundation-prompt-log", "dotnet-cli-run"], state.SelectedDirectives.Select(directive => directive.Name));
+        Assert.Equal(["missing-skill", "repair-skill"], state.SelectedSkills.Select(skill => skill.LocalFolder));
+    }
+
     static IReadOnlyList<RecommendationSelectionItem> CreateItems(string[] directiveNames, string[] skillNames)
         => [.. directiveNames
             .Select(name => new RecommendationSelectionItem(

@@ -504,12 +504,67 @@ public sealed class WorkflowTests
         CheckWorkflow workflow = new(commandRunner, new FakePrompts(), reporter);
 
         var result = await workflow.RunAsync(
-            new AgenticCheckOptions(tempDirectory.Path, true, false, null, Path.Combine(tempDirectory.Path, "skills-file"), null, false),
+            new AgenticCheckOptions(tempDirectory.Path, true, false, null, "skills-file", null, false),
             CancellationToken.None);
 
         Assert.Equal(2, result.ExitCode);
         Assert.Empty(commandRunner.Calls);
         Assert.Contains(reporter.Errors, error => error.Contains("Invalid skills directory", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task MissingSkillsDirectoryProducesValidationErrorBeforePrerequisites()
+    {
+        using TempDirectory tempDirectory = new();
+        _ = tempDirectory.CreateDirectory(".");
+        FakeCommandRunner commandRunner = new();
+        RecordingReporter reporter = new();
+        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), reporter);
+
+        var result = await workflow.RunAsync(
+            new AgenticCheckOptions(tempDirectory.Path, true, false, null, ".agents/skills", null, false),
+            CancellationToken.None);
+
+        Assert.Equal(2, result.ExitCode);
+        Assert.Empty(commandRunner.Calls);
+        Assert.Contains(reporter.Errors, error => error.Contains("Skills directory does not exist", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task AbsoluteSkillsDirectoryProducesValidationErrorBeforePrerequisites()
+    {
+        using TempDirectory tempDirectory = new();
+        string skillsDirectory = tempDirectory.CreateDirectory(".agents/skills");
+        FakeCommandRunner commandRunner = new();
+        RecordingReporter reporter = new();
+        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), reporter);
+
+        var result = await workflow.RunAsync(
+            new AgenticCheckOptions(tempDirectory.Path, true, false, null, skillsDirectory, null, false),
+            CancellationToken.None);
+
+        Assert.Equal(2, result.ExitCode);
+        Assert.Empty(commandRunner.Calls);
+        Assert.Contains(reporter.Errors, error => error.Contains("must be relative to the target directory", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task EscapingRelativeSkillsDirectoryProducesValidationErrorBeforePrerequisites()
+    {
+        using TempDirectory tempDirectory = new();
+        string targetDirectory = tempDirectory.CreateDirectory("repo/backend");
+        _ = tempDirectory.CreateDirectory("repo/shared-skills");
+        FakeCommandRunner commandRunner = new();
+        RecordingReporter reporter = new();
+        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), reporter);
+
+        var result = await workflow.RunAsync(
+            new AgenticCheckOptions(targetDirectory, true, false, null, "../shared-skills", null, false),
+            CancellationToken.None);
+
+        Assert.Equal(2, result.ExitCode);
+        Assert.Empty(commandRunner.Calls);
+        Assert.Contains(reporter.Errors, error => error.Contains("must resolve below the target directory", StringComparison.Ordinal));
     }
 
     [Fact]

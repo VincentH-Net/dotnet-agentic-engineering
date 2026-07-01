@@ -10,6 +10,8 @@ interface IUserPrompts
     Task<RecommendationSelectionResult> SelectRecommendationsAsync(
         IReadOnlyList<DirectivePlanItem> recommendedDirectives,
         IReadOnlyList<SkillManifestEntry> missingSkills,
+        string targetDirectory,
+        IReadOnlyList<string> skillsDirectories,
         CancellationToken cancellationToken);
 }
 
@@ -32,10 +34,17 @@ sealed class SpectreUserPrompts(IAnsiConsole console) : IUserPrompts
     public Task<RecommendationSelectionResult> SelectRecommendationsAsync(
         IReadOnlyList<DirectivePlanItem> recommendedDirectives,
         IReadOnlyList<SkillManifestEntry> missingSkills,
+        string targetDirectory,
+        IReadOnlyList<string> skillsDirectories,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return new RecommendationSelectionPrompt(console).PromptAsync(recommendedDirectives, missingSkills, cancellationToken);
+        return new RecommendationSelectionPrompt(console).PromptAsync(
+            recommendedDirectives,
+            missingSkills,
+            targetDirectory,
+            skillsDirectories,
+            cancellationToken);
     }
 }
 

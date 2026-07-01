@@ -68,9 +68,9 @@ static class AgenticCheckCli
         {
             Description = "Write a JSON report to this path."
         };
-        Option<DirectoryInfo?> skillsDirectoryOption = new("--skills-dir")
+        Option<string?> skillsDirectoryOption = new("--skills-dir")
         {
-            Description = "Target-local skills directory. Overrides directories implied by --agents."
+            Description = "Target-contained relative skills directory below the target directory, for example .agents/skills or .claude/skills. Absolute paths and paths that escape the target directory are not allowed. Overrides directories implied by --agents."
         };
         Option<string?> agentsOption = new("--agents")
         {
@@ -141,7 +141,7 @@ static class AgenticCheckCli
                     bool preview = parseResult.GetValue(previewOption);
                     bool yes = parseResult.GetValue(yesOption);
                     var report = parseResult.GetValue(reportOption);
-                    var skillsDirectory = parseResult.GetValue(skillsDirectoryOption);
+                    string? skillsDirectory = parseResult.GetValue(skillsDirectoryOption);
                     string? agents = parseResult.GetValue(agentsOption);
                     bool verbose = parseResult.GetValue(verboseOption);
 
@@ -160,7 +160,7 @@ static class AgenticCheckCli
                         dryRun,
                         yes,
                         report?.FullName,
-                        skillsDirectory?.FullName,
+                        skillsDirectory,
                         effectiveAgents,
                         verbose,
                         preview);

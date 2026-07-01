@@ -110,6 +110,8 @@ sealed class FakePrompts : IUserPrompts
     public Task<RecommendationSelectionResult> SelectRecommendationsAsync(
         IReadOnlyList<DirectivePlanItem> recommendedDirectives,
         IReadOnlyList<SkillManifestEntry> missingSkills,
+        string targetDirectory,
+        IReadOnlyList<string> skillsDirectories,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();

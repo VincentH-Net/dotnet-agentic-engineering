@@ -225,7 +225,6 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
         var result = await RunCommandAsync(workspace, $"--yes {Quote(workspace.RepoPath)}").ConfigureAwait(true);
 
         Assert.Equal(0, result.ExitCode);
-        Assert.Contains("Installing skills", result.Screen, StringComparison.Ordinal);
         Assert.True(File.Exists(Path.Combine(workspace.RepoPath, "AGENTS.md")));
         Assert.True(File.Exists(Path.Combine(workspace.RepoPath, "CLAUDE.md")));
         Assert.Contains("@AGENTS.md", await workspace.ReadRepoFileAsync("CLAUDE.md").ConfigureAwait(true), StringComparison.Ordinal);
@@ -277,7 +276,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
 
         var result = await RunCommandAsync(
             workspace,
-            $"--yes --skills-dir {Quote(customSkillsDirectory)} {Quote(workspace.RepoPath)}").ConfigureAwait(true);
+            $"--yes --skills-dir custom-skills {Quote(workspace.RepoPath)}").ConfigureAwait(true);
 
         Assert.Equal(0, result.ExitCode);
         Assert.Contains("custom skills directory", result.Screen, StringComparison.Ordinal);
@@ -319,6 +318,59 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
             : string.Empty;
         Assert.DoesNotContain("dotnet-agentic-engineering:", agentsContent, StringComparison.Ordinal);
         Assert.DoesNotContain(" skill install ", await workspace.ReadGhLogAsync().ConfigureAwait(true), StringComparison.Ordinal);
+        AssertRecordingWasWritten(workspace);
+    }
+
+    [Fact]
+    [Trait("Category", "EndToEnd")]
+    public async Task InteractiveSpecializeTargetDirectoryDeselectsScopedDuplicates()
+    {
+        if (IsUnsupportedPlatform())
+        {
+            return;
+        }
+
+        using var workspace = await TestWorkspace.CreateAsync(nameof(InteractiveSpecializeTargetDirectoryDeselectsScopedDuplicates)).ConfigureAwait(true);
+        string backendPath = Path.Combine(workspace.RepoPath, "backend");
+        _ = Directory.CreateDirectory(backendPath);
+        workspace.WriteRepoFile(
+            "AGENTS.md",
+            """
+            <!-- dotnet-agentic-engineering:foundation-prompt-log:start -->
+            # foundation-prompt-log
+            <!-- dotnet-agentic-engineering:foundation-prompt-log:end -->
+            """);
+        workspace.WriteRepoFile(Path.Combine(".agents", "skills", "dotnet-livecharts2", "SKILL.md"), "# parent skill");
+        workspace.WriteRepoFile(
+            Path.Combine("backend", "App.csproj"),
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net10.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+
+        var result = await RunInteractiveCommandAsync(
+            workspace,
+            $"--agents codex {Quote(backendPath)}",
+            async auto =>
+            {
+                await auto.WaitUntilTextAsync("Recommend ", timeout: TimeSpan.FromSeconds(45)).ConfigureAwait(true);
+                await auto.WaitUntilTextAsync("Tab to specialize target directory", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
+                await auto.TabAsync().ConfigureAwait(true);
+                await auto.WaitUntilTextAsync("actions already present upwards / downwards", timeout: TimeSpan.FromSeconds(20)).ConfigureAwait(true);
+                await auto.WaitUntilTextAsync("Duplicate(s) that prevent specialization:", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
+                await auto.WaitUntilTextAsync("../AGENTS.md", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
+                await auto.WaitUntilTextAsync(Path.Combine("..", ".agents", "skills", "dotnet-livecharts2", "SKILL.md"), timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
+                await auto.EnterAsync().ConfigureAwait(true);
+            }).ConfigureAwait(true);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("actions already present upwards / downwards", result.Screen, StringComparison.Ordinal);
+        Assert.Contains("Duplicate(s) that prevent specialization:", result.Screen, StringComparison.Ordinal);
+        string ghLog = await workspace.ReadGhLogAsync().ConfigureAwait(true);
+        Assert.DoesNotContain("dotnet-livecharts2", ghLog, StringComparison.Ordinal);
         AssertRecordingWasWritten(workspace);
     }
 

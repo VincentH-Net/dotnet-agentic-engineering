@@ -12,6 +12,7 @@ enum SkillSelectionCommand
     Backspace,
     ClearFilter,
     Confirm,
+    Specialize,
     Character
 }
 
@@ -37,12 +38,24 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
     readonly Dictionary<string, IReadOnlyList<string>> dependencyKeysByKey = BuildDependencyKeysByKey(items);
     readonly Dictionary<string, IReadOnlyList<string>> dependentKeysByKey = BuildDependentKeysByKey(items);
     readonly HashSet<string> selectedKeys = items.Select(item => item.Key).ToHashSet(StringComparer.Ordinal);
+    HashSet<string>? selectionBeforeSpecialization;
 
     public IReadOnlyList<RecommendationSelectionItem> FilteredItems { get; private set; } = items;
 
     public string Filter { get; private set; } = string.Empty;
 
     public int CursorIndex { get; private set; }
+
+    public bool IsSpecialized { get; private set; }
+
+    public bool IsSpecializationScanning { get; private set; }
+
+    public int SpecializationScanCurrent { get; private set; }
+
+    public int SpecializationScanTotal { get; private set; }
+
+    public IReadOnlyDictionary<string, IReadOnlyList<string>> DuplicateLocationsByKey { get; private set; }
+        = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
 
     public IReadOnlyList<DirectivePlanItem> SelectedDirectives
         => [.. items
@@ -58,6 +71,43 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
 
     public bool IsSelected(RecommendationSelectionItem item)
         => selectedKeys.Contains(item.Key);
+
+    public IReadOnlyList<string> GetDuplicateLocations(RecommendationSelectionItem item)
+        => DuplicateLocationsByKey.GetValueOrDefault(item.Key, []);
+
+    public bool HasSpecializationScanResult { get; private set; }
+
+    public void BeginSpecializationScan()
+    {
+        IsSpecializationScanning = true;
+        SpecializationScanCurrent = 0;
+        SpecializationScanTotal = 0;
+    }
+
+    public void UpdateSpecializationScanProgress(int current, int total)
+    {
+        SpecializationScanCurrent = current;
+        SpecializationScanTotal = total;
+    }
+
+    public void ApplySpecializationScanResult(ScopeDuplicateScanResult result)
+    {
+        IsSpecializationScanning = false;
+        HasSpecializationScanResult = true;
+        DuplicateLocationsByKey = result.LocationsByKey;
+        EnableSpecialization();
+    }
+
+    public void ToggleCachedSpecialization()
+    {
+        if (IsSpecialized)
+        {
+            DisableSpecialization();
+            return;
+        }
+
+        EnableSpecialization();
+    }
 
     public void Apply(SkillSelectionInput input)
     {
@@ -88,6 +138,7 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
                 AddFilterCharacter(input.Character);
                 break;
             case SkillSelectionCommand.Confirm:
+            case SkillSelectionCommand.Specialize:
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(input), input.Command, "Unsupported selection input.");
@@ -136,6 +187,35 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
             SelectWithDependencies(item.Key);
         }
     }
+
+    void EnableSpecialization()
+    {
+        selectionBeforeSpecialization = selectedKeys.ToHashSet(StringComparer.Ordinal);
+        foreach (var item in items.Where(item => DuplicateLocationsByKey.ContainsKey(item.Key) && !IsTargetLocalRepair(item)))
+        {
+            DeselectWithDependents(item.Key);
+        }
+
+        IsSpecialized = true;
+    }
+
+    void DisableSpecialization()
+    {
+        if (selectionBeforeSpecialization is not null)
+        {
+            selectedKeys.Clear();
+            foreach (string key in selectionBeforeSpecialization)
+            {
+                _ = selectedKeys.Add(key);
+            }
+        }
+
+        IsSpecialized = false;
+    }
+
+    static bool IsTargetLocalRepair(RecommendationSelectionItem item)
+        => item.Directive?.Status == DirectiveStatuses.Outdated
+            || item.Skill?.ForceInstall == true;
 
     void SelectWithDependencies(string key)
     {
@@ -247,6 +327,8 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
     public async Task<RecommendationSelectionResult> PromptAsync(
         IReadOnlyList<DirectivePlanItem> recommendedDirectives,
         IReadOnlyList<SkillManifestEntry> missingSkills,
+        string targetDirectory,
+        IReadOnlyList<string> skillsDirectories,
         CancellationToken cancellationToken)
     {
         var items = BuildItems(recommendedDirectives, missingSkills);
@@ -265,6 +347,32 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
             if (input.Command == SkillSelectionCommand.Confirm)
             {
                 return new RecommendationSelectionResult(state.SelectedDirectives, state.SelectedSkills);
+            }
+
+            if (input.Command == SkillSelectionCommand.Specialize)
+            {
+                if (state.HasSpecializationScanResult)
+                {
+                    state.ToggleCachedSpecialization();
+                    continue;
+                }
+
+                state.BeginSpecializationScan();
+                Render(items.Count, state);
+                var result = await ScopeDuplicateScanner
+                    .ScanAsync(
+                        items,
+                        targetDirectory,
+                        skillsDirectories,
+                        (current, total) =>
+                        {
+                            state.UpdateSpecializationScanProgress(current, total);
+                            Render(items.Count, state);
+                        },
+                        cancellationToken)
+                    .ConfigureAwait(false);
+                state.ApplySpecializationScanResult(result);
+                continue;
             }
 
             state.Apply(input);
@@ -342,6 +450,7 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
             ConsoleKey.Backspace => new(SkillSelectionCommand.Backspace),
             ConsoleKey.Escape => new(SkillSelectionCommand.ClearFilter),
             ConsoleKey.Enter => new(SkillSelectionCommand.Confirm),
+            ConsoleKey.Tab => new(SkillSelectionCommand.Specialize),
             _ => new(SkillSelectionCommand.Character, key.KeyChar)
         };
 
@@ -364,7 +473,9 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
         console.WriteLine();
         lineCount++;
         MarkupLine($"[bold]{Markup.Escape(FormatRecommendationPromptHeading(itemCount))}[/]");
-        MarkupLine("[grey][[Use arrows to move, space to select, <right> to all, <left> to none, type to filter, Enter to confirm]][/]");
+        MarkupLine("[grey][[Use arrows to move, space to select, <right> to all, <left> to none, type to filter]][/]");
+        MarkupLine(FormatSpecializationHelpLine(state));
+        MarkupLine("[grey][[Enter to confirm]][/]");
 
         if (state.Filter.Length > 0)
         {
@@ -378,7 +489,10 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
             return;
         }
 
-        var (visibleStartIndex, visibleItems) = GetVisibleItems(state.FilteredItems, state.CursorIndex);
+        var (visibleStartIndex, visibleItems) = GetVisibleItems(
+            state.FilteredItems,
+            state.CursorIndex,
+            item => 1 + (state.GetDuplicateLocations(item).Count == 0 ? 0 : 1 + state.GetDuplicateLocations(item).Count));
         if (visibleItems.Count < state.FilteredItems.Count)
         {
             int visibleEndIndex = visibleStartIndex + visibleItems.Count;
@@ -444,11 +558,23 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
             if (showVersionColumn)
             {
                 int padding = Math.Max(1, versionColumnStart - (rowPrefix.Length + item.Display.Length));
-                MarkupLine($"{indent}{cursor} {check} {display}{new string(' ', padding)}{Markup.Escape(item.Version)}");
+                MarkupLine(FormatItemLine(
+                    $"{indent}{cursor} {check} {display}{new string(' ', padding)}{Markup.Escape(item.Version)}",
+                    state.GetDuplicateLocations(item).Count > 0));
             }
             else
             {
-                MarkupLine($"{indent}{cursor} {check} {display}");
+                MarkupLine(FormatItemLine($"{indent}{cursor} {check} {display}", state.GetDuplicateLocations(item).Count > 0));
+            }
+
+            var duplicateLocations = state.GetDuplicateLocations(item);
+            if (duplicateLocations.Count > 0)
+            {
+                MarkupLine($"[yellow]{Markup.Escape($"{indent}    Duplicate(s) that prevent specialization:")}[/]");
+                foreach (string location in duplicateLocations)
+                {
+                    MarkupLine($"[yellow]{Markup.Escape($"{indent}      {location}")}[/]");
+                }
             }
         }
 
@@ -472,6 +598,35 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
         return $"{prefix}[bold]Name[/]{new string(' ', padding)}[bold]Version[/]";
     }
 
+    static string FormatItemLine(string markup, bool warning)
+        => warning ? $"[yellow]{markup}[/]" : markup;
+
+    static string FormatSpecializationHelpLine(RecommendationSelectionState state)
+    {
+        string suffix = string.Empty;
+        if (state.IsSpecializationScanning)
+        {
+            suffix = " " + FormatSpecializationProgress(state.SpecializationScanCurrent, state.SpecializationScanTotal);
+        }
+        else if (state.HasSpecializationScanResult)
+        {
+            suffix = state.DuplicateLocationsByKey.Count == 0
+                ? " (no actions already present upwards / downwards)"
+                : string.Create(
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    $" ({state.DuplicateLocationsByKey.Count} actions already present upwards / downwards)");
+        }
+
+        return $"[grey][[Tab to specialize target directory{Markup.Escape(suffix)}]][/]";
+    }
+
+    static string FormatSpecializationProgress(int current, int total)
+    {
+        const int width = 12;
+        int completed = total <= 0 ? 0 : Math.Clamp((int)Math.Round((double)current / total * width), 0, width);
+        return $"[{new string('━', completed)}{new string('─', width - completed)}]";
+    }
+
     internal static (int StartIndex, IReadOnlyList<RecommendationSelectionItem> Items) GetVisibleItems(
         IReadOnlyList<RecommendationSelectionItem> items,
         int cursorIndex)
@@ -484,6 +639,56 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
         int startIndex = Math.Clamp(cursorIndex - (MaxVisibleItems / 2), 0, items.Count - MaxVisibleItems);
         return (startIndex, [.. items.Skip(startIndex).Take(MaxVisibleItems)]);
     }
+
+    internal static (int StartIndex, IReadOnlyList<RecommendationSelectionItem> Items) GetVisibleItems(
+        IReadOnlyList<RecommendationSelectionItem> items,
+        int cursorIndex,
+        Func<RecommendationSelectionItem, int> visualRowCount)
+    {
+        int totalRows = items.Sum(visualRowCount);
+        if (totalRows <= MaxVisibleItems)
+        {
+            return (0, items);
+        }
+
+        int startIndex = Math.Clamp(cursorIndex - (MaxVisibleItems / 2), 0, Math.Max(0, items.Count - 1));
+        while (startIndex > 0 && VisualRows(items, startIndex, cursorIndex, visualRowCount) < MaxVisibleItems / 2)
+        {
+            startIndex--;
+        }
+
+        List<RecommendationSelectionItem> visibleItems = [];
+        int visibleRows = 0;
+        for (int index = startIndex; index < items.Count; index++)
+        {
+            int itemRows = visualRowCount(items[index]);
+            if (visibleItems.Count > 0 && visibleRows + itemRows > MaxVisibleItems)
+            {
+                break;
+            }
+
+            visibleItems.Add(items[index]);
+            visibleRows += itemRows;
+        }
+
+        if (!visibleItems.Contains(items[cursorIndex]) && cursorIndex < items.Count)
+        {
+            var (_, fallbackItems) = GetVisibleItems([.. items.Skip(cursorIndex)], 0, visualRowCount);
+            return (cursorIndex, fallbackItems);
+        }
+
+        return (startIndex, visibleItems);
+    }
+
+    static int VisualRows(
+        IReadOnlyList<RecommendationSelectionItem> items,
+        int startIndex,
+        int endIndex,
+        Func<RecommendationSelectionItem, int> visualRowCount)
+        => items
+            .Skip(startIndex)
+            .Take(Math.Max(0, endIndex - startIndex + 1))
+            .Sum(visualRowCount);
 
     void FinishRender(int currentRenderLineCount)
     {

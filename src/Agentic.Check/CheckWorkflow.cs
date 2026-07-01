@@ -63,7 +63,7 @@ sealed class CheckWorkflow(
             return new CheckRunResult(2, report);
         }
 
-        var skillsDirectoryValidation = ValidateSkillsDirectory(options.SkillsDirectory);
+        var skillsDirectoryValidation = ValidateSkillsDirectory(options.SkillsDirectory, targetDirectoryResolution.Directory);
         if (!skillsDirectoryValidation.Success)
         {
             reporter.Error(skillsDirectoryValidation.Error ?? "Invalid --skills-dir value.");
@@ -217,7 +217,7 @@ sealed class CheckWorkflow(
             else
             {
                 var selection = await prompts
-                    .SelectRecommendationsAsync(recommendedDirectives, recommendedSkillActions, cancellationToken)
+                    .SelectRecommendationsAsync(recommendedDirectives, recommendedSkillActions, targetDirectory, skillsDirectories, cancellationToken)
                     .ConfigureAwait(false);
                 selectedDirectives = selection.SelectedDirectives;
                 selectedSkills = AddSelectedSkillDependencies(selection.SelectedSkills, recommendedSkillActions);
@@ -392,23 +392,50 @@ sealed class CheckWorkflow(
             $"Target directory does not exist: {fullTargetDirectory}.");
     }
 
-    static DirectoryValidationResult ValidateSkillsDirectory(string? skillsDirectory)
+    static DirectoryValidationResult ValidateSkillsDirectory(string? skillsDirectory, string targetDirectory)
     {
         if (string.IsNullOrWhiteSpace(skillsDirectory))
         {
             return DirectoryValidationResult.Valid(string.Empty, []);
         }
 
-        var pathValidation = TryGetFullPath(skillsDirectory, "skills directory");
+        if (Path.IsPathRooted(skillsDirectory))
+        {
+            return DirectoryValidationResult.Invalid(
+                skillsDirectory,
+                $"Invalid skills directory: {skillsDirectory} must be relative to the target directory.");
+        }
+
+        var pathValidation = TryGetFullPath(Path.Combine(targetDirectory, skillsDirectory), "skills directory");
         if (!pathValidation.Success)
         {
             return DirectoryValidationResult.Invalid(skillsDirectory, pathValidation.Error);
         }
 
         string fullSkillsDirectory = pathValidation.Directory;
-        return File.Exists(fullSkillsDirectory)
-            ? DirectoryValidationResult.Invalid(fullSkillsDirectory, $"Invalid skills directory: {fullSkillsDirectory} is a file.")
-            : DirectoryValidationResult.Valid(fullSkillsDirectory, []);
+        if (!IsPathBelowDirectory(targetDirectory, fullSkillsDirectory))
+        {
+            return DirectoryValidationResult.Invalid(
+                fullSkillsDirectory,
+                $"Invalid skills directory: {skillsDirectory} must resolve below the target directory.");
+        }
+
+        if (File.Exists(fullSkillsDirectory))
+        {
+            return DirectoryValidationResult.Invalid(fullSkillsDirectory, $"Invalid skills directory: {fullSkillsDirectory} is a file.");
+        }
+
+        return Directory.Exists(fullSkillsDirectory)
+            ? DirectoryValidationResult.Valid(fullSkillsDirectory, [])
+            : DirectoryValidationResult.Invalid(fullSkillsDirectory, $"Skills directory does not exist: {fullSkillsDirectory}.");
+    }
+
+    static bool IsPathBelowDirectory(string parentDirectory, string childPath)
+    {
+        string parent = Path.TrimEndingDirectorySeparator(Path.GetFullPath(parentDirectory));
+        string child = Path.TrimEndingDirectorySeparator(Path.GetFullPath(childPath));
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        return child.StartsWith(parent + Path.DirectorySeparatorChar, comparison);
     }
 
     static DirectoryValidationResult TryGetFullPath(string path, string parameterName)
