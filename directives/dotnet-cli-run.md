@@ -8,16 +8,6 @@ Use the `agentic-check` tool to install or update directives for your technology
 <!-- dotnet-agentic-engineering:dotnet-cli-run:start -->
 ## Running `dotnet ...`
 
-  All `dotnet ...` commands MUST be run directly in the foreground.
-
-  Do NOT run `dotnet ...` commands in:
-  - background terminals
-  - persistent shell sessions
-  - detached jobs
-  - long-running interactive sessions
-
-  Reason: background execution can hide immediate sandbox/access failures until a long timeout.
-
-  If sandboxed access blocks the foreground command, rerun the same foreground command with the required escalation.
+All `dotnet ...` commands require network access. Always run `dotnet` commands with escalated/network-enabled permissions from the start; do not first try them in the restricted sandbox. Include a concise approval reason such as: “Allow network access for dotnet commands, they need it to function.”
 <!-- dotnet-agentic-engineering:dotnet-cli-run:end -->
 ~~~
