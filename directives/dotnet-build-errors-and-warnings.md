@@ -16,7 +16,7 @@ This directive does NOT govern WHEN to initiate a build, only WHAT to do before 
 
 All `dotnet ...` commands MUST follow the separate "Running `dotnet ...`" directive.
 
-1. Once per session, IMMEDIATELY BEFORE the first build, check if the current working folder
+1. Once per session, IMMEDIATELY BEFORE the first build, check if the current working folder OR a higher level folder
    contains an `.editorconfig` that contains the text
    `https://github.com/VincentH-Net/Modern.CSharp.Templates/blob/main/Editorconfig.md`.
    Do not count `.editorconfig` files inside `.git`, `.vs`, `bin`, `obj`, or `node_modules`.
