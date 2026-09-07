@@ -67,12 +67,46 @@ sealed record SkillDependency(string SourceRepo, string InstallArg)
         => $"{sourceRepo}\n{installArg}";
 }
 
+// Discovery baselines only; these do not pin installation or update versions.
+sealed record SkillSourceReview(
+    string SourceRepo,
+    string CommitSha,
+    DateTimeOffset CommittedAt,
+    DateTimeOffset ReviewedAt);
+
 static class StaticSkillManifest
 {
     const string DotnetSkillsRepo = "dotnet/skills";
     const string VincentRepo = "VincentH-Net/dotnet-agentic-engineering";
     const string UnoStudioRepo = "unoplatform/studio";
     const string MattRepo = "mtmattei/UnoPlatformSkills";
+
+    // Initial review dates are inferred from each repo's last skill-set change in this file.
+    // SHAs identify the latest default-branch commits at those cutoffs (GitHub committer time).
+    // Advance a baseline only after reviewing upstream additions, including rejected candidates.
+    internal static IReadOnlyList<SkillSourceReview> SourceReviews { get; } =
+    [
+        new(
+            VincentRepo,
+            "fbf904d9e8c22dc8449e58d1d9a47170d82e5e8c",
+            new(2026, 6, 29, 17, 25, 38, TimeSpan.Zero),
+            new(2026, 6, 29, 17, 25, 38, TimeSpan.Zero)),
+        new(
+            MattRepo,
+            "802045a45ae73eaae9b9ac70c01d0ff0e6c5d401",
+            new(2026, 4, 4, 15, 14, 11, TimeSpan.Zero),
+            new(2026, 6, 12, 14, 59, 14, TimeSpan.Zero)),
+        new(
+            UnoStudioRepo,
+            "af302962882751455551bdb35e81a4f7d7d4ba9f",
+            new(2026, 6, 9, 20, 52, 25, TimeSpan.Zero),
+            new(2026, 6, 12, 14, 59, 14, TimeSpan.Zero)),
+        new(
+            DotnetSkillsRepo,
+            "4975793af043e1f4ddd75c86778bd9bbcc94d7dd",
+            new(2026, 6, 29, 22, 25, 44, TimeSpan.Zero),
+            new(2026, 6, 30, 11, 35, 24, TimeSpan.Zero))
+    ];
 
     internal static IReadOnlyList<SkillManifestEntry> All { get; } =
     [
