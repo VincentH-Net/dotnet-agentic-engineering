@@ -188,7 +188,7 @@ sealed class CheckWorkflow(
             directivePlan.OutdatedCount);
         report.DirectiveSummary = directiveSummary;
 
-        reporter.Summary(targetDirectory, stack.Technologies, stack.InstallGates, targetAgents, skillsDirectories, directiveSummary, recommended.Count, missing.Count, report.OutdatedSkills);
+        reporter.Summary(targetDirectory, stack.Technologies, stack.InstallGates, targetAgents, skillsDirectories, directiveSummary, recommended.Count, missing.Count, report.OutdatedSkills, sourceMode);
         reporter.Info($"GitHub cache duration: {directiveCacheSettings.DurationDescription}");
 
         foreach (string warning in report.Warnings)
@@ -199,7 +199,7 @@ sealed class CheckWorkflow(
         var recommendedDirectives = directivePlan.SelectableDirectives;
         var branchInstalledSkills = FindBranchInstalledSkillActions(options.Preview, recommended, skillsDirectories);
         var recommendedSkillActions = options.Preview
-            ? recommended
+            ? [.. recommended.Select(skill => skill with { RecommendationAction = missing.Contains(skill) ? "install" : "re-install" })]
             : BuildStableSkillActions(recommended, missing, branchInstalledSkills);
         IReadOnlyList<DirectivePlanItem> selectedDirectives = [];
         IReadOnlyList<SkillManifestEntry> selectedSkills = [];

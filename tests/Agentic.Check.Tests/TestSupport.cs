@@ -202,7 +202,8 @@ sealed class RecordingReporter : IReporter
         DirectiveSummary directiveSummary,
         int recommendedCount,
         int missingCount,
-        int outdatedCount)
+        int outdatedCount,
+        SourceVersionMode sourceMode = SourceVersionMode.Stable)
     {
         TargetAgents = targetAgents;
         OutdatedSkillCount = outdatedCount;

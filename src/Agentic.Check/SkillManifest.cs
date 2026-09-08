@@ -141,7 +141,8 @@ static class StaticSkillManifest
 
     internal static IReadOnlyList<SkillManifestEntry> Preview { get; } =
     [
-        ..All,
+        ..All.Where(skill => skill.SourceRepo != DotnetSkillsRepo || skill.Plugin != "dotnet-test"),
+        ..DotnetTestSkills(preview: true),
         DotnetAspNetCore("dotnet-webapi"),
         DotnetAspNetCore("minimal-api-file-upload")
     ];
@@ -209,12 +210,13 @@ static class StaticSkillManifest
         string plugin = "")
         => new(sourceRepo, skill, skill, technology, gateRequirements ?? [], plugin);
 
-    static IReadOnlyList<SkillManifestEntry> DotnetTestSkills()
+    static IReadOnlyList<SkillManifestEntry> DotnetTestSkills(bool preview = false)
         =>
         [
             DotnetTest("crap-score"),
             DotnetTest("detect-static-dependencies"),
-            DotnetTest("dotnet-test-frameworks"),
+            // Upstream consolidated the reference on the default branch; stable still has the old skill.
+            DotnetTest(preview ? "test-analysis-extensions" : "dotnet-test-frameworks"),
             DotnetTest("filter-syntax"),
             DotnetTest("generate-testability-wrappers"),
             DotnetTest("migrate-static-to-wrapper"),
@@ -226,7 +228,7 @@ static class StaticSkillManifest
                     DotnetTestDependency("platform-detection"),
                     DotnetTestDependency("filter-syntax")
                 ]),
-            DotnetTest("test-anti-patterns"),
+            DotnetTest("test-anti-patterns", preview ? [DotnetTestDependency("test-analysis-extensions")] : []),
             DotnetTest("writing-mstest-tests")
         ];
 

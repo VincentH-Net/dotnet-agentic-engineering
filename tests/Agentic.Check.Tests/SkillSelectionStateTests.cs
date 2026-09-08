@@ -189,6 +189,25 @@ public sealed class SkillSelectionStateTests
     }
 
     [Fact]
+    public void PreviewTestAntiPatternsSelectionRequiresAnalysisExtensions()
+    {
+        var reference = Assert.Single(StaticSkillManifest.Preview, skill => skill.LocalFolder == "test-analysis-extensions");
+        var dependent = Assert.Single(StaticSkillManifest.Preview, skill => skill.LocalFolder == "test-anti-patterns");
+        RecommendationSelectionState state = new([CreateSkillItem(reference), CreateSkillItem(dependent)]);
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.SelectNone));
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Down));
+
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Toggle));
+
+        Assert.Equal([reference.Key, dependent.Key], state.SelectedSkills.Select(skill => skill.Key));
+
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Up));
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Toggle));
+
+        Assert.Empty(state.SelectedSkills);
+    }
+
+    [Fact]
     public void DeselectingDependencyDeselectsDependentSkills()
     {
         RecommendationSelectionState state = new([

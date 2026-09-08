@@ -86,6 +86,51 @@ public sealed class SkillPlannerTests
     }
 
     [Fact]
+    public void PreviewReplacesFrameworkReferenceWithoutChangingStableManifest()
+    {
+        StackDetectionResult stack = new(
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase) { TechnologyNames.Dotnet }, [], []);
+
+        var stable = SkillPlanner.Plan(StaticSkillManifest.All, stack);
+        var preview = SkillPlanner.Plan(StaticSkillManifest.Preview, stack);
+
+        Assert.Contains(stable, skill => skill.InstallArg == "plugins/dotnet-test/skills/dotnet-test-frameworks");
+        Assert.DoesNotContain(stable, skill => skill.LocalFolder == "test-analysis-extensions");
+        Assert.DoesNotContain(preview, skill => skill.LocalFolder == "dotnet-test-frameworks");
+        var reference = Assert.Single(preview, skill => skill.LocalFolder == "test-analysis-extensions");
+        Assert.Equal("dotnet/skills", reference.SourceRepo);
+        Assert.Equal("plugins/dotnet-test/skills/test-analysis-extensions", reference.InstallArg);
+        Assert.Equal("dotnet-test", reference.Plugin);
+        Assert.Equal(TechnologyNames.Dotnet, reference.Technology);
+        Assert.Empty(reference.GateRequirements);
+
+        var dependent = Assert.Single(preview, skill => skill.LocalFolder == "test-anti-patterns");
+        Assert.Equal(reference.Key, Assert.Single(dependent.Dependencies).Key);
+        Assert.Empty(Assert.Single(stable, skill => skill.LocalFolder == "test-anti-patterns").Dependencies);
+    }
+
+    [Fact]
+    public void PreviewPreservesOtherStableSkillsAndDependencyKeys()
+    {
+        foreach (var stable in StaticSkillManifest.All.Where(skill =>
+            skill.SourceRepo != "dotnet/skills" || skill.LocalFolder is not ("dotnet-test-frameworks" or "test-anti-patterns")))
+        {
+            var preview = Assert.Single(StaticSkillManifest.Preview, skill => skill.Key == stable.Key);
+            Assert.Equal(stable.LocalFolder, preview.LocalFolder);
+            Assert.Equal(stable.Technology, preview.Technology);
+            Assert.Equal(stable.Plugin, preview.Plugin);
+            Assert.Equal(stable.GateRequirements, preview.GateRequirements);
+            Assert.Equal(stable.Dependencies, preview.Dependencies);
+        }
+
+        Assert.Equal(StaticSkillManifest.Preview.Count, StaticSkillManifest.Preview.Select(skill => skill.Key).Distinct().Count());
+        foreach (var dependency in StaticSkillManifest.Preview.SelectMany(skill => skill.Dependencies))
+        {
+            Assert.Contains(StaticSkillManifest.Preview, skill => skill.Key == dependency.Key);
+        }
+    }
+
+    [Fact]
     public void DotnetTestRunTestsDeclaresDependencies()
     {
         var runTests = Assert.Single(
