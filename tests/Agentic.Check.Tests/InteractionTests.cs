@@ -265,6 +265,54 @@ public sealed class InteractionTests
             "4 missing, 2 update(s) available, 1 up to date",
             SpectreReporter.FormatSkillSummary(7, 4, 2));
 
+    [Theory]
+    [InlineData(15, 1, "1 missing, 14 installed")]
+    [InlineData(15, 0, "all 15 installed")]
+    [InlineData(15, 15, "all 15 missing")]
+    [InlineData(0, 0, "none")]
+    public void PreviewSkillSummaryReportsPresenceNotUpdateStatus(int recommended, int missing, string expected)
+        => Assert.Equal(expected, SpectreReporter.FormatSkillSummary(recommended, missing, 0, SourceVersionMode.Preview));
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void SummaryShowsSourceChannelImmediatelyBeforeDirectives(bool preview)
+    {
+        using StringWriter writer = new();
+        var console = AnsiConsole.Create(new AnsiConsoleSettings
+        {
+            Ansi = AnsiSupport.No,
+            Interactive = InteractionSupport.No,
+            Out = new AnsiConsoleOutput(writer)
+        });
+        console.Profile.Width = 120;
+        SpectreReporter reporter = new(console);
+
+        reporter.Summary("/repo", new HashSet<string> { TechnologyNames.Dotnet }, [], "codex",
+            ["/repo/.agents/skills"], new DirectiveSummary(false, false, 3, 1, 1),
+            15, 1, 0, preview ? SourceVersionMode.Preview : SourceVersionMode.Stable);
+
+        string text = writer.ToString();
+        int channelIndex = text.IndexOf("Source channel", StringComparison.Ordinal);
+        int directivesIndex = text.IndexOf("Recommended directives", StringComparison.Ordinal);
+        Assert.True(channelIndex > text.IndexOf("Create CLAUDE.md", StringComparison.Ordinal));
+        Assert.True(directivesIndex > channelIndex);
+        Assert.Contains(preview ? "Preview" : "Stable", text[channelIndex..directivesIndex], StringComparison.Ordinal);
+        const string note = "* no skills update check - always (re)installs";
+        if (preview)
+        {
+            Assert.Contains(note, text[channelIndex..directivesIndex], StringComparison.Ordinal);
+            Assert.Contains("1 missing, 14 installed", text, StringComparison.Ordinal);
+        }
+        else
+        {
+            Assert.DoesNotContain(note, text, StringComparison.Ordinal);
+            Assert.Contains("1 missing, 14 up to date", text, StringComparison.Ordinal);
+        }
+
+        Assert.Contains("1 missing, 1 update(s) available, 1 up to date", text, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void RecommendationStatusOmitsZeroCountParts()
         => Assert.Equal(

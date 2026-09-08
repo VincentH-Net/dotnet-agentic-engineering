@@ -116,6 +116,9 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
         Assert.Contains(".agents/skills", result.Screen, StringComparison.Ordinal);
         Assert.Contains("Recommended directives", result.Screen, StringComparison.Ordinal);
         Assert.Contains("Recommended skills", result.Screen, StringComparison.Ordinal);
+        Assert.Contains("Source channel", result.Screen, StringComparison.Ordinal);
+        Assert.Contains("Stable", result.Screen, StringComparison.Ordinal);
+        Assert.DoesNotContain("no skills update check", result.Screen, StringComparison.Ordinal);
         Assert.Contains("Would install directives into AGENTS.md:", result.Screen, StringComparison.Ordinal);
         Assert.Contains("Would install skills into skills directories:", result.Screen, StringComparison.Ordinal);
         Assert.Contains("Would update skills in skills directories:", result.Screen, StringComparison.Ordinal);
@@ -594,6 +597,51 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
               </PropertyGroup>
             </Project>
             """);
+    }
+
+    [Fact]
+    [Trait("Category", "EndToEnd")]
+    public async Task PreviewDisplaysSourceChannelPresenceAndReinstallActions()
+    {
+        if (IsUnsupportedPlatform())
+        {
+            return;
+        }
+
+        using var workspace = await TestWorkspace.CreateAsync(nameof(PreviewDisplaysSourceChannelPresenceAndReinstallActions)).ConfigureAwait(true);
+        const string installed = "---\nname: dotnet-livecharts2\n---\nExisting skill\n";
+        workspace.WriteRepoFile(".agents/skills/dotnet-livecharts2/SKILL.md", installed);
+
+        var result = await RunInteractiveCommandAsync(workspace,
+            $"--preview --agents codex {Quote(workspace.RepoPath)}",
+            async auto =>
+            {
+                await auto.WaitUntilTextAsync("dotnet-livecharts2 (re-install)").ConfigureAwait(true);
+                await auto.WaitUntilTextAsync("dotnet-modern-csharp-editorconfig (install)").ConfigureAwait(true);
+                using (var snapshot = auto.CreateSnapshot())
+                {
+                    string screen = snapshot.GetScreenText();
+                    int channel = screen.IndexOf("Source channel", StringComparison.Ordinal);
+                    int directives = screen.IndexOf("Recommended directives", StringComparison.Ordinal);
+                    Assert.True(channel >= 0 && directives > channel);
+                    Assert.Contains("Preview", screen[channel..directives], StringComparison.Ordinal);
+                    Assert.Contains("* no skills update check - always (re)installs", screen[channel..directives], StringComparison.Ordinal);
+                    Assert.Contains("12 missing, 1 installed", screen, StringComparison.Ordinal);
+                    Assert.DoesNotContain("12 missing, 1 up to date", screen, StringComparison.Ordinal);
+                }
+
+                await auto.LeftAsync().ConfigureAwait(true);
+                await auto.WaitUntilTextAsync("[ ] dotnet-livecharts2 (re-install)").ConfigureAwait(true);
+                await auto.EnterAsync().ConfigureAwait(true);
+            }).ConfigureAwait(true);
+
+        Assert.Contains("No actions selected", result.Screen, StringComparison.Ordinal);
+        string log = await workspace.ReadGhLogAsync().ConfigureAwait(true);
+        Assert.DoesNotContain("skill update", log, StringComparison.Ordinal);
+        Assert.DoesNotContain("skill install", log, StringComparison.Ordinal);
+        Assert.Equal(installed, await File.ReadAllTextAsync(Path.Combine(workspace.RepoPath, ".agents/skills/dotnet-livecharts2/SKILL.md")).ConfigureAwait(true));
+        Assert.False(File.Exists(Path.Combine(workspace.RepoPath, ".agents/skills/dotnet-modern-csharp-editorconfig/SKILL.md")));
+        AssertRecordingWasWritten(workspace);
     }
 
     async Task<TerminalRunResult> RunCommandAsync(

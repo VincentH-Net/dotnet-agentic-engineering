@@ -58,7 +58,7 @@ static class AgenticCheckCli
         };
         Option<bool> previewOption = new("--preview")
         {
-            Description = "Install preview directives and skills from source repo default branches."
+            Description = "Install preview directives and skills from each source repo's default branch instead of its latest release."
         };
         Option<bool> yesOption = new("--yes")
         {

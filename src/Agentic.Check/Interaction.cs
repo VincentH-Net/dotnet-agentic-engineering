@@ -108,7 +108,8 @@ interface IReporter
         DirectiveSummary directiveSummary,
         int recommendedCount,
         int missingCount,
-        int outdatedCount);
+        int outdatedCount,
+        SourceVersionMode sourceMode = SourceVersionMode.Stable);
 
     Task RunProgressAsync(
         string description,
@@ -191,7 +192,8 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
         DirectiveSummary directiveSummary,
         int recommendedCount,
         int missingCount,
-        int outdatedCount)
+        int outdatedCount,
+        SourceVersionMode sourceMode = SourceVersionMode.Stable)
         => console.Write(CreateSummaryTable(
             targetDirectory,
             technologies,
@@ -201,7 +203,8 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
             directiveSummary,
             recommendedCount,
             missingCount,
-            outdatedCount));
+            outdatedCount,
+            sourceMode));
 
     internal static Table CreateSummaryTable(
         string targetDirectory,
@@ -212,7 +215,8 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
         DirectiveSummary directiveSummary,
         int recommendedCount,
         int missingCount,
-        int outdatedCount)
+        int outdatedCount,
+        SourceVersionMode sourceMode = SourceVersionMode.Stable)
     {
         Table table = new()
         {
@@ -228,8 +232,11 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
         _ = table.AddRow("Skills directories", Markup.Escape(FormatSkillsDirectories(targetDirectory, skillsDirectories)));
         _ = table.AddRow("Create AGENTS.md", directiveSummary.CreateAgentsFile ? "yes" : "no");
         _ = table.AddRow("Create CLAUDE.md", directiveSummary.CreateClaudeFile ? "yes" : "no");
+        _ = table.AddRow("Source channel", sourceMode == SourceVersionMode.Preview
+            ? "Preview\n* no skills update check - always (re)installs"
+            : "Stable");
         _ = table.AddRow("Recommended directives", Markup.Escape(FormatDirectiveSummary(directiveSummary)));
-        _ = table.AddRow("Recommended skills", Markup.Escape(FormatSkillSummary(recommendedCount, missingCount, outdatedCount)));
+        _ = table.AddRow("Recommended skills", Markup.Escape(FormatSkillSummary(recommendedCount, missingCount, outdatedCount, sourceMode)));
         return table;
     }
 
@@ -279,8 +286,11 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
             directiveSummary.MissingCount,
             directiveSummary.OutdatedCount);
 
-    internal static string FormatSkillSummary(int recommendedCount, int missingCount, int outdatedCount)
-        => FormatRecommendationStatus(recommendedCount, missingCount, outdatedCount);
+    internal static string FormatSkillSummary(int recommendedCount, int missingCount, int outdatedCount,
+        SourceVersionMode sourceMode = SourceVersionMode.Stable)
+        => sourceMode == SourceVersionMode.Preview
+            ? recommendedCount == 0 ? "none" : FormatRecommendationStatus(recommendedCount, missingCount, 0, "installed")
+            : FormatRecommendationStatus(recommendedCount, missingCount, outdatedCount);
 
     internal static string FormatStack(IReadOnlySet<string> technologies, IReadOnlyList<InstallGateReport> installGates)
     {
@@ -335,7 +345,8 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
             .Where(report => report.Technology.Equals(technology, StringComparison.OrdinalIgnoreCase))
             .Any(report => report.GetValues(gate).Count > 0);
 
-    internal static string FormatRecommendationStatus(int recommendedCount, int missingCount, int outdatedCount)
+    internal static string FormatRecommendationStatus(int recommendedCount, int missingCount, int outdatedCount,
+        string presentStatus = "up to date")
     {
         int upToDateCount = Math.Max(0, recommendedCount - missingCount - outdatedCount);
         List<string> parts = [];
@@ -351,7 +362,7 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
 
         if (upToDateCount > 0)
         {
-            parts.Add(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{upToDateCount} up to date"));
+            parts.Add(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{upToDateCount} {presentStatus}"));
         }
 
         return parts.Count switch
@@ -414,7 +425,8 @@ sealed class NullReporter : IReporter
         DirectiveSummary directiveSummary,
         int recommendedCount,
         int missingCount,
-        int outdatedCount)
+        int outdatedCount,
+        SourceVersionMode sourceMode = SourceVersionMode.Stable)
     {
     }
 
