@@ -21,9 +21,9 @@ enum SourceVersionMode
     Preview
 }
 
-sealed record DirectiveSourceFile(string FileName, string DownloadUrl, string Version = "");
+sealed record DirectiveSourceFile(string FileName, string DownloadUrl, string Version = "", string SourceRef = "");
 
-sealed record DirectiveBlock(string Name, string Content, string Version = "");
+sealed record DirectiveBlock(string Name, string Content, string Version = "", string SourceRef = "");
 
 sealed record DirectiveResult(
     bool Success,
@@ -57,7 +57,7 @@ sealed record DirectivePlanResult(
         => [.. Directives.Where(directive => directive.Status is DirectiveStatuses.Missing or DirectiveStatuses.Outdated)];
 }
 
-sealed record DirectivePlanItem(string Name, string Status, string Content, string Version = "");
+sealed record DirectivePlanItem(string Name, string Status, string Content, string Version = "", string SourceRef = "");
 
 static class DirectiveStatuses
 {
@@ -236,7 +236,7 @@ sealed partial class DirectiveInstaller(IDirectiveSource source, IReporter repor
             throw new DirectiveException($"Directive block from {sourceFile.DownloadUrl} is missing expected stable markers for {directiveName}.");
         }
 
-        return new DirectiveBlock(directiveName, block, sourceFile.Version);
+        return new DirectiveBlock(directiveName, block, sourceFile.Version, sourceFile.SourceRef);
     }
 
     static DirectivePlanItem PlanDirective(string agentsContent, DirectiveBlock directive)
@@ -253,7 +253,7 @@ sealed partial class DirectiveInstaller(IDirectiveSource source, IReporter repor
 
         if (startCount == 0)
         {
-            return new DirectivePlanItem(directive.Name, DirectiveStatuses.Missing, directive.Content, directive.Version);
+            return new DirectivePlanItem(directive.Name, DirectiveStatuses.Missing, directive.Content, directive.Version, directive.SourceRef);
         }
 
         int startIndex = content.IndexOf(startMarker, StringComparison.Ordinal);
@@ -262,7 +262,7 @@ sealed partial class DirectiveInstaller(IDirectiveSource source, IReporter repor
         string status = existingBlock.Equals(directive.Content, StringComparison.Ordinal)
             ? DirectiveStatuses.Current
             : DirectiveStatuses.Outdated;
-        return new DirectivePlanItem(directive.Name, status, directive.Content, directive.Version);
+        return new DirectivePlanItem(directive.Name, status, directive.Content, directive.Version, directive.SourceRef);
     }
 
     static string ApplyDirectiveBlocks(
@@ -484,7 +484,8 @@ sealed class GitHubDirectiveSource(
     HttpClient? httpClient = null,
     DirectiveCacheSettings? cacheSettings = null,
     IReporter? reporter = null,
-    SourceVersionMode sourceVersionMode = SourceVersionMode.Stable) : IDirectiveSource
+    SourceVersionMode sourceVersionMode = SourceVersionMode.Stable,
+    SourceVersionInfo? resolvedVersion = null) : IDirectiveSource
 {
     static readonly Uri LatestReleaseUri = new(DirectiveInstallerUrl.LatestRelease);
     static readonly Uri RepositoryUri = new(DirectiveInstallerUrl.Repository);
@@ -494,8 +495,8 @@ sealed class GitHubDirectiveSource(
 
     public async Task<IReadOnlyList<DirectiveSourceFile>> ListAsync(CancellationToken cancellationToken)
     {
-        var directiveRef = await ResolveDirectiveRefAsync(cancellationToken).ConfigureAwait(false);
-        string listingUrl = DirectiveInstallerUrl.Listing(directiveRef.Ref);
+        var directiveRef = resolvedVersion ?? await ResolveDirectiveRefAsync(cancellationToken).ConfigureAwait(false);
+        string listingUrl = DirectiveInstallerUrl.Listing(directiveRef.ContentRef);
         Uri listingUri = new(listingUrl);
         string content = await GetStringAsync(listingUri, listingUrl, "directives listing", cancellationToken).ConfigureAwait(false);
         var items = JsonSerializer.Deserialize<IReadOnlyList<GitHubContentItem>>(content)
@@ -508,7 +509,8 @@ sealed class GitHubDirectiveSource(
             .Select(item => new DirectiveSourceFile(
                 item.Name,
                 item.DownloadUrl,
-                directiveRef.Display))];
+                directiveRef.Display,
+                directiveRef.ContentRef))];
     }
 
     public async Task<string> FetchAsync(DirectiveSourceFile sourceFile, CancellationToken cancellationToken)
@@ -600,7 +602,8 @@ sealed class GitHubDirectiveSource(
             throw new DirectiveException($"Default branch metadata from {branchUrl} is missing a valid commit date.");
         }
 
-        return new SourceVersionInfo("VincentH-Net/dotnet-agentic-engineering", defaultBranch, lastChangedAtUtc.ToUniversalTime());
+        return new SourceVersionInfo("VincentH-Net/dotnet-agentic-engineering", defaultBranch, lastChangedAtUtc.ToUniversalTime(),
+            branchDocument.RootElement.GetProperty("commit").TryGetProperty("sha", out var sha) ? sha.GetString() ?? string.Empty : string.Empty);
     }
 
     async Task<string?> GetOptionalStringAsync(Uri uri, string displayUrl, string description, CancellationToken cancellationToken)

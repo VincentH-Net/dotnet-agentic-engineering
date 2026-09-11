@@ -20,7 +20,8 @@ enum SkillSelectionCommand
 enum RecommendationSelectionKind
 {
     Directive,
-    Skill
+    Skill,
+    Tool
 }
 
 readonly record struct SkillSelectionInput(SkillSelectionCommand Command, char Character = '\0');
@@ -215,7 +216,8 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
         => IsSpecialized = false;
 
     static bool IsTargetLocalRepair(RecommendationSelectionItem item)
-        => item.Directive?.Status == DirectiveStatuses.Outdated
+        => item.Skill?.IsCompanion == true
+            || item.Directive?.Status == DirectiveStatuses.Outdated
             || item.Skill?.ForceInstall == true;
 
     HashSet<string> BuildSpecializedDefaultSelection()
@@ -242,7 +244,7 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
         }
     }
 
-    void SelectWithDependencies(string key)
+    internal void SelectWithDependencies(string key)
     {
         if (!selectedKeys.Add(key))
         {
@@ -255,7 +257,7 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
         }
     }
 
-    void DeselectWithDependents(string key)
+    internal void DeselectWithDependents(string key)
     {
         if (!selectedKeys.Remove(key))
         {
@@ -303,9 +305,9 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
     {
         var selectableKeys = items.Select(item => item.Key).ToHashSet(StringComparer.Ordinal);
         Dictionary<string, IReadOnlyList<string>> dependencyKeysByKey = new(StringComparer.Ordinal);
-        foreach (var item in items.Where(item => item.Skill is not null))
+        foreach (var item in items)
         {
-            string[] dependencyKeys = [.. item.Skill!.Dependencies
+            string[] dependencyKeys = [.. (item.Skill?.Dependencies ?? CompanionDependency.ForDirective(item.Directive?.Name))
                 .Select(dependency => FormatSkillKey(dependency.SourceRepo, dependency.InstallArg))
                 .Where(selectableKeys.Contains)
                 .Distinct(StringComparer.Ordinal)];
@@ -340,7 +342,9 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
     }
 
     internal static string FormatSkillKey(string sourceRepo, string installArg)
-        => $"skill:{SkillDependency.CreateKey(sourceRepo, installArg)}";
+        => sourceRepo.Length == 0 && installArg == CompanionDependency.PackageId
+            ? "tool:" + CompanionDependency.PackageId
+            : $"skill:{SkillDependency.CreateKey(sourceRepo, installArg)}";
 }
 
 sealed class RecommendationSelectionPrompt(IAnsiConsole console)
@@ -423,7 +427,7 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
         state.ApplySpecializationScanResult(result);
     }
 
-    static List<RecommendationSelectionItem> BuildItems(
+    internal static List<RecommendationSelectionItem> BuildItems(
         IReadOnlyList<DirectivePlanItem> recommendedDirectives,
         IReadOnlyList<SkillManifestEntry> missingSkills)
     {
@@ -438,7 +442,7 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
         items.AddRange(missingSkills.Select(skill => new RecommendationSelectionItem(
             RecommendationSelectionState.FormatSkillKey(skill.SourceRepo, skill.InstallArg),
             FormatSkillListItem(skill),
-            RecommendationSelectionKind.Skill,
+            skill.IsCompanion ? RecommendationSelectionKind.Tool : RecommendationSelectionKind.Skill,
             null,
             skill,
             skill.Version)));
@@ -475,7 +479,7 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
         => string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Recommend {itemCount} action(s), select which to apply:");
 
     internal static string FormatRecommendationKindHeaderMarkup(RecommendationSelectionKind kind)
-        => $"[bold {ToolHeader.CheckColor}]{(kind == RecommendationSelectionKind.Directive ? "Directives" : "Skills")}[/]";
+        => $"[bold {ToolHeader.CheckColor}]{(kind == RecommendationSelectionKind.Directive ? "Directives" : kind == RecommendationSelectionKind.Tool ? "Tools" : "Skills")}[/]";
 
     internal static string FormatRecommendationSourceHeaderMarkup(string sourceRepo)
         => $"  [bold {ToolHeader.AgenticColor}]{Markup.Escape(FormatSkillSourceHeader(sourceRepo))}[/]";
@@ -574,7 +578,7 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
                 lastSkillPlugin = null;
             }
 
-            if (item.Skill is not null)
+            if (item.Skill is { IsCompanion: false })
             {
                 string skillSourceRepo = item.Skill.SourceRepo;
                 bool showPluginHeaders = !visibleSkillSourceReposWithoutPluginHeaders.Contains(skillSourceRepo, StringComparer.OrdinalIgnoreCase);

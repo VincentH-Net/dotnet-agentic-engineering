@@ -24,7 +24,8 @@ sealed class CheckWorkflow(
     IUserPrompts prompts,
     IReporter reporter,
     IDirectiveSource? directiveSource = null,
-    ISourceVersionResolver? sourceVersionResolver = null)
+    ISourceVersionResolver? sourceVersionResolver = null,
+    IReadOnlyList<SkillManifestEntry>? skillManifest = null)
 {
     static readonly JsonSerializerOptions ReportSerializerOptions = new(JsonSerializerDefaults.Web)
     {
@@ -122,17 +123,70 @@ sealed class CheckWorkflow(
         var directiveCacheSettings = DirectiveCacheSettings.FromEnvironment();
         report.Warnings.AddRange(directiveCacheSettings.ConfigurationWarnings);
         var sourceMode = options.Preview ? SourceVersionMode.Preview : SourceVersionMode.Stable;
-        DirectiveInstaller directiveInstaller = new(
-            directiveSource ?? new GitHubDirectiveSource(cacheSettings: directiveCacheSettings, reporter: reporter, sourceVersionMode: sourceMode),
-            reporter);
+
         string firstSkillsDirectory = skillsDirectories[0];
         report.SkillsDirectory = firstSkillsDirectory;
         report.SkillsDirectories.AddRange(skillsDirectories);
         var manifest = await AddSourceVersionInfoAsync(
-            options.Preview ? StaticSkillManifest.Preview : StaticSkillManifest.All,
+            skillManifest ?? (options.Preview ? StaticSkillManifest.Preview : StaticSkillManifest.All),
             sourceMode,
             directiveCacheSettings,
             cancellationToken).ConfigureAwait(false);
+
+        var sourceVersion = manifest.FirstOrDefault(skill => skill.SourceRepo == CompanionDependency.SourceRepo);
+        var contentSource = directiveSource ?? new GitHubDirectiveSource(
+            cacheSettings: directiveCacheSettings, reporter: reporter, sourceVersionMode: sourceMode,
+            resolvedVersion: sourceVersion?.ResolvedSource);
+        DirectiveInstaller directiveInstaller = new(contentSource, reporter);
+        CompanionSourceVersionReader companionVersions = new(contentSource);
+        CompanionInstaller companionInstaller = new(commandRunner);
+        Dictionary<string, bool> prerequisiteResults = new(StringComparer.Ordinal);
+
+        async Task<bool> EnsureCompanionAsync(string sourceRef, ToolVersion? localRequirement, bool restoreOnly)
+        {
+            try
+            {
+                var requirement = localRequirement ?? await companionVersions.ReadAsync(sourceRef, cancellationToken).ConfigureAwait(false);
+                string key = requirement.Minimum + (restoreOnly ? ":restore" : ":update");
+                if (prerequisiteResults.TryGetValue(key, out bool previous))
+                {
+                    return previous;
+                }
+
+                CompanionReport? result = null;
+                await reporter.RunProgressAsync(ActionOutputFormatter.ProgressIndent, 1, async advance =>
+                {
+                    result = await companionInstaller.EnsureAsync(targetDirectory, requirement, options.Preview, restoreOnly, options.DryRun, cancellationToken).ConfigureAwait(false);
+                    advance();
+                }, cancellationToken).ConfigureAwait(false);
+                var completed = result!;
+                report.Companion = completed;
+                string description = $"{(options.DryRun ? "Would " : "")}{completed.Action} {CompanionDependency.PackageId}: installed {completed.InstalledVersion ?? "absent"}, required {requirement.Minimum}, pattern {completed.Pattern}";
+                if (completed.ResolvedVersion is not null)
+                {
+                    description += $", resolved {completed.ResolvedVersion}";
+                }
+
+                report.Actions.Add(description);
+                if (completed.Success)
+                {
+                    reporter.Success(ActionOutputFormatter.FormatLine(options.DryRun ? "Would prepare tool" : "Prepared tool", description));
+                }
+                else
+                {
+                    reporter.Error($"{description}: {completed.Error}. Dependent actions skipped.{(completed.Changed ? " The tool manifest changed before validation failed." : "")}");
+                }
+
+                prerequisiteResults[key] = completed.Success;
+                return completed.Success;
+            }
+            catch (Exception exception) when (exception is DirectiveException or FormatException or System.Xml.XmlException or IOException or UnauthorizedAccessException or JsonException)
+            {
+                reporter.Error($"Cannot prepare {CompanionDependency.PackageId}: {exception.Message}. Dependent actions skipped.");
+                report.Companion = new(CompanionInstaller.ManifestPath(targetDirectory), null, "unknown", "unknown", "resolve", false, null, false, exception.Message);
+                return false;
+            }
+        }
 
         await reporter.RunProgressAsync(
             "Scanning target directory",
@@ -201,6 +255,82 @@ sealed class CheckWorkflow(
         var recommendedSkillActions = options.Preview
             ? [.. recommended.Select(skill => skill with { RecommendationAction = missing.Contains(skill) ? "install" : "re-install" })]
             : BuildStableSkillActions(recommended, missing, branchInstalledSkills);
+        ToolVersion? repairRequirement = null;
+        bool restoreOnly = false;
+        string? repairError = null;
+        try
+        {
+            List<string> installedConsumers = [];
+            foreach (var directive in directivePlan.Directives.Where(d => CompanionDependency.ForDirective(d.Name).Count > 0))
+            {
+                string start = $"<!-- dotnet-agentic-engineering:{directive.Name}:start -->";
+                string end = $"<!-- dotnet-agentic-engineering:{directive.Name}:end -->";
+                int from = directivePlan.AgentsContent.IndexOf(start, StringComparison.Ordinal);
+                int to = directivePlan.AgentsContent.IndexOf(end, StringComparison.Ordinal);
+                if (from >= 0 && to > from)
+                {
+                    string installed = directivePlan.AgentsContent[from..to];
+                    if (CompanionDependency.Invocations(installed).Count > 0)
+                    {
+                        installedConsumers.Add(installed);
+                    }
+                }
+            }
+
+            foreach (var skill in manifest.Where(skill => skill.Dependencies.Contains(CompanionDependency.Identity)))
+            {
+                foreach (string directory in skillsDirectories)
+                {
+                    string path = Path.Combine(directory, skill.LocalFolder, "SKILL.md");
+                    if (File.Exists(path))
+                    {
+                        installedConsumers.Add(await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false));
+                    }
+                }
+            }
+
+            if (installedConsumers.Count > 0)
+            {
+                repairRequirement = CompanionDependency.ReadLocalRequirement(installedConsumers);
+                string? installed = CompanionInstaller.InstalledVersion(targetDirectory);
+                restoreOnly = installed is not null && ToolVersion.Parse(installed).Satisfies(repairRequirement);
+                if (restoreOnly)
+                {
+                    var available = await commandRunner.RunAsync("dotnet", ["tool", "run", "agentic", "--", "--version"], targetDirectory, cancellationToken).ConfigureAwait(false);
+                    if (available.Success && available.StandardOutput.Trim().Split('+')[0] == installed!.Split('+')[0])
+                    {
+                        repairRequirement = null;
+                    }
+                }
+            }
+        }
+        catch (Exception exception) when (exception is FormatException or IOException or UnauthorizedAccessException or JsonException or KeyNotFoundException)
+        {
+            repairError = exception.Message;
+        }
+
+        bool hasDependentRecommendations = recommendedDirectives.Any(d => CompanionDependency.ForDirective(d.Name).Count > 0)
+            || recommendedSkillActions.Any(skill => skill.Dependencies.Contains(CompanionDependency.Identity));
+        if (hasDependentRecommendations || repairRequirement is not null || repairError is not null)
+        {
+            string status;
+            try
+            {
+                var plannedRequirement = hasDependentRecommendations
+                    ? await companionVersions.ReadAsync(recommendedDirectives.FirstOrDefault(d => CompanionDependency.ForDirective(d.Name).Count > 0)?.SourceRef
+                        ?? recommendedSkillActions.First(skill => skill.Dependencies.Contains(CompanionDependency.Identity)).ResolvedSourceRef, cancellationToken).ConfigureAwait(false)
+                    : repairRequirement;
+                status = $"installed {CompanionInstaller.InstalledVersion(targetDirectory) ?? "absent"}; required {plannedRequirement?.Minimum ?? "unknown"}";
+            }
+            catch (Exception exception) when (exception is DirectiveException or FormatException or System.Xml.XmlException or IOException or UnauthorizedAccessException or JsonException or KeyNotFoundException)
+            {
+                // Selection may exclude this action. Report the actionable failure only if it runs.
+                status = "version unavailable: " + exception.Message;
+            }
+
+            recommendedSkillActions = [.. recommendedSkillActions, CompanionDependency.Action(hasDependentRecommendations ? "install/update" : restoreOnly ? "restore" : "repair") with { Version = status }];
+        }
+
         IReadOnlyList<DirectivePlanItem> selectedDirectives = [];
         IReadOnlyList<SkillManifestEntry> selectedSkills = [];
         if (!options.DryRun && !options.Preview)
@@ -221,14 +351,49 @@ sealed class CheckWorkflow(
                     .SelectRecommendationsAsync(recommendedDirectives, recommendedSkillActions, targetDirectory, skillsDirectories, cancellationToken)
                     .ConfigureAwait(false);
                 selectedDirectives = selection.SelectedDirectives;
-                selectedSkills = AddSelectedSkillDependencies(selection.SelectedSkills, recommendedSkillActions);
+                selectedSkills = selection.SelectedSkills;
             }
+        }
+
+        // The same selection graph closes dependencies for interactive, --yes, dry-run, and updates.
+        var closedSelection = CloseDependencies(selectedDirectives, selectedSkills, recommendedSkillActions);
+        selectedSkills = closedSelection.SelectedSkills;
+        if (repairRequirement is null && repairError is null
+            && !selectedDirectives.Any(d => CompanionDependency.ForDirective(d.Name).Count > 0)
+            && !selectedSkills.Any(skill => skill.Dependencies.Contains(CompanionDependency.Identity)))
+        {
+            selectedSkills = [.. selectedSkills.Where(skill => !skill.IsCompanion)];
         }
 
         if (!options.DryRun && (recommendedDirectives.Count > 0 || recommendedSkillActions.Count > 0))
         {
             ReportSelectedActions(selectedDirectives.Count + selectedSkills.Count);
         }
+
+        if (selectedSkills.Any(skill => skill.IsCompanion))
+        {
+            bool selectedConsumer = selectedDirectives.Any(d => CompanionDependency.ForDirective(d.Name).Count > 0)
+                || selectedSkills.Any(skill => skill.Dependencies.Contains(CompanionDependency.Identity));
+            string selectedRef = selectedDirectives.FirstOrDefault(d => CompanionDependency.ForDirective(d.Name).Count > 0)?.SourceRef
+                ?? selectedSkills.FirstOrDefault(skill => skill.Dependencies.Contains(CompanionDependency.Identity))?.ResolvedSourceRef
+                ?? sourceVersion?.ResolvedSourceRef ?? string.Empty;
+            if (repairError is not null && !selectedConsumer)
+            {
+                reporter.Error(repairError);
+                report.Companion = new(CompanionInstaller.ManifestPath(targetDirectory), null, "unknown", "unknown", "repair", false, null, false, repairError);
+            }
+            else if (!await EnsureCompanionAsync(selectedRef, selectedConsumer ? null : repairRequirement, !selectedConsumer && restoreOnly).ConfigureAwait(false))
+            {
+                var failedItems = RecommendationSelectionPrompt.BuildItems(selectedDirectives, selectedSkills);
+                RecommendationSelectionState failedSelection = new(failedItems);
+                // Deselecting a failed prerequisite propagates through every transitive consumer.
+                failedSelection.DeselectWithDependents(RecommendationSelectionState.FormatSkillKey(string.Empty, CompanionDependency.PackageId));
+                selectedDirectives = failedSelection.SelectedDirectives;
+                selectedSkills = failedSelection.SelectedSkills;
+            }
+        }
+
+        selectedSkills = [.. selectedSkills.Where(skill => !skill.IsCompanion)];
 
         var directiveResult = await directiveInstaller
             .ApplyAsync(directivePlan, selectedDirectives.Select(directive => directive.Name), options.DryRun, cancellationToken)
@@ -264,7 +429,7 @@ sealed class CheckWorkflow(
             }
 
             await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
-            return new CheckRunResult(0, report);
+            return new CheckRunResult(report.Companion?.Success == false ? 1 : 0, report);
         }
 
         if (selectedSkills.Count > 0)
@@ -330,10 +495,15 @@ sealed class CheckWorkflow(
 
         if (!options.Preview)
         {
-            await RunSkillUpdateAsync(options, skillsDirectories, targetDirectory, report, skillUpdates, cancellationToken).ConfigureAwait(false);
+            await RunSkillUpdateAsync(options, skillsDirectories, targetDirectory, report, skillUpdates, manifest, async updateSkills =>
+            {
+                var closure = CloseDependencies([], updateSkills, [.. manifest, CompanionDependency.Action()]);
+                return !closure.SelectedSkills.Any(skill => skill.IsCompanion)
+                    || await EnsureCompanionAsync(closure.SelectedSkills.First(skill => skill.Dependencies.Contains(CompanionDependency.Identity)).ResolvedSourceRef, null, false).ConfigureAwait(false);
+            }, cancellationToken).ConfigureAwait(false);
         }
 
-        int exitCode = report.InstallResults.Any(result => !result.Success) || report.SkillCopyResults.Any(result => !result.Success) ? 1 : 0;
+        int exitCode = report.Companion?.Success == false || report.SkillUpdates.Any(result => !result.Success) || report.InstallResults.Any(result => !result.Success) || report.SkillCopyResults.Any(result => !result.Success) ? 1 : 0;
         await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
         return new CheckRunResult(exitCode, report);
     }
@@ -361,8 +531,9 @@ sealed class CheckWorkflow(
         return [.. manifest.Select(skill => versions.TryGetValue(skill.SourceRepo, out var version)
             ? skill with
             {
-                SourceRef = sourceVersionMode == SourceVersionMode.Preview ? version.Ref : string.Empty,
-                Version = version.Display
+                SourceRef = sourceVersionMode == SourceVersionMode.Preview ? version.ContentRef : string.Empty,
+                Version = version.Display,
+                ResolvedSource = version
             }
             : skill)];
     }
@@ -376,19 +547,13 @@ sealed class CheckWorkflow(
         }
 
         string fullTargetDirectory = pathValidation.Directory;
-        if (File.Exists(fullTargetDirectory))
-        {
-            return DirectoryValidationResult.Invalid(
+        return File.Exists(fullTargetDirectory)
+            ? DirectoryValidationResult.Invalid(
                 fullTargetDirectory,
-                $"Invalid target directory: {fullTargetDirectory} is a file.");
-        }
-
-        if (Directory.Exists(fullTargetDirectory))
-        {
-            return DirectoryValidationResult.Valid(fullTargetDirectory, []);
-        }
-
-        return DirectoryValidationResult.Invalid(
+                $"Invalid target directory: {fullTargetDirectory} is a file.")
+            : Directory.Exists(fullTargetDirectory)
+            ? DirectoryValidationResult.Valid(fullTargetDirectory, [])
+            : DirectoryValidationResult.Invalid(
             fullTargetDirectory,
             $"Target directory does not exist: {fullTargetDirectory}.");
     }
@@ -414,19 +579,13 @@ sealed class CheckWorkflow(
         }
 
         string fullSkillsDirectory = pathValidation.Directory;
-        if (!IsPathBelowDirectory(targetDirectory, fullSkillsDirectory))
-        {
-            return DirectoryValidationResult.Invalid(
+        return !IsPathBelowDirectory(targetDirectory, fullSkillsDirectory)
+            ? DirectoryValidationResult.Invalid(
                 fullSkillsDirectory,
-                $"Invalid skills directory: {skillsDirectory} must resolve below the target directory.");
-        }
-
-        if (File.Exists(fullSkillsDirectory))
-        {
-            return DirectoryValidationResult.Invalid(fullSkillsDirectory, $"Invalid skills directory: {fullSkillsDirectory} is a file.");
-        }
-
-        return Directory.Exists(fullSkillsDirectory)
+                $"Invalid skills directory: {skillsDirectory} must resolve below the target directory.")
+            : File.Exists(fullSkillsDirectory)
+            ? DirectoryValidationResult.Invalid(fullSkillsDirectory, $"Invalid skills directory: {fullSkillsDirectory} is a file.")
+            : Directory.Exists(fullSkillsDirectory)
             ? DirectoryValidationResult.Valid(fullSkillsDirectory, [])
             : DirectoryValidationResult.Invalid(fullSkillsDirectory, $"Skills directory does not exist: {fullSkillsDirectory}.");
     }
@@ -457,6 +616,8 @@ sealed class CheckWorkflow(
         string repoRoot,
         AgenticCheckReport report,
         IReadOnlyList<SkillUpdateCandidate> skillUpdates,
+        IReadOnlyList<SkillManifestEntry> manifest,
+        Func<IReadOnlyList<SkillManifestEntry>, Task<bool>> ensurePrerequisites,
         CancellationToken cancellationToken)
     {
         if (report.SkillUpdateDryRuns.All(result => !result.Success))
@@ -470,7 +631,7 @@ sealed class CheckWorkflow(
             return;
         }
 
-        ReportSkillUpdates(skillUpdates, recommendedSkills: StaticSkillManifest.All);
+        ReportSkillUpdates(skillUpdates, recommendedSkills: manifest);
 
         bool update = options.Yes || await prompts.ConfirmAsync("Update these skill(s)?", false, cancellationToken)
             .ConfigureAwait(false);
@@ -482,6 +643,7 @@ sealed class CheckWorkflow(
         }
 
         List<(string SkillsDirectory, CommandReport Report)> failures = [];
+        bool skippedPrerequisite = false;
         await reporter.RunProgressAsync(
             "Updating skills",
             skillsDirectories.Count,
@@ -489,6 +651,16 @@ sealed class CheckWorkflow(
             {
                 foreach (string skillsDirectory in skillsDirectories)
                 {
+                    var directoryUpdates = skillUpdates.SelectMany(update => FindMatchingManifestEntries(update, manifest))
+                        .Where(skill => !SkillInstaller.IsMissing(skill, skillsDirectory)).DistinctBy(skill => skill.Key).ToArray();
+                    if (!await ensurePrerequisites(directoryUpdates).ConfigureAwait(false))
+                    {
+                        skippedPrerequisite = true;
+                        reporter.Error($"Skipped skill update --all in {skillsDirectory}: companion prerequisite failed.");
+                        advance();
+                        continue;
+                    }
+
                     var updateResult = await commandRunner.RunAsync(
                         "gh",
                         ["skill", "update", "--dir", skillsDirectory, "--all"],
@@ -515,7 +687,7 @@ sealed class CheckWorkflow(
             ReportCommandOutput(updateReport);
         }
 
-        if (failures.Count == 0)
+        if (failures.Count == 0 && !skippedPrerequisite)
         {
             reporter.Success(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Updated {skillUpdates.Count} skill(s) successfully."));
         }
@@ -843,32 +1015,20 @@ sealed class CheckWorkflow(
         IReadOnlyList<string> skillsDirectories)
         => preview ? [] : SkillInstaller.FindInstalledFromBranch(recommendedSkills, skillsDirectories);
 
-    static IReadOnlyList<SkillManifestEntry> AddSelectedSkillDependencies(
-        IReadOnlyList<SkillManifestEntry> selectedSkills,
-        IReadOnlyList<SkillManifestEntry> selectableSkills)
+    internal static RecommendationSelectionResult CloseDependencies(
+        IReadOnlyList<DirectivePlanItem> directives,
+        IReadOnlyList<SkillManifestEntry> selected,
+        IReadOnlyList<SkillManifestEntry> available)
     {
-        var selectableByKey = selectableSkills.ToDictionary(skill => skill.Key, StringComparer.OrdinalIgnoreCase);
-        var selectedKeys = selectedSkills.Select(skill => skill.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        foreach (var skill in selectedSkills)
+        var items = RecommendationSelectionPrompt.BuildItems(directives, available);
+        RecommendationSelectionState state = new(items);
+        state.Apply(new(SkillSelectionCommand.SelectNone));
+        foreach (var item in items.Where(item => item.Directive is not null || selected.Any(skill => skill.Key == item.Skill?.Key)))
         {
-            AddDependencies(skill);
+            state.SelectWithDependencies(item.Key);
         }
 
-        return [.. selectableSkills.Where(skill => selectedKeys.Contains(skill.Key))];
-
-        void AddDependencies(SkillManifestEntry skill)
-        {
-            foreach (var dependency in skill.Dependencies)
-            {
-                if (!selectableByKey.TryGetValue(dependency.Key, out var selectableDependency)
-                    || !selectedKeys.Add(selectableDependency.Key))
-                {
-                    continue;
-                }
-
-                AddDependencies(selectableDependency);
-            }
-        }
+        return new(state.SelectedDirectives, state.SelectedSkills);
     }
 
     static IEnumerable<string> UpdateSkillKeys(
@@ -965,12 +1125,7 @@ sealed class CheckWorkflow(
     static bool IsIgnoredOutdatedSkillLine(string line, IReadOnlyList<string> ignoredLineFragments)
     {
         string normalized = TrimListMarker(line);
-        if (ignoredLineFragments.Any(fragment => normalized.Contains(fragment, StringComparison.OrdinalIgnoreCase)))
-        {
-            return true;
-        }
-
-        return normalized.Length > 0
+        return ignoredLineFragments.Any(fragment => normalized.Contains(fragment, StringComparison.OrdinalIgnoreCase)) || normalized.Length > 0
             && char.IsDigit(normalized[0])
             && (normalized.Contains("update(s) available", StringComparison.OrdinalIgnoreCase)
                 || normalized.Contains("updates available", StringComparison.OrdinalIgnoreCase)

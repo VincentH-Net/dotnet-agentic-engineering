@@ -1,4 +1,4 @@
-﻿using System.CommandLine;
+using System.CommandLine;
 using Spectre.Console;
 
 namespace Agentic.Check;
@@ -58,7 +58,7 @@ static class AgenticCheckCli
         };
         Option<bool> previewOption = new("--preview")
         {
-            Description = "Install preview directives and skills from each source repo's default branch instead of its latest release."
+            Description = "Install preview directives and skills from each source repo's default branch; allow stable and prerelease companion packages in the required major."
         };
         Option<bool> yesOption = new("--yes")
         {
@@ -104,6 +104,9 @@ static class AgenticCheckCli
           dotnet-agentic-engineering GitHub repo
         - Skills are installed / updated directly from source GitHub skill repo's with 
           'gh skill'
+        - Required InnoWvate.Agentic tools are installed locally before dependent content.
+          Stable uses major.*; preview uses major.*-*. The resolved manifest version
+          must satisfy the source project's major/minor requirement.
 
         The skills available for composition are carefully selected and tested from 
         best-in-class GitHub repo's. The composition minimizes context usage and avoids

@@ -59,3 +59,22 @@ Discovery fails on candidates, possible moves, missing entries, or fetch/parse e
 4. Run maintenance again. Nothing advances baselines automatically. These SHAs never pin installation or update versions.
 
 Initial review dates were inferred from manifest history and do not prove that every upstream skill was consciously reviewed. Moves with changed frontmatter names cannot be identified reliably and appear as separate additions/missing entries. Name-only install arguments whose frontmatter name differs from their folder may need explicit paths in the manifest; `gh skill preview` remains the authoritative argument validation.
+
+## Deterministic terminal regression tests
+
+Run `dotnet test tests/Agentic.Check.LiveTests/Agentic.Check.LiveTests.csproj` for the offline tests
+and Hex1b terminal suite. GitHub responses are seeded in a per-test cache from working-tree source;
+`gh` and companion SDK operations use isolated executable fixtures. Agentic.Check runs through its
+real apphost so the process boundary honors these fixtures. Actual SDK/NuGet resolution is tested
+separately by `tests/Agentic.LiveTests`, with local packages and isolated caches.
+
+Recordings include prerequisite selection/deselection, dry-run, install failure, and version
+validation failure. Replay with:
+
+```bash
+asciinema play tests/Agentic.Check.LiveTests/TestResults/recordings/<test-name>-<id>.cast
+```
+
+The CI workflow runs both normal unit suites (including the offline source path/version contract)
+and both live-test projects, and uploads terminal recordings. The two network maintenance tests
+remain opt-in. Running the normal suite checks working-tree edits; no Git hook is installed.

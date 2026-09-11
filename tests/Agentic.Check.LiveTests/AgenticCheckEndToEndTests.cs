@@ -14,6 +14,88 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
       1 update(s) available:
     """;
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    [Trait("Category", "EndToEnd")]
+    public async Task CompanionFailureSkipsDependentDirectiveAndReportsPartialOutcome(bool invalidVersion)
+    {
+        if (IsUnsupportedPlatform())
+        {
+            return;
+        }
+
+        using var workspace = await TestWorkspace.CreateAsync(nameof(CompanionFailureSkipsDependentDirectiveAndReportsPartialOutcome), writeDotnetProject: false).ConfigureAwait(true);
+        await File.WriteAllTextAsync(Path.Combine(workspace.RootPath, invalidVersion ? "tool-invalid-version" : "tool-failure"), string.Empty).ConfigureAwait(true);
+        string reportPath = Path.Combine(workspace.RootPath, "report.json");
+        var result = await RunCommandAsync(workspace, $"--yes --agents codex --report {Quote(reportPath)} {Quote(workspace.RepoPath)}", 1).ConfigureAwait(true);
+        Assert.Contains("Dependent actions skipped", result.Screen, StringComparison.Ordinal);
+        Assert.DoesNotContain("foundation-prompt-log:start", await workspace.ReadRepoFileAsync("AGENTS.md").ConfigureAwait(true), StringComparison.Ordinal);
+        using var report = JsonDocument.Parse(await File.ReadAllTextAsync(reportPath).ConfigureAwait(true));
+        Assert.False(report.RootElement.GetProperty("companion").GetProperty("success").GetBoolean());
+        Assert.Equal(invalidVersion, report.RootElement.GetProperty("companion").GetProperty("changed").GetBoolean());
+        AssertRecordingWasWritten(workspace);
+    }
+
+    [Fact]
+    [Trait("Category", "EndToEnd")]
+    public async Task DeselectingCompanionDeselectsPromptDirectiveWithoutInstallation()
+    {
+        if (IsUnsupportedPlatform())
+        {
+            return;
+        }
+
+        using var workspace = await TestWorkspace.CreateAsync(nameof(DeselectingCompanionDeselectsPromptDirectiveWithoutInstallation), writeDotnetProject: false).ConfigureAwait(true);
+        _ = await RunInteractiveCommandAsync(workspace, $"--agents codex {Quote(workspace.RepoPath)}", async auto =>
+        {
+            await auto.WaitUntilTextAsync("InnoWvate.Agentic (install/update)").ConfigureAwait(true);
+            await auto.TypeAsync("InnoWvate.Agentic").ConfigureAwait(true);
+            await auto.WaitUntilTextAsync("Filter: InnoWvate.Agentic").ConfigureAwait(true);
+            await auto.SpaceAsync().ConfigureAwait(true);
+            await auto.WaitUntilTextAsync("[ ] InnoWvate.Agentic").ConfigureAwait(true);
+            await auto.EscapeAsync().ConfigureAwait(true);
+            await auto.WaitUntilTextAsync("[ ] foundation-prompt-log").ConfigureAwait(true);
+            await auto.EnterAsync().ConfigureAwait(true);
+        }).ConfigureAwait(true);
+        Assert.False(File.Exists(Path.Combine(workspace.RootPath, "tool.log")));
+        Assert.False(File.Exists(CompanionInstaller.ManifestPath(workspace.RepoPath)));
+        Assert.DoesNotContain("foundation-prompt-log:start", await workspace.ReadRepoFileAsync("AGENTS.md").ConfigureAwait(true), StringComparison.Ordinal);
+        AssertRecordingWasWritten(workspace);
+    }
+
+    [Fact]
+    [Trait("Category", "EndToEnd")]
+    public async Task DirectiveSelectionIncludesCompanionAndDryRunDoesNotInstall()
+    {
+        if (IsUnsupportedPlatform())
+        {
+            return;
+        }
+
+        using var workspace = await TestWorkspace.CreateAsync(nameof(DirectiveSelectionIncludesCompanionAndDryRunDoesNotInstall), writeDotnetProject: false).ConfigureAwait(true);
+        var dry = await RunCommandAsync(workspace, $"--dry-run --agents codex {Quote(workspace.RepoPath)}").ConfigureAwait(true);
+        Assert.Contains("required 2.3, pattern 2.*", dry.Screen, StringComparison.Ordinal);
+        Assert.False(File.Exists(CompanionInstaller.ManifestPath(workspace.RepoPath)));
+        Assert.False(File.Exists(Path.Combine(workspace.RootPath, "tool.log")));
+        _ = await RunInteractiveCommandAsync(workspace, $"--agents codex {Quote(workspace.RepoPath)}", async auto =>
+        {
+            await auto.WaitUntilTextAsync("InnoWvate.Agentic (install/update)").ConfigureAwait(true);
+            await auto.LeftAsync().ConfigureAwait(true);
+            await auto.TypeAsync("foundation-prompt-log").ConfigureAwait(true);
+            await auto.WaitUntilTextAsync("[ ] foundation-prompt-log").ConfigureAwait(true);
+            await auto.SpaceAsync().ConfigureAwait(true);
+            await auto.WaitUntilTextAsync("[x] foundation-prompt-log").ConfigureAwait(true);
+            await auto.EscapeAsync().ConfigureAwait(true);
+            await auto.WaitUntilTextAsync("[x] InnoWvate.Agentic").ConfigureAwait(true);
+            await auto.EnterAsync().ConfigureAwait(true);
+        }).ConfigureAwait(true);
+        Assert.Contains("foundation-prompt-log:start", await workspace.ReadRepoFileAsync("AGENTS.md").ConfigureAwait(true), StringComparison.Ordinal);
+        Assert.Equal("2.3.0", CompanionInstaller.InstalledVersion(workspace.RepoPath));
+        _ = Assert.Single(await File.ReadAllLinesAsync(Path.Combine(workspace.RootPath, "tool.log")).ConfigureAwait(true));
+        AssertRecordingWasWritten(workspace);
+    }
+
     [Fact]
     [Trait("Category", "EndToEnd")]
     public async Task HelpListsCoreOptionsAndAgentValues()
@@ -733,7 +815,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
     static string AgenticCheckCommand(TestWorkspace workspace, string arguments)
     {
         string path = workspace.BinPath + Path.PathSeparator + (Environment.GetEnvironmentVariable("PATH") ?? string.Empty);
-        return $"AGENTIC_CHECK_GH_LOG={Quote(workspace.GhLogPath)} PATH={Quote(path)} dotnet {Quote(ToolAssemblyPath)} {arguments}";
+        return $"AGENTIC_CHECK_CACHE_SECONDS=3600 AGENTIC_CHECK_CACHE_DIR={Quote(Path.Combine(workspace.RootPath, "cache"))} AGENTIC_CHECK_GH_LOG={Quote(workspace.GhLogPath)} PATH={Quote(path)} {Quote(Path.ChangeExtension(ToolAssemblyPath, null))} {arguments}";
     }
 
     static Hex1bTerminal CreateTerminal(TestWorkspace workspace)
@@ -817,7 +899,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
 
         public static async Task<TestWorkspace> CreateAsync(string testName, bool writeDotnetProject = true)
         {
-            var workspace = new TestWorkspace(Path.Combine("/private/tmp", $"agentic-check-e2e-{Guid.NewGuid():N}"), testName);
+            var workspace = new TestWorkspace(Path.Combine(OperatingSystem.IsMacOS() ? "/private/tmp" : Path.GetTempPath(), $"agentic-check-e2e-{Guid.NewGuid():N}"), testName);
             _ = Directory.CreateDirectory(workspace.RootPath);
             _ = Directory.CreateDirectory(workspace.RepoPath);
             _ = Directory.CreateDirectory(workspace.BinPath);
@@ -835,6 +917,8 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
                     """);
             }
 
+            SeedSourceCache(workspace);
+            await WriteFakeDotnetAsync(workspace).ConfigureAwait(true);
             await WriteFakeGhAsync(workspace).ConfigureAwait(true);
             await WriteFakeAgentProbeCommandsAsync(workspace).ConfigureAwait(true);
             return workspace;
@@ -907,6 +991,70 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
             {
                 Directory.Delete(RootPath, recursive: true);
             }
+        }
+
+        static void SeedSourceCache(TestWorkspace workspace)
+        {
+            DirectiveHttpCache cache = new(new(3600, Path.Combine(workspace.RootPath, "cache"), []), null);
+            foreach (string repo in StaticSkillManifest.All.Concat(StaticSkillManifest.Preview).Select(skill => skill.SourceRepo).Distinct(StringComparer.Ordinal))
+            {
+                string api = "https://api.github.com/repos/" + repo;
+                cache.TryWrite(new(api + "/releases/latest"), "{\"tag_name\":\"v2.3.0\",\"published_at\":\"2026-09-01T00:00:00Z\"}");
+                cache.TryWrite(new(api), "{\"default_branch\":\"main\"}");
+                cache.TryWrite(new(api + "/branches/main"), "{\"commit\":{\"commit\":{\"committer\":{\"date\":\"2026-09-01T00:00:00Z\"}}}}");
+            }
+
+            DirectoryInfo? directory = new(AppContext.BaseDirectory);
+            while (directory is not null && !Directory.Exists(Path.Combine(directory.FullName, "directives")))
+            {
+                directory = directory.Parent;
+            }
+
+            string checkout = directory?.FullName ?? throw new InvalidOperationException("Missing source checkout.");
+            foreach (string sourceRef in new[] { "v2.3.0", "main" })
+            {
+                List<object> listing = [];
+                foreach (string file in Directory.EnumerateFiles(Path.Combine(checkout, "directives"), "*.md"))
+                {
+                    string name = Path.GetFileName(file);
+                    string url = $"https://raw.githubusercontent.com/{CompanionDependency.SourceRepo}/{sourceRef}/directives/{name}";
+                    listing.Add(new { name, download_url = url, type = "file" });
+                    cache.TryWrite(new(url), File.ReadAllText(file));
+                }
+
+                cache.TryWrite(new(DirectiveInstallerUrl.Listing(sourceRef)), JsonSerializer.Serialize(listing));
+                cache.TryWrite(new($"https://raw.githubusercontent.com/{CompanionDependency.SourceRepo}/{sourceRef}/{CompanionSourceVersionReader.ProjectPath}"), File.ReadAllText(Path.Combine(checkout, CompanionSourceVersionReader.ProjectPath)));
+            }
+        }
+
+        static async Task WriteFakeDotnetAsync(TestWorkspace workspace)
+        {
+            string realDotnet = Path.Combine(System.Runtime.InteropServices.RuntimeEnvironment.GetRuntimeDirectory(), "../../../dotnet");
+            string script = """
+                #!/usr/bin/env python3
+                import json, os, pathlib, sys
+                root = pathlib.Path(__file__).resolve().parent.parent
+                args = sys.argv[1:]
+                if not args or args[0] != 'tool':
+                    os.execv(REAL_DOTNET, [REAL_DOTNET] + args)
+                with (root / 'tool.log').open('a') as log:
+                    log.write(' '.join(args) + '\n')
+                if (root / 'tool-failure').exists():
+                    print('fixture SDK installation failure', file=sys.stderr)
+                    sys.exit(1)
+                if args[1] == 'run':
+                    print('2.3.0')
+                    sys.exit(0)
+                manifest = pathlib.Path(args[args.index('--tool-manifest') + 1])
+                data = json.loads(manifest.read_text())
+                if args[1] in ('install', 'update'):
+                    version = '2.2.0' if (root / 'tool-invalid-version').exists() else '2.3.0'
+                    data['tools']['innowvate.agentic'] = {'version': version, 'commands': ['agentic']}
+                    manifest.write_text(json.dumps(data))
+                sys.exit(0)
+                """;
+            script = script.Replace("REAL_DOTNET", JsonSerializer.Serialize(Path.GetFullPath(realDotnet)), StringComparison.Ordinal);
+            await WriteExecutableAsync(workspace, "dotnet", script).ConfigureAwait(true);
         }
 
         static async Task WriteFakeGhAsync(TestWorkspace workspace)

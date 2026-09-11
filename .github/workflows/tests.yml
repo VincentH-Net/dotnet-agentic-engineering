@@ -1,0 +1,28 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet test tests/Agentic.Tests/Agentic.Tests.csproj
+      - run: dotnet test tests/Agentic.Check.Tests/Agentic.Check.Tests.csproj
+      - run: dotnet test tests/Agentic.LiveTests/Agentic.LiveTests.csproj
+      - run: dotnet test tests/Agentic.Check.LiveTests/Agentic.Check.LiveTests.csproj
+      - run: dotnet pack src/Agentic/Agentic.csproj --configuration Release
+      - run: dotnet pack src/Agentic.Check/Agentic.Check.csproj --configuration Release
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: terminal-recordings
+          path: tests/**/TestResults/recordings/*.cast

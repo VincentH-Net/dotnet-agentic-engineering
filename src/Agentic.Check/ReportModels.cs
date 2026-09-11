@@ -1,10 +1,12 @@
-﻿namespace Agentic.Check;
+namespace Agentic.Check;
 
 sealed class AgenticCheckReport
 {
     public string TargetDirectory { get; set; } = string.Empty;
 
     public bool DryRun { get; set; }
+
+    public CompanionReport? Companion { get; set; }
 
     public string? RepoRoot { get; set; }
 

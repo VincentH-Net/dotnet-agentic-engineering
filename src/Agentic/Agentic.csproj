@@ -4,17 +4,20 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <PackAsTool>true</PackAsTool>
-    <ToolCommandName>agentic-check</ToolCommandName>
-    <PackageId>Agentic.Check</PackageId>
-    <Title>Agentic Check</Title>
+    <ToolCommandName>agentic</ToolCommandName>
+    <PackageId>InnoWvate.Agentic</PackageId>
+    <Title>Agentic</Title>
+    <!-- Agentic.Check reads this literal version from this GitHub path to install a compatible tool.
+         Keep it explicit here (no imports/expressions); update consumer -m values when major/minor changes.
+         If this file moves, update Agentic.Check's source path; contract tests verify both. -->
     <Version>2.3.0</Version>
     <Authors>VincentH-Net</Authors>
     <Copyright>Copyright © VincentH.NET</Copyright>
-    <Description>Optimizes your repo for agentic engineering with .NET - based technologies.</Description>
+    <Description>Deterministic prompt-log wrapping, history display, and validation for coding agents.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/VincentH-Net/dotnet-agentic-engineering</PackageProjectUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageTags>agentic-check;agentic;dotnet-tool;dotnet;cli;skills;directives;github;repo;doctor;check;codex;claude-code;gh skills</PackageTags>
+    <PackageTags>agentic;dotnet-tool;dotnet;cli;prompt-log;git;agents</PackageTags>
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/VincentH-Net/dotnet-agentic-engineering</RepositoryUrl>
     <PackageReleaseNotes>https://github.com/VincentH-Net/dotnet-agentic-engineering/releases/tag/v$(Version)</PackageReleaseNotes>
@@ -24,7 +27,6 @@
     <None Include="README.md" Pack="true" PackagePath="/" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Spectre.Console" Version="0.57.1" />
     <PackageReference Include="System.CommandLine" Version="2.0.9" />
   </ItemGroup>
   <ItemGroup><Compile Include="../Shared/ToolVersion.cs" Link="ToolVersion.cs" /></ItemGroup>

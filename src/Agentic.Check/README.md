@@ -52,3 +52,30 @@ agentic-check -h
 2. Start `agentic-check` in the `backend` subfolder and select the additional specialized set of directives and skills for that subfolder - `agentic-check` will automatically deselect any directives and skills that are already installed above or below the target folder. For `agentic-chech`, above terminates at the repo root or else the drive root.
 3. Start `agentic-check` in the `frontend` subfolder and select the specialized set of directives and skills for that subfolder
 4. Start your agent in a (sub)folder of choice to use that specialized set of instructions. Multiple harnesses support this, including Codex CLI (composes above) and Claude Code CLI (composes above, as well as below when working on files below it's working dir).
+
+## Local companion prerequisites (2.3.0)
+
+Selecting `foundation-prompt-log` also selects `InnoWvate.Agentic` in the same dependency list.
+Deselecting the prerequisite deselects its consumers. Agentic.Check prepares it once per target,
+before changing dependent content, using the target's explicit `.config/dotnet-tools.json` and
+normal `nuget.config` sources. New nested manifests preserve discovery of unrelated parent tools.
+Existing tool entries and `isRoot` settings are retained.
+
+The required major/minor comes from the literal `src/Agentic/Agentic.csproj` version at the same
+source revision as the selected content. Stable installs/updates use `major.*`; `--preview` uses
+`major.*-*`, allowing stable and prerelease packages. The SDK resolves the newest matching package,
+including downgrades when repairing a different major or switching back to stable. Agentic.Check
+verifies the exact manifest version and minimum before applying consumers. Failures skip dependent
+actions and report any partial manifest change. Dry-run reports a pattern and minimum without
+creating manifests, restoring tools, or changing content. JSON reports include `companion` status.
+
+After cloning, `dotnet tool restore` restores the exact recorded version. Repair of an unrestored,
+compatible installation uses that version; repair of missing/incompatible prerequisites reads the
+installed consumer's literal `-m`/`--minver` requirement. Confirmed stable skill updates enforce the
+same prerequisites even when no recommendations were selected. Declining updates does not install
+their prerequisites. No global launcher, PATH edits, or activation scripts are needed.
+
+For development, add the locally packed companion folder to the target's `nuget.config`; see the
+[companion README](../Agentic/README.md). Highest-version resolution spans all configured feeds, so
+use unique test versions and isolated caches. Publish the matching package before exposing new
+consumer content in a future release.

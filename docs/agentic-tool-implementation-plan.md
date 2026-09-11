@@ -6,7 +6,7 @@ Implement the agreed first release of a companion .NET local tool and its instal
 
 The companion executes deterministic logic extracted from this repository's directives and skills. The first release implements ONLY prompt logging. Do not implement the other previously explored commands for code style, builds, Orleans, Uno, charts, or terminal testing.
 
-This is an implementation plan, not a record of completed implementation. At preparation time, `src/Agentic` does not exist and Agentic.Check is version 2.2.0.
+This is an implementation specification, not a verification report. It has been amended after implementation review: prompt logging now accepts one complete raw body rather than accumulating JSON-encoded entries. The historical formats remain read-only compatibility paths. The package version remains 2.3.0; the earlier contract was not published.
 
 ## Settled decisions
 
@@ -23,7 +23,7 @@ This is an implementation plan, not a record of completed implementation. At pre
 - Only directives and skills authored in this repository will declare the companion prerequisite.
 - The companion does not discover or read installed skills/directives at runtime. Compatibility is explicit in each invocation.
 - The companion never stages files, commits, amends, pushes, or modifies Git configuration. It may perform read-only Git operations for history and validation.
-- The agent decides what to commit and executes Git. The companion creates the prompt-log block file that the agent includes in its commit message.
+- The agent decides what to commit and executes Git. The companion creates a prompt-log block on stdout or in a file that the agent includes in its commit message.
 
 ## Current implementation map
 
@@ -52,8 +52,8 @@ At preparation time, `docs/agentic-check-announcement-x-article.md` is an unrela
 
 ## Companion command contract
 
-```text
-dotnet agentic prompt-log encode --input <file> --prompt-log <file> [-m <major.minor>]
+```bash
+dotnet agentic prompt-log wrap --input <file|-> [--prompt-log <file|->] [-m <major.minor>]
 dotnet agentic prompt-log show [--since <date>] [--until <date>] [-m <major.minor>]
 dotnet agentic prompt-log check [--commit <ref>] [-m <major.minor>]
 ```
@@ -85,41 +85,47 @@ in the intended target directory, then retry.
 
 The directive must instruct agents to follow this failure guidance. The tool does not launch Agentic.Check or self-update.
 
-### prompt-log encode
+### prompt-log wrap
 
-- `--input` contains one already-sanitized prompt or combined question/answer entry. Also support `--input -` for stdin.
-- `--prompt-log` is the accumulating prompt-log block file, not a complete commit message.
-- If absent, create that file with the opening and closing markers.
-- If present, validate the entire block before changing it.
-- Encode each physical input line as a JSON string using the built-in serializer, preserving entry boundaries, multiline content, and blank lines.
-- Append each entry immediately before the closing marker; maintain a blank separator between entries.
-- The file is a complete block after every successful invocation. Do not blindly append text after the closing marker.
-- Do not hand-escape JSON or invoke Perl.
-- Preserve all input text, including meaningful whitespace. Define and test CRLF/LF handling explicitly; normalize physical newline encodings while preserving logical lines and final empty lines. Use UTF-8 output.
-- Use atomic replacement for an existing file where possible; failures must not truncate or partially rewrite it. Reject input/output referring to the same file.
-- Reject malformed existing blocks, duplicated/missing delimiters, non-string JSON values, and unrelated text outside the block.
-- Default for zero-byte input: successful no-op, without creating a new file or an empty block. Whitespace-only nonempty entries are preserved. Do not suppress duplicate entries automatically.
-- Agent calls are sequential; prevent silent lost updates if concurrent writes occur, for example by obtaining exclusive access or failing clearly.
-- No Git dependency is needed for this command, and it works outside a repository.
+- `--input` contains the complete already-sanitized, human-readable raw log for one commit. Support `--input -` for stdin.
+- The agent chooses entries, pairs questions and answers, sanitizes sensitive content, and formats the body for readability. No internal entry schema, JSON serialization, marker insertion, or escaping is required of the agent.
+- `--prompt-log` is the output block file, or `-` for stdout (the default). File input and output work independently of stdin/stdout. Named output is replaced, never accumulated or appended to.
+- The tool adds exactly one full-line `prompt-log:` / `prompt-log-end:` pair and the immediately following format identifier `prompt-log-format: raw-v1`. It handles reversible escaping entirely internally.
+- In the body, prefix a delimiter line (including one with trailing whitespace) with one backslash so Git cleanup cannot turn content into a delimiter. Also prefix every line already beginning with a backslash with one additional backslash. Leave other lines unchanged. The reader reverses this transformation and rejects invalid escapes.
+- Preserve all text and meaningful whitespace, including repeated blank lines and final empty lines. Normalize CRLF, LF, and lone CR to logical LF. Use UTF-8 input/output.
+- Insert one framing LF before the closing delimiter independently of the body's existing final LF. This permits exact round trips after newline normalization before Git cleanup. Normal Git whitespace cleanup is acceptable; `show` preserves the resulting stored text. Accept a whitespace-only body that Git has reduced to one empty line.
+- Zero-byte input produces empty output, with no block. For a named output, clear it atomically so a previous log cannot be reused accidentally. Preserve whitespace-only input.
+- Buffer the complete input before output. Input/compatibility failures emit no block; callers must discard output on any nonzero exit, including partial stdout write failures.
+- Replace named output atomically; failure must preserve the previous file. Reject input/output referring to the same file, including supported alias checks. Concurrent file writers must fail clearly rather than race.
+- This command needs no Git repository, Git access, extra executable, or package dependency.
 
-Example output file:
+Example output:
 
 ```text
 prompt-log:
-"First line of the user's prompt"
-"Second line"
+prompt-log-format: raw-v1
+First prompt, with "quotes" and raw multiline text.
 
-"Q: Sanitized question -> A: Sanitized answer"
+Q: Keep the setting?
+A: Yes.
 prompt-log-end:
 ```
 
-The agent includes this file in its initial commit message. Do not implement `prompt-log commit`, `prompt-log format`, or `--message-file`. The tool does not assemble the rest of the commit message.
+The agent includes this block unchanged in its initial commit message, before Git trailers. Git's normal whitespace cleanup is acceptable. The companion does not assemble the rest of the message or write Git history. Do not add a commit command, structured request envelope, per-entry protocol, or temporary-workspace manager.
+
+### Historical format support
+
+- The raw format identifier is explicit; do not infer raw versus historical JSON from whether the body happens to look like JSON.
+- Retain reading and checking of the original JSON-string-line blocks, including the original Perl helper's final blank separator. Retain numbered standalone prompt-log commits as raw historical text.
+- Isolate both historical readers in `LegacyPromptLogReader.cs`, with documented dispatch points in `PromptLogReader.cs` and dedicated tests so support can be removed later.
+- Unknown format identifiers are errors, not a reason to guess or fall back silently.
+- Escaping protects block framing and round-trip fidelity. It is not a prompt-injection security boundary. Retrieved logs are historical content, like repository files.
 
 ### prompt-log show
 
 - Use the Git CLI in the current working directory; normal Git behavior supports invocation from a repository subfolder or worktree.
 - Retrieve logs from current reachable history, in chronological order, optionally filtered by `--since` and `--until`.
-- Display commit identification/date and decoded prompt-log entries in full, preserving multiline content and entry boundaries.
+- Display full commit hash, ISO 8601 committer datetime including timezone, and status/legacy label, then the unescaped complete body in full. Preserve the agent-authored multiline content and spacing; do not parse internal entry boundaries. Omit ordinary commit subjects, bodies, and trailers.
 - Do not truncate, summarize, re-encode entries for human display, or interpret entry text as Spectre markup.
 - Ignore commits with no prompt logs. Report malformed logs with the commit identity and fail; do not silently discard malformed content. Prefer continuing to show other valid logs while returning a failure status.
 - Support older standalone prompt-log commits as legacy read-only history. Preserve their textual entries; do not pretend the older raw format has the current JSON-format guarantees.
@@ -128,7 +134,7 @@ The agent includes this file in its initial commit message. Do not implement `pr
 ### prompt-log check
 
 - Use read-only Git to retrieve the specified commit; default to `HEAD`.
-- Validate embedded markers, JSON-string lines, entry separation, and complete block structure.
+- Validate embedded markers, the format identifier, and reversible escaping. Do not impose an internal entry or Q&A schema on raw logs. Apply the historical format rules when reading historical logs.
 - Missing prompt log is reported but succeeds: not every commit requires a log.
 - Recognized legacy standalone logs are reported as legacy, not rejected solely for using the old format.
 - Invalid revisions, malformed current-format logs, missing Git, or unavailable Git repositories are errors.
@@ -254,10 +260,10 @@ Retain the agent's responsibilities:
 
 - Choose relevant prompts since the previous logged work; omit continuation prompts and a final commit/push-only request as the current source directive specifies.
 - Pair answers with their questions, sanitize sensitive content, preserve everything else verbatim, and check completeness.
-- Collect one entry per input file/stdin invocation and accumulate a complete block using `encode`.
-- Start a fresh accumulation file for each intended code commit; do not accidentally reuse prior entries.
+- Collect the complete free-form log and send it as raw text to one `wrap` invocation, preferably through stdin/stdout when supported by the harness. Otherwise use one input file and one output file, outside staged work.
+- Check the command exit code before using the result. Each invocation replaces its named output, and empty input clears it.
 - Include the block in the initial commit message, then use normal agent-controlled staging/commit operations.
-- Keep any Git trailers at the end of the complete message. This is a short directive note, not companion trailer-manipulation logic.
+- Keep any Git trailers at the end of the complete message. Git's normal whitespace cleanup is acceptable. This is a short directive note, not companion trailer-manipulation logic.
 - Stop on compatibility failure and ask the user to run Agentic.Check interactively; do not bypass it by removing `-m` / `--minver`.
 
 Correct the source introduction that still describes an accompanying separate commit. Do not introduce a replacement prompt-log skill solely for dependency management.
@@ -276,8 +282,8 @@ Create `tests/Agentic.Tests` using existing test conventions.
 
 - CLI parsing/help: missing/unknown parameters, invalid `-m` / `--minver`, valid default, operation exit codes. Verify both aliases in leading and trailing placement for all three subcommands, equivalent compatibility behavior, and help documenting both spellings.
 - Compatibility matrix: lower/equal/higher minor, different major, patch ignored, prerelease ignored, explicit/default requirement exposed to handlers. No writes or Git calls on incompatibility.
-- Encoding: quotes, backslashes, Unicode, multiline/blank lines, trailing newline, CRLF/LF, strings resembling markers, JSON literals as text, stdin, empty input, multiple appends, marker placement.
-- Mutation failures: malformed existing block, missing input, denied access, identical input/output, interrupted write and competing access. Existing valid output remains intact.
+- Raw framing: quotes, backslashes, Unicode, repeated blank lines, trailing newlines, CRLF/LF/lone CR, exact and near-match delimiters, escape-prefix collisions, JSON-looking raw text, explicit format routing, and unstructured Q&A text. Verify that real Git commits with normal cleanup preserve valid framing, including delimiters with trailing whitespace and whitespace-only bodies. Verify exact round trips and independently specified wrapped output.
+- I/O: all file/stdin/stdout combinations, default stdout, no per-entry files or Git dependency, complete replacement instead of append, and empty-output replacement. Failures: missing/invalid input, denied access, identical input/output, interrupted write, competing access, and incompatible version. Failed operations preserve existing output and do not emit partial stdout before input validation.
 - Reading/validation: multiple commits and entries, exact decoded text, ordinary commits without logs, legacy standalone logs, malformed current format, invalid refs, date filtering, non-repository folders, missing Git, repository subfolders/worktrees, and Git messages with trailers after the block.
 - Use real temporary Git repositories for history behavior. Tests can create commits as fixture setup; production code must perform only read-only Git operations.
 - Verify literal text containing markup characters is not interpreted or truncated.
@@ -302,7 +308,7 @@ Implement the explicitly requested in-repo test:
 2. Inspect every authored skill under `plugins/**/skills/**/SKILL.md`, relevant authored skill scripts/assets with invocations, and every source directive under `directives/`.
 3. Find actual companion command invocations, including multiline examples, require a literal `-m` or `--minver`, and compare its major/minor to the package version. Recognize both spellings independent of leading or trailing placement; use trailing `-m` in newly authored examples. Include detection fixtures for both spellings and placements.
 4. Check that each invoking skill/directive is declared as tool-dependent in Agentic.Check and that required consumers are not missing declarations.
-5. Make the test non-vacuous: assert the prompt-log directive contains the expected encode/show/check invocations. Use synthetic skill fixtures to test discovery until real skills invoke the tool.
+5. Make the test non-vacuous: assert the prompt-log directive contains the expected wrap/show/check invocations. Use synthetic skill fixtures to test discovery until real skills invoke the tool.
 6. Do not apply this test to installed historical copies in `.agents`, unrelated documentation quoting old versions, or intentional negative test fixtures. Do not hide invalid authored invocations behind broad exclusions.
 
 Use a narrow, documented invocation convention and fixtures covering detection rather than pretending to parse every possible shell program. No version metadata is introduced by this test.
@@ -323,7 +329,7 @@ Read and use `.agents/skills/cli-e2e-testing/SKILL.md` for terminal tests. Use H
 
 - Create `tests/Agentic.LiveTests` if a separate companion test project makes ownership clearer; follow existing test patterns.
 - Run the real packaged companion via `dotnet agentic` from a local manifest, including from child folders.
-- Record help, encode accumulation, history show/check, invalid arguments, and incompatibility/error output. Test generated files and exit codes as well as terminal text.
+- Record help, complete raw-log preparation from file and stdin, stdout output, raw and historical history show/check, invalid arguments, and incompatibility/error output. Test generated files and exit codes as well as terminal text. Add a shell-independent real-process stdin/stdout round trip using a large Unicode body, literal delimiters and escape prefixes, a fixture Git commit from captured output, exact displayed body and commit metadata, and no per-entry files.
 - Extend Agentic.Check terminal tests to cover prerequisite selection, cancellation/deselection, dry-run, installation failure, and version-validation failure without dependent mutations.
 - Use a temporary `nuget.config` and local package directory with uniquely versioned package fixtures. Exercise actual SDK floating resolution, install, update, downgrade, restore, and exact manifest verification.
 - Test stable `2.*` and preview `2.*-*` resolution with stable/prerelease fixture versions; verify the runtime trailing `-m 2.3` behavior independently of installation channel and retain coverage of the `--minver` alias.
@@ -335,7 +341,7 @@ Read and use `.agents/skills/cli-e2e-testing/SKILL.md` for terminal tests. Use H
 ## Implementation sequence
 
 1. Read active repo instructions, relevant files, and testing skill. Inspect the worktree. Do not disturb unrelated changes.
-2. Add companion packaging, CLI, compatibility context, encoder/parser, and read-only Git commands with focused tests.
+2. Add companion packaging, CLI, compatibility context, wrapper/parser, and read-only Git commands with focused tests.
 3. Add the single companion prerequisite node to the existing dependency selection model, including directive dependencies. Implement its specific local-tool installer and known source-project version reader with testable command/source boundaries; follow the architectural limits above.
 4. Integrate planning, prerequisite-first execution, reporting, dry-run, and existing update/repair paths in Agentic.Check.
 5. Replace source directive helpers, add dependency declaration and source consistency tests, and update docs/help and package versions.
@@ -376,7 +382,7 @@ Use isolated fixture packs during integration tests without altering the committ
 ## Completion criteria
 
 - The three documented companion commands work, and production Git usage is read-only.
-- Encode produces a complete appendable block; no commit-message formatter or Git writer was added.
+- Wrap frames one complete raw log with reversible escaping and explicit format identification, default stdout, and atomic file replacement. Historical readers are isolated for later removal. No per-entry protocol, commit-message formatter, or Git writer was added.
 - Every authored consumer invocation has the package's major/minor through `-m` or `--minver`, enforced by tests. Newly authored examples use trailing `-m`; both spellings and leading/trailing placement work.
 - An offline working-tree contract test fails if the source project is missing, renamed/moved without updating the production GitHub path, or no longer contains a version readable by the production parser.
 - Agentic.Check reuses dependency selection, fetches one source project version, delegates package resolution to the SDK, and verifies the exact manifest version before dependent mutations.

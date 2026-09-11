@@ -1,4 +1,4 @@
-﻿namespace Agentic.Check.Tests;
+namespace Agentic.Check.Tests;
 
 public sealed class WorkflowTests
 {
@@ -204,7 +204,7 @@ public sealed class WorkflowTests
         {
             OnRun = call =>
             {
-                if (call.Arguments.Contains("install"))
+                if (call.FileName == "gh" && call.Arguments.Contains("install"))
                 {
                     tempDirectory.Write(
                         ".agents/skills/dotnet-webapi/SKILL.md",
@@ -873,7 +873,7 @@ public sealed class WorkflowTests
         string agents = await File.ReadAllTextAsync(Path.Combine(tempDirectory.Path, "AGENTS.md"), CancellationToken.None);
         Assert.Contains("dotnet-agentic-engineering:foundation-prompt-log:start", agents, StringComparison.Ordinal);
         Assert.DoesNotContain("dotnet-agentic-engineering:dotnet-cli-run:start", agents, StringComparison.Ordinal);
-        Assert.Contains("1 action selected", reporter.InfoMessages);
+        Assert.Contains("2 actions selected", reporter.InfoMessages);
         Assert.Contains(ActionOutputFormatter.FormatHeader(), reporter.BoldMessages);
         Assert.Contains(ActionOutputFormatter.FormatLine("Installed directive", "foundation-prompt-log"), reporter.Successes);
     }
@@ -983,7 +983,7 @@ public sealed class WorkflowTests
         {
             OnRun = call =>
             {
-                if (call.Arguments.Contains("install"))
+                if (call.FileName == "gh" && call.Arguments.Contains("install"))
                 {
                     tempDirectory.Write(".claude/skills/dotnet-modern-csharp-editorconfig/SKILL.md", "# Installed");
                 }
@@ -1009,7 +1009,7 @@ public sealed class WorkflowTests
             CancellationToken.None);
 
         Assert.Equal(0, result.ExitCode);
-        _ = Assert.Single(commandRunner.Calls, call => call.Arguments.Contains("install"));
+        _ = Assert.Single(commandRunner.Calls, call => call.FileName == "gh" && call.Arguments.Contains("install"));
         Assert.True(File.Exists(Path.Combine(tempDirectory.Path, ".agents", "skills", "dotnet-modern-csharp-editorconfig", "SKILL.md")));
         Assert.Contains(ActionOutputFormatter.ProgressIndent, reporter.ProgressDescriptions);
         Assert.DoesNotContain("Installing skills", reporter.ProgressDescriptions);

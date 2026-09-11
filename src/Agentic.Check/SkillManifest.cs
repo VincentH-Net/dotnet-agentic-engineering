@@ -1,4 +1,4 @@
-﻿namespace Agentic.Check;
+namespace Agentic.Check;
 
 sealed record SkillManifestEntry
 {
@@ -47,6 +47,12 @@ sealed record SkillManifestEntry
     public string Version { get; init; }
 
     public string SourceRef { get; init; }
+
+    public SourceVersionInfo? ResolvedSource { get; init; }
+
+    public string ResolvedSourceRef => ResolvedSource?.ContentRef ?? string.Empty;
+
+    public bool IsCompanion => Key == CompanionDependency.Identity.Key;
 
     public string RecommendationAction { get; init; }
 

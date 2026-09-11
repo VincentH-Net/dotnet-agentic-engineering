@@ -12,8 +12,10 @@ interface ISourceVersionResolver
         CancellationToken cancellationToken);
 }
 
-sealed record SourceVersionInfo(string SourceRepo, string Ref, DateTimeOffset LastChangedAtUtc)
+sealed record SourceVersionInfo(string SourceRepo, string Ref, DateTimeOffset LastChangedAtUtc, string CommitSha = "")
 {
+    public string ContentRef => string.IsNullOrWhiteSpace(CommitSha) ? Ref : CommitSha;
+
     public string Display
         => LastChangedAtUtc == DateTimeOffset.MinValue
             ? Ref
@@ -168,7 +170,8 @@ sealed class GitHubSourceVersionResolver(HttpClient? httpClient = null, IReporte
             throw new DirectiveException($"Default branch metadata from {branchUrl} is missing a valid commit date.");
         }
 
-        return new SourceVersionInfo(sourceRepo, defaultBranch, lastChangedAtUtc.ToUniversalTime());
+        return new SourceVersionInfo(sourceRepo, defaultBranch, lastChangedAtUtc.ToUniversalTime(),
+            branchDocument.RootElement.GetProperty("commit").TryGetProperty("sha", out var sha) ? sha.GetString() ?? string.Empty : string.Empty);
     }
 
     async Task<string?> GetOptionalStringAsync(

@@ -1,4 +1,4 @@
-﻿namespace Agentic.Check.Tests;
+namespace Agentic.Check.Tests;
 
 sealed class TempDirectory : IDisposable
 {
@@ -56,6 +56,11 @@ sealed class FakeCommandRunner : ICommandRunner
         CommandCall call = new(fileName, [.. arguments], workingDirectory);
         Calls.Add(call);
         OnRun?.Invoke(call);
+        if (fileName == "dotnet" && arguments[0] == "tool")
+        {
+            return Task.FromResult(CompanionTestCommands.Succeed(arguments, workingDirectory));
+        }
+
         return results.Count == 0
             ? throw new InvalidOperationException($"No fake command result queued for {fileName} {string.Join(' ', arguments)}.")
             : Task.FromResult(results.Dequeue());
@@ -81,6 +86,11 @@ sealed class MappedCommandRunner : ICommandRunner
     {
         cancellationToken.ThrowIfCancellationRequested();
         Calls.Add(new CommandCall(fileName, [.. arguments], workingDirectory));
+        if (fileName == "dotnet" && arguments[0] == "tool" && !results.ContainsKey(CreateKey(fileName, arguments)))
+        {
+            return Task.FromResult(CompanionTestCommands.Succeed(arguments, workingDirectory));
+        }
+
         return Task.FromResult(results.GetValueOrDefault(
             CreateKey(fileName, arguments),
             new CommandResult(127, string.Empty, "command not found")));
@@ -228,6 +238,10 @@ sealed class RecordingReporter : IReporter
 
 sealed class FakeDirectiveSource : IDirectiveSource
 {
+    public int ProjectFetches { get; private set; }
+
+    public string ProjectContent { get; init; } = "<Project><Version>2.3.0</Version></Project>";
+
     readonly IReadOnlyList<DirectiveSourceFile> files;
     readonly Dictionary<string, string> contents;
 
@@ -236,7 +250,7 @@ sealed class FakeDirectiveSource : IDirectiveSource
         contents = directiveContents is null
             ? new Dictionary<string, string>(DefaultDirectiveContents(), StringComparer.Ordinal)
             : new Dictionary<string, string>(directiveContents, StringComparer.Ordinal);
-        files = [.. contents.Keys.Select(name => new DirectiveSourceFile(name, $"https://example.test/{name}"))];
+        files = [.. contents.Keys.Select(name => new DirectiveSourceFile(name, $"https://example.test/{name}", SourceRef: "fixture-ref"))];
     }
 
     public Task<IReadOnlyList<DirectiveSourceFile>> ListAsync(CancellationToken cancellationToken)
@@ -248,6 +262,12 @@ sealed class FakeDirectiveSource : IDirectiveSource
     public Task<string> FetchAsync(DirectiveSourceFile sourceFile, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (sourceFile.FileName == CompanionSourceVersionReader.ProjectPath)
+        {
+            ProjectFetches++;
+            return Task.FromResult(ProjectContent);
+        }
+
         return contents.TryGetValue(sourceFile.FileName, out string? content)
             ? Task.FromResult(content)
             : throw new InvalidOperationException($"Missing fake directive content for {sourceFile.FileName}.");
@@ -301,5 +321,25 @@ sealed class FakeSourceVersionResolver : ISourceVersionResolver
         }
 
         return Task.FromResult((IReadOnlyDictionary<string, SourceVersionInfo>)result);
+    }
+}
+
+static class CompanionTestCommands
+{
+    internal static CommandResult Succeed(IReadOnlyList<string> arguments, string target)
+    {
+        if (arguments[1] is "install" or "update")
+        {
+            string manifest = CompanionInstaller.ManifestPath(target);
+            var json = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(manifest))!;
+            json["tools"]!["innowvate.agentic"] = new System.Text.Json.Nodes.JsonObject
+            {
+                ["version"] = "2.3.0",
+                ["commands"] = new System.Text.Json.Nodes.JsonArray("agentic")
+            };
+            File.WriteAllText(manifest, json.ToJsonString());
+        }
+
+        return new(0, arguments[1] == "run" ? "2.3.0" : string.Empty, string.Empty);
     }
 }

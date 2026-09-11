@@ -44,8 +44,11 @@ sealed class ProcessCommandRunner : ICommandRunner
         {
             _ = process.Start();
             started = true;
-            string standardOutput = await process.StandardOutput.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
-            string standardError = await process.StandardError.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
+            var outputTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+            var errorTask = process.StandardError.ReadToEndAsync(cancellationToken);
+            _ = await Task.WhenAll(outputTask, errorTask).ConfigureAwait(false);
+            string standardOutput = await outputTask.ConfigureAwait(false);
+            string standardError = await errorTask.ConfigureAwait(false);
             await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
             return new CommandResult(process.ExitCode, standardOutput, standardError);
         }
