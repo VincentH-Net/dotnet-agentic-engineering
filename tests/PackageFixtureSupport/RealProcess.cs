@@ -75,6 +75,8 @@ sealed class FixtureWorkspace : IDisposable
             ["HOME"] = Path.Combine(Root, "home"), ["USERPROFILE"] = Path.Combine(Root, "home"),
             ["XDG_CONFIG_HOME"] = Path.Combine(Root, "config"), ["XDG_CACHE_HOME"] = Path.Combine(Root, "cache"),
             ["GH_CONFIG_DIR"] = Path.Combine(Root, "gh"), ["GH_HOST"] = "github.com", ["GH_PROMPT_DISABLED"] = "1", ["GH_PAGER"] = "cat",
+            // gh telemetry can write its device ID after the command exits, racing workspace cleanup.
+            ["GH_TELEMETRY"] = "0",
             ["NUGET_PACKAGES"] = Path.Combine(Root, "packages"), ["NUGET_HTTP_CACHE_PATH"] = Path.Combine(Root, "nuget-http"),
             ["DOTNET_CLI_HOME"] = Path.Combine(Root, "cli"), ["DOTNET_NOLOGO"] = "1", ["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1",
             ["DOTNET_SKIP_FIRST_TIME_EXPERIENCE"] = "1", ["GIT_CONFIG_GLOBAL"] = Path.Combine(Root, "gitconfig"),

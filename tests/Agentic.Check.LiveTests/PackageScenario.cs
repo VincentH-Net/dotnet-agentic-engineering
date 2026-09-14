@@ -160,6 +160,7 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
         bool hasActions = dryReport.GetProperty("directiveSummary").GetProperty("missingCount").GetInt32() > 0
             || dryReport.GetProperty("directiveSummary").GetProperty("outdatedCount").GetInt32() > 0
             || dryReport.GetProperty("missingSkills").GetArrayLength() > 0 || preview
+            || dryReport.GetProperty("actions").EnumerateArray().Any(action => action.GetString()!.StartsWith("Would install ", StringComparison.Ordinal))
             || (dryReport.TryGetProperty("companion", out var companion) && companion.ValueKind == JsonValueKind.Object);
         if (hasActions)
         {

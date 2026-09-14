@@ -31,6 +31,8 @@ Use .NET 10 and a supported real `gh skill` CLI (this capture was developed agai
 `GH_TOKEN`/`GITHUB_TOKEN` may supply authentication. Otherwise the helper reads the existing
 `gh auth token` into memory and passes it only to child processes. It never logs or stores
 that token. Git/global agent directories, CLI home, NuGet caches, and configuration are isolated.
+Fixture child processes disable gh telemetry (`GH_TELEMETRY=0`) to prevent delayed telemetry
+writes racing disposal of the temporary home directory.
 
 From the checkout, in the foreground:
 
