@@ -29,8 +29,6 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
     internal bool HasSkillUpdates => dryReport.GetProperty("outdatedSkills").GetInt32() > 0;
     internal string SourceDescription => $"{fixtureName}/{scenario}: " + string.Join(", ", sources.Values.Select(source => $"{source.Repository}@{source.Reference} ({source.Commit})"));
 
-    internal static readonly string[] UnrelatedCommands = ["agentic-check"];
-
     internal async Task PrepareAsync()
     {
         if (scenario == "fresh")
@@ -350,8 +348,9 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
         _ = Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         var manifest = File.Exists(path) ? System.Text.Json.Nodes.JsonNode.Parse(await File.ReadAllTextAsync(path).ConfigureAwait(false))!
             : System.Text.Json.Nodes.JsonNode.Parse("""{"version":1,"isRoot":false,"tools":{}}""")!;
-        manifest["tools"]!["agentic.check"] = JsonSerializer.SerializeToNode(new { version = check.Version, commands = UnrelatedCommands });
         await File.WriteAllTextAsync(path, manifest.ToJsonString(FixtureFiles.JsonOptions)).ConfigureAwait(false);
+        string action = manifest["tools"]!["agentic.check"] is null ? "install" : "update";
+        _ = await workspace.Process.SuccessAsync("dotnet", ["tool", action, check.Id, "--local", "--tool-manifest", path, "--version", check.Version, "--allow-downgrade"], workspace.Target).ConfigureAwait(false);
     }
 
     internal static Task CompanionRoundTripAsync(FixtureWorkspace workspace, PackageArtifact companion)
