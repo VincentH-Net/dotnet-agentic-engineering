@@ -1,3 +1,5 @@
+Exact supplied-package installation/migration verification is documented in [the fixture suite](../fixtures/README.md).
+
 # Skill maintenance
 
 These opt-in tests inspect source repositories without installing skills or modifying manifests or review baselines. They require a recent GitHub CLI with `gh skill preview`, plus GitHub authentication (`gh auth login`, or `GH_TOKEN` in CI). This requirement applies to maintenance tests only, not to agentic-check users.

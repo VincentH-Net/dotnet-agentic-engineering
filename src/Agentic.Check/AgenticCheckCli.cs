@@ -11,6 +11,7 @@ static class AgenticCheckCli
         "--skills-dir",
         "--dry-run",
         "--preview",
+        "--preview-source-ref",
         "--yes",
         "--report",
         "--verbose",
@@ -24,7 +25,8 @@ static class AgenticCheckCli
     {
         "--agents",
         "--skills-dir",
-        "--report"
+        "--report",
+        "--preview-source-ref"
     };
 
     internal static async Task<int> InvokeAsync(string[] args)
@@ -64,6 +66,16 @@ static class AgenticCheckCli
         {
             Description = "Apply all recommended actions."
         };
+        Option<string?> previewSourceRefOption = new("--preview-source-ref")
+        {
+            Hidden = true,
+            Arity = ArgumentArity.ExactlyOne
+        };
+        previewSourceRefOption.Validators.Add(result =>
+        {
+            if (!GitHubSourceVersionResolver.IsValidPreviewRef(result.GetValueOrDefault<string?>()))
+                result.AddError("--preview-source-ref requires a valid branch reference or commit SHA.");
+        });
         Option<FileInfo?> reportOption = new("--report")
         {
             Description = "Write a JSON report to this path."
@@ -144,6 +156,7 @@ static class AgenticCheckCli
         rootCommand.Options.Add(skillsDirectoryOption);
         rootCommand.Options.Add(dryRunOption);
         rootCommand.Options.Add(previewOption);
+        rootCommand.Options.Add(previewSourceRefOption);
         rootCommand.Options.Add(yesOption);
         rootCommand.Options.Add(reportOption);
         rootCommand.Options.Add(verboseOption);
@@ -184,7 +197,8 @@ static class AgenticCheckCli
                         skillsDirectory,
                         effectiveAgents,
                         verbose,
-                        preview);
+                        preview,
+                        parseResult.GetValue(previewSourceRefOption));
 
                     var workflow = new CheckWorkflow(
                         new ProcessCommandRunner(),

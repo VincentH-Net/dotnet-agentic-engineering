@@ -1,0 +1,9 @@
+{
+  "name": "foundation-only",
+  "agents": "codex",
+  "baselinePreview": false,
+  "technologies": [
+    "foundation"
+  ],
+  "gates": {}
+}

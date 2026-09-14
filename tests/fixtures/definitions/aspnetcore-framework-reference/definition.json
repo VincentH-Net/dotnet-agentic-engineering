@@ -1,0 +1,11 @@
+{
+  "name": "aspnetcore-framework-reference",
+  "agents": "codex",
+  "baselinePreview": false,
+  "technologies": [
+    "foundation",
+    "dotnet",
+    "aspnetcore"
+  ],
+  "gates": {}
+}

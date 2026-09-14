@@ -1,0 +1,4 @@
+{
+  "README.md": "# uno-mvvm-csharp2-fluent\n\nParseable detector inputs; these projects are not built or restored.\n",
+  "Uno.csproj": "<Project Sdk=\"Uno.Sdk/6.3.0\"><PropertyGroup><TargetFramework>net10.0</TargetFramework><UnoFeatures>MVVM</UnoFeatures></PropertyGroup><ItemGroup><PackageReference Include=\"CSharpMarkup.WinUI\" Version=\"2.0.0\" /></ItemGroup></Project>\n"
+}

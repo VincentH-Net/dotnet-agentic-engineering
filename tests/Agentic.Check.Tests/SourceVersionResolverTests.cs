@@ -12,12 +12,14 @@ public sealed class SourceVersionResolverTests
             System.Net.HttpStatusCode.NotFound);
         handler.SetJson(
             "https://api.github.com/repos/owner/repo",
-            """
+            /*lang=json,strict*/
+                                 """
             { "default_branch": "main" }
             """);
         handler.SetJson(
             "https://api.github.com/repos/owner/repo/branches/main",
-            """
+            /*lang=json,strict*/
+                                 """
             { "commit": { "commit": { "committer": { "date": "2026-06-30T09:12:00Z" } } } }
             """);
         using HttpClient httpClient = new(handler, disposeHandler: false);
@@ -36,6 +38,114 @@ public sealed class SourceVersionResolverTests
         Assert.Equal(
             1,
             handler.Requests.Count(request => request == "https://api.github.com/repos/owner/repo/branches/main"));
+    }
+
+    [Theory]
+    [InlineData("feature/package-fixtures", true)]
+    [InlineData("0123456789abcdef0123456789abcdef01234567", true)]
+    [InlineData("", false)]
+    [InlineData(" ", false)]
+    [InlineData("../main", false)]
+    [InlineData("main?ref=other", false)]
+    [InlineData("refs//heads/main", false)]
+    [InlineData("feature/.hidden", false)]
+    [InlineData("feature/branch.lock", false)]
+    public void ExplicitRefValidation(string reference, bool expected)
+        => Assert.Equal(expected, GitHubSourceVersionResolver.IsValidPreviewRef(reference));
+
+    [Fact]
+    public async Task ExplicitPreviewResolvesOnceAndLeavesExternalSelectionAlone()
+    {
+        using TempDirectory temp = new();
+        using RecordingHttpMessageHandler handler = new();
+        const string sha = "0123456789abcdef0123456789abcdef01234567";
+        const string url = "https://api.github.com/repos/VincentH-Net/dotnet-agentic-engineering/branches/feature%2Ffixtures";
+        handler.SetJson(url, $$"""{ "commit": { "sha": "{{sha}}", "commit": { "committer": { "date": "2026-09-14T12:00:00Z" } } } }""");
+        handler.SetJson("https://api.github.com/repos/external/skills", /*lang=json,strict*/ """{ "default_branch": "main" }""");
+        handler.SetJson("https://api.github.com/repos/external/skills/branches/main", /*lang=json,strict*/ """{ "commit": { "sha": "external-sha", "commit": { "committer": { "date": "2026-09-13T12:00:00Z" } } } }""");
+        using HttpClient client = new(handler);
+        GitHubSourceVersionResolver resolver = new(client, previewSourceRef: "feature/fixtures");
+        var versions = await resolver.ResolveVersionsAsync([CompanionDependency.SourceRepo, "external/skills", CompanionDependency.SourceRepo], SourceVersionMode.Preview, new(0, temp.CreateDirectory("cache"), []), CancellationToken.None);
+        Assert.Equal(sha, versions[CompanionDependency.SourceRepo].ContentRef);
+        Assert.Equal("feature/fixtures", versions[CompanionDependency.SourceRepo].Ref);
+        Assert.Equal("external-sha", versions["external/skills"].ContentRef);
+        _ = Assert.Single(handler.Requests, request => request == url);
+        Assert.DoesNotContain(handler.Requests, request => request.Contains("releases", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("0123456789abcdef0123456789abcdef01234567")]
+    public async Task ExplicitUnavailableRefNeverFallsBack(string reference)
+    {
+        ArgumentNullException.ThrowIfNull(reference);
+        using TempDirectory temp = new();
+        using RecordingHttpMessageHandler handler = new();
+        handler.SetStatus($"https://api.github.com/repos/{CompanionDependency.SourceRepo}/{(reference.Length == 40 ? "commits" : "branches")}/{reference}", System.Net.HttpStatusCode.NotFound);
+        using HttpClient client = new(handler);
+        GitHubSourceVersionResolver resolver = new(client, previewSourceRef: reference);
+        var exception = await Assert.ThrowsAsync<DirectiveException>(() => resolver.ResolveVersionsAsync([CompanionDependency.SourceRepo], SourceVersionMode.Preview, new(0, temp.CreateDirectory("cache"), []), CancellationToken.None));
+        Assert.Contains("--preview-source-ref", exception.Message, StringComparison.Ordinal);
+        _ = Assert.Single(handler.Requests);
+    }
+
+    [Fact]
+    public async Task StableOverrideFailsBeforeProcessesOrWrites()
+    {
+        using TempDirectory temp = new();
+        FakeCommandRunner runner = new();
+        CheckWorkflow workflow = new(runner, new FakePrompts(), new NullReporter());
+        var result = await workflow.RunAsync(new(temp.Path, false, true, null, null, "codex", false, PreviewSourceRef: "feature/fixtures"), CancellationToken.None);
+        Assert.Equal(2, result.ExitCode);
+        Assert.Empty(runner.Calls);
+        Assert.False(Directory.Exists(temp.Path));
+        Assert.Null(AgenticCheckCli.FindUnknownOption(["--preview", "--preview-source-ref", "feature/fixtures"]));
+        Assert.Null(AgenticCheckCli.FindUnknownOption(["--preview-source-ref=feature/fixtures"]));
+    }
+
+    [Fact]
+    public async Task ExplicitShaIsSharedByDirectiveListingContentAndPrerequisiteReader()
+    {
+        using TempDirectory temp = new();
+        using RecordingHttpMessageHandler handler = new();
+        const string sha = "0123456789abcdef0123456789abcdef01234567";
+        string commitUrl = $"https://api.github.com/repos/{CompanionDependency.SourceRepo}/commits/{sha}";
+        handler.SetJson(commitUrl, $$"""{ "sha": "{{sha}}", "commit": { "committer": { "date": "2026-09-14T12:00:00Z" } } }""");
+        string listing = DirectiveInstallerUrl.Listing(sha);
+        string directive = $"https://raw.githubusercontent.com/{CompanionDependency.SourceRepo}/{sha}/directives/foundation-prompt-log.md";
+        string project = $"https://raw.githubusercontent.com/{CompanionDependency.SourceRepo}/{sha}/src/Agentic/Agentic.csproj";
+        handler.SetJson(listing, $$"""[{"name":"foundation-prompt-log.md","type":"file","download_url":"{{directive}}"}]""");
+        handler.SetJson(directive, "fixture directive");
+        handler.SetJson(project, "<Project><PropertyGroup><Version>2.3.0</Version></PropertyGroup></Project>");
+        using HttpClient client = new(handler);
+        DirectiveCacheSettings cache = new(0, temp.CreateDirectory("cache"), []);
+        GitHubSourceVersionResolver resolver = new(client, previewSourceRef: sha);
+        var versions = await resolver.ResolveVersionsAsync([CompanionDependency.SourceRepo], SourceVersionMode.Preview, cache, CancellationToken.None);
+        var selected = versions[CompanionDependency.SourceRepo];
+        GitHubDirectiveSource source = new(client, cache, sourceVersionMode: SourceVersionMode.Preview, resolvedVersion: selected);
+        var files = await source.ListAsync(CancellationToken.None);
+        var file = Assert.Single(files);
+        Assert.Equal(sha, file.SourceRef);
+        Assert.Equal("fixture directive", await source.FetchAsync(file, CancellationToken.None));
+        CompanionSourceVersionReader reader = new(source);
+        Assert.Equal("2.3", (await reader.ReadAsync(file.SourceRef, CancellationToken.None)).Minimum);
+        Assert.Equal(new[] { commitUrl, listing, directive, project }, handler.Requests);
+    }
+
+    [Theory]
+    [InlineData("{invalid-json")]
+    [InlineData("{\"sha\":\"bad\"}")]
+    [InlineData("{\"sha\":\"ffffffffffffffffffffffffffffffffffffffff\",\"commit\":{\"committer\":{\"date\":\"2026-09-14T12:00:00Z\"}}}")]
+    public async Task InvalidExplicitCommitMetadataNeverFallsBack(string response)
+    {
+        using TempDirectory temp = new();
+        using RecordingHttpMessageHandler handler = new();
+        const string sha = "0123456789abcdef0123456789abcdef01234567";
+        handler.SetJson($"https://api.github.com/repos/{CompanionDependency.SourceRepo}/commits/{sha}", response);
+        using HttpClient client = new(handler);
+        GitHubSourceVersionResolver resolver = new(client, previewSourceRef: sha);
+        _ = await Assert.ThrowsAsync<DirectiveException>(() => resolver.ResolveVersionsAsync([CompanionDependency.SourceRepo], SourceVersionMode.Preview, new(0, temp.CreateDirectory("cache"), []), CancellationToken.None));
+        _ = Assert.Single(handler.Requests);
     }
 
     sealed class RecordingHttpMessageHandler : HttpMessageHandler

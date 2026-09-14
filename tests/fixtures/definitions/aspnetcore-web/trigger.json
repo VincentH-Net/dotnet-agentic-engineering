@@ -1,0 +1,4 @@
+{
+  "README.md": "# aspnetcore-web\n\nParseable detector inputs; these projects are not built or restored.\n",
+  "Web.csproj": "<Project Sdk=\"Microsoft.NET.Sdk.Web\"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>\n"
+}

@@ -1,3 +1,5 @@
+Exact supplied-package installation/migration verification is documented in [the fixture suite](../fixtures/README.md).
+
 # Companion package and terminal tests
 
 Run `dotnet test tests/Agentic.LiveTests/Agentic.LiveTests.csproj` from the checkout.

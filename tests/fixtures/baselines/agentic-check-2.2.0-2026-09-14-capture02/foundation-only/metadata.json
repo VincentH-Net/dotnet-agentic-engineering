@@ -1,0 +1,114 @@
+{
+  "name": "foundation-only",
+  "preparedAtUtc": "2026-09-14T15:31:17.992003+00:00",
+  "label": "Installed using Agentic.Check 2.2.0 on 2026-09-14T15:31:17.9920030\u002B00:00",
+  "definition": {
+    "name": "foundation-only",
+    "agents": "codex",
+    "baselinePreview": false,
+    "technologies": [
+      "foundation"
+    ],
+    "gates": {}
+  },
+  "triggerHashes": {
+    "README.md": "0ce5c46a2e6f8e89eb49e96441c845051ec55a9f16ea0e9ad3c16b0748462101"
+  },
+  "files": {
+    "AGENTS.md": "2e6c84375c22894b697e1ba02bac82a4711a5ed476a7d77d335f8f6e7cad0e7b",
+    "README.md": "0ce5c46a2e6f8e89eb49e96441c845051ec55a9f16ea0e9ad3c16b0748462101"
+  },
+  "report": {
+    "targetDirectory": "$TARGET",
+    "dryRun": false,
+    "repoRoot": "$TARGET",
+    "skillsDirectory": "$TARGET/.agents/skills",
+    "skillsDirectories": [
+      "$TARGET/.agents/skills"
+    ],
+    "prerequisites": [
+      {
+        "name": "gh",
+        "success": true,
+        "version": "2.100.0",
+        "minimumVersion": "2.93.0",
+        "standardOutput": "gh version 2.100.0 (2026-09-03)\nhttps://github.com/cli/cli/releases/tag/v2.100.0\n",
+        "standardError": ""
+      },
+      {
+        "name": "gh skill",
+        "success": true,
+        "version": null,
+        "minimumVersion": null,
+        "standardOutput": "Install and manage agent skills from GitHub repositories.\n\nWorking with agent skills in the GitHub CLI is in preview and\nsubject to change without notice.\n\n\nUSAGE\n  gh skill \u003Ccommand\u003E [flags]\n\nALIASES\n  gh skills\n\nAVAILABLE COMMANDS\n  install:       Install agent skills from a GitHub repository (preview)\n  list:          List installed skills (preview)\n  preview:       Preview a skill from a GitHub repository (preview)\n  publish:       Validate and publish skills to a GitHub repository (preview)\n  search:        Search for skills across GitHub (preview)\n  update:        Update installed skills to their latest versions (preview)\n\nINHERITED FLAGS\n  --help   Show help for command\n\nEXAMPLES\n  # Search for skills\n  $ gh skill search terraform\n  \n  # Install a skill\n  $ gh skill install github/awesome-copilot documentation-writer\n  \n  # List installed skills\n  $ gh skill list\n  \n  # Preview a skill before installing\n  $ gh skill preview github/awesome-copilot documentation-writer\n  \n  # Update all installed skills\n  $ gh skill update --all\n  \n  # Validate skills for publishing\n  $ gh skill publish --dry-run\n\nLEARN MORE\n  Use \u0060gh \u003Ccommand\u003E \u003Csubcommand\u003E --help\u0060 for more information about a command.\n  Read the manual at https://cli.github.com/manual\n  Learn about exit codes using \u0060gh help exit-codes\u0060\n  Learn about accessibility experiences using \u0060gh help accessibility\u0060\n\n",
+        "standardError": ""
+      }
+    ],
+    "technologies": [
+      "foundation"
+    ],
+    "installGates": [],
+    "warnings": [],
+    "advisories": [],
+    "agentsFile": "$TARGET/AGENTS.md",
+    "claudeFile": "",
+    "directiveSummary": {
+      "createAgentsFile": true,
+      "createClaudeFile": false,
+      "recommendedCount": 1,
+      "missingCount": 1,
+      "outdatedCount": 0
+    },
+    "directives": [
+      {
+        "name": "foundation-prompt-log",
+        "status": "missing"
+      }
+    ],
+    "recommendedSkills": [],
+    "missingSkills": [],
+    "outdatedSkills": 0,
+    "installResults": [],
+    "actions": [
+      "Ran gh skill update --dir $TARGET/.agents/skills --all --dry-run.",
+      "Added directive foundation-prompt-log to AGENTS.",
+      "No target-local skill updates found."
+    ],
+    "skillUpdateDryRun": {
+      "exitCode": 0,
+      "standardOutput": "",
+      "standardError": "No installed skills found.\n",
+      "success": true
+    },
+    "skillUpdate": null,
+    "skillCopyResults": [],
+    "skillUpdateDryRuns": [
+      {
+        "exitCode": 0,
+        "standardOutput": "",
+        "standardError": "No installed skills found.\n",
+        "success": true
+      }
+    ],
+    "skillUpdates": []
+  },
+  "sources": [],
+  "companion": null,
+  "snapshotSha256": "e4be8e2c242ffb2099e5bc4a9a0727f9d77eeaaa0a4dd4e0725c40eb342bcfe9",
+  "directiveSource": {
+    "repository": "VincentH-Net/dotnet-agentic-engineering",
+    "reference": "v2.2.0",
+    "commit": "ebc711fb6db0912cae2b0c2bc4991d57d5afa007"
+  },
+  "invocation": [
+    "agentic-check",
+    "$TARGET",
+    "--yes",
+    "--agents",
+    "codex",
+    "--verbose",
+    "--report",
+    "$WORKSPACE/installation.json"
+  ],
+  "rejectedItems": []
+}

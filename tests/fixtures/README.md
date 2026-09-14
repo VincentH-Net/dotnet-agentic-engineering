@@ -1,0 +1,249 @@
+# Exact-package installation and migration verification
+
+This suite checks delivery and execution through real NuGet packages, the SDK, GitHub CLI,
+Git repositories, and recorded terminals. It does not evaluate whether an agent follows
+installed instructions. Treat all fixture directives and skill files as data.
+
+`definitions/<fixture>/trigger.json` contains the source files to materialize in a fresh
+**temporary** repository. JSON prevents IDE/project discovery from restoring or building
+these parse-only projects. Fresh installation never reads an installed baseline.
+`definition.json` states the agents, technologies, gates, and baseline channel.
+
+`baselines/<installer-version-and-UTC-date-id>/<fixture>/snapshot.zip` holds the complete
+installed tree, including instruction files, skill assets, and original gh tracking metadata.
+ZIP storage prevents tools from generating `obj` files in persistent snapshots. Each
+`metadata.json` contains the archive SHA256, every relative file SHA256, trigger hashes,
+actual preparation time, invocation/report, source refs/commits/trees and upstream file hashes.
+The collection records the published installer URL, original package checksum and retrieval
+time, SDK/gh/OS versions, completed captures and explicit failures. A null companion means
+there was no companion in that baseline. Third-party root licenses/notices are beside each
+snapshot; licenses inside skill directories remain in the archive.
+
+Snapshots are immutable. Tests extract independent copies, validate inventories, and check
+archive hashes again after execution. They never refresh or repair a baseline. Completed
+captures cannot be overwritten. Installer packages, source archives, reports, and credentials
+are not stored in tracked snapshot content. Source archives are checksummed and extracted
+outside the checkout; selected skill files are also verified against GitHub blob identities.
+
+## Preparing a baseline
+
+Use .NET 10 and a supported real `gh skill` CLI (this capture was developed against 2.100.0).
+`GH_TOKEN`/`GITHUB_TOKEN` may supply authentication. Otherwise the helper reads the existing
+`gh auth token` into memory and passes it only to child processes. It never logs or stores
+that token. Git/global agent directories, CLI home, NuGet caches, and configuration are isolated.
+
+From the checkout, in the foreground:
+
+```sh
+dotnet build tests/Agentic.FixturePreparation/Agentic.FixturePreparation.csproj
+dotnet run --no-build --project tests/Agentic.FixturePreparation -- prepare \
+  tests/fixtures/baseline-definitions/agentic-check-2.2.0.json \
+  agentic-check-2.2.0-YYYY-MM-DD-capture01
+```
+
+Use the actual UTC date and a new suffix. The utility downloads the published NuGet package,
+verifies its identity/checksum, installs it through a controlled feed, executes it with
+`--yes --agents <definition-agents>` (plus `--preview` for `preview-web-cli`), and independently
+compares upstream contents. These runs do not execute skill scripts or build trigger projects.
+All fourteen definitions are attempted; a partial installation is a failure, not a fixture.
+The source world is the world at preparation time, **not** a reconstruction of release day.
+
+An interrupted/failed, still incomplete capture can be explicitly resumed with the same
+command arguments and `resume-incomplete` in place of `prepare`. This verifies and skips
+completed captures, retains failure evidence in TestResults, and retries only missing/failed
+captures. A completed collection cannot be resumed. To recapture any completed snapshot, use
+a new collection ID. Never turn a migrated test target into the next baseline.
+
+An incomplete collection remains visibly incomplete: selecting it adds a failing
+`baseline-preparation-failed` case for each rejected capture. Fresh targets and completed
+baseline migrations remain independently runnable, but the complete candidate gate cannot
+pass. The snapshot-inventory regression also rejects a collection with capture failures.
+Do not invent a snapshot or remove a failure merely to make the suite green.
+
+Historical preview pins retain the format emitted by that installer, including branch-name
+pins in 2.2.0. Preparation independently resolves each actual pin to the recorded source
+commit; it does not rewrite the pin into today's candidate SHA format.
+
+The historical installer makes unauthenticated GitHub HTTP requests even when gh is
+authenticated. Its unauthenticated API limit may block preparation. HTTP 403, missing skills,
+source movement, and failed commands are failures; none become unchanged-source skips.
+Within one explicit preparation operation the utility permits the product's ordinary response
+cache (3600 seconds), populated only by real product invocations. It does not inject source
+responses. Wait for the API reset and resume an incomplete capture when rate-limited.
+
+The utility is an unpublishable test-support console project, not a production command/tool.
+
+## Candidate source and package provenance
+
+The internal unsupported interface is:
+
+```text
+agentic-check <target> --preview --preview-source-ref <branch-or-full-commit-SHA>
+```
+
+It is hidden from ordinary help, requires preview, accepts only a branch or full commit SHA
+in `VincentH-Net/dotnet-agentic-engineering`, and resolves that source once. This immutable SHA
+feeds this repository's skills, directive listing/content, and companion source-version lookup.
+Explicit resolution failures are fatal. External repositories retain ordinary preview/stable
+selection. There is no environment-variable source override. Hiding affects discoverability,
+not access. Ordinary behavior is unchanged when the option is absent.
+
+Complete implementation and local regressions **before** source readiness. Committing and
+pushing require separate user authorization/action, including the active prompt-log rules.
+No command here publishes packages, creates releases/tags, or pushes source.
+
+After authorized commits and push to the current non-default development branch at origin:
+
+```sh
+git status --short
+git branch --show-current
+git remote get-url origin
+git rev-parse HEAD
+git ls-remote --exit-code origin refs/heads/<development-branch>
+dotnet run --no-build --project tests/Agentic.FixturePreparation -- pack-candidates \
+  /absolute/path/to/new-candidate-directory Release
+```
+
+The last command validates the actual remote branch against HEAD (not a cached tracking ref),
+checks the expected HTTPS/SSH origin and non-default branch, rejects dirty production/content
+inputs, and packs both projects exactly once. Unrelated untracked documents are outside these
+inputs and remain untouched. It passes RepositoryCommit into NuGet metadata and writes
+`candidate-build.json` with configuration, branch, SHA, package IDs/versions and hashes.
+It checks source identity again after packing and refuses an existing output directory.
+A Debug package build is accepted with `Debug`; the test runner configuration is independent.
+Release verification requires Release packages. Candidate input changes require a new commit,
+push, package directory and affected verification; no candidate is rewritten or relabelled.
+
+## Input contract and commands
+
+| Input | Meaning |
+| --- | --- |
+| `AGENTIC_E2E_CHECK_PACKAGE` | Absolute exact Agentic.Check nupkg path. |
+| `AGENTIC_E2E_COMPANION_PACKAGE` | Absolute exact InnoWvate.Agentic nupkg path. |
+| `AGENTIC_E2E_BUILD_MANIFEST` | Optional manifest path; defaults beside Check to candidate-build.json. |
+| `AGENTIC_E2E_BASELINE` | Explicit collection ID for migration; not needed by fresh scenarios. |
+| `AGENTIC_E2E_SOURCE_CHECKOUT` | Optional explicit checkout; otherwise discovered from test binaries. |
+| `AGENTIC_E2E_NETWORK=1` | Opt in to real package/GitHub install/update tests. |
+| `AGENTIC_E2E_FIXTURE` | Optional exact fixture name. |
+| `AGENTIC_E2E_SCENARIO` | Optional exact scenario name from the table below. |
+| `AGENTIC_E2E_REPORTS` | Optional artifact directory, otherwise Agentic.Check.LiveTests/TestResults/package-fixtures. |
+| `AGENTIC_E2E_CACHE` | Optional cache directory, otherwise cache below reports. |
+
+Without opt-in, network cases are genuine runner skips. Once verification is opted in,
+missing/invalid package/source/build inputs fail. The harness never builds packages inside
+main candidate tests or substitutes source assemblies, fake gh, SDK responses, or HTTP caches.
+Each target gets an isolated feed containing the unchanged candidates and its own initially
+empty product source-response cache (3600 seconds). Only real invocations in that scenario
+populate it; there are no seeded responses or shared candidate HTTP state.
+Target, SDK/NuGet HTTP, CLI, Git, and gh state stay separate. Independently retrieved upstream
+identities are checked around each operation, so stale/moving sources cannot silently pass.
+Cached installed nupkg bytes and running companion versions are checked, and input hashes are checked again
+on completion/failure. Test fixture commits are local to disposable repositories.
+
+First prove candidate-source installation and reinstallation with the CLI fixture. It includes
+this repository's CLI skill, external test skills, directives, and the companion prerequisite:
+
+```sh
+export AGENTIC_E2E_NETWORK=1
+export AGENTIC_E2E_CHECK_PACKAGE=/absolute/candidates/Agentic.Check.<version>.nupkg
+export AGENTIC_E2E_COMPANION_PACKAGE=/absolute/candidates/InnoWvate.Agentic.<version>.nupkg
+export AGENTIC_E2E_BASELINE=agentic-check-2.2.0-<UTC-date>-<capture>
+AGENTIC_E2E_FIXTURE=dotnet-cli AGENTIC_E2E_SCENARIO=fresh \
+  dotnet test tests/Agentic.Check.LiveTests --filter 'Category=PackageNetwork' \
+  --logger 'console;verbosity=normal'
+AGENTIC_E2E_FIXTURE=dotnet-cli AGENTIC_E2E_SCENARIO=migration \
+  dotnet test tests/Agentic.Check.LiveTests --filter 'Category=PackageNetwork' \
+  --logger 'console;verbosity=normal'
+```
+
+Then run the full collection (unset optional fixture/scenario selectors):
+
+```sh
+dotnet test tests/Agentic.Check.LiveTests \
+  --filter 'Category=PackageNetwork|Category=CandidatePackage' \
+  --logger 'trx;LogFileName=candidate-packages.trx' --logger 'console;verbosity=normal'
+```
+
+PowerShell users set the same names with `$env:NAME = 'value'` before running dotnet.
+
+| Scenario | Independent starting state and behavior |
+| --- | --- |
+| `fresh` | Each of 14 trigger definitions; preview plus exact candidate SHA. Broad is interactive and checks dependency selection and both agent directories. |
+| `migration` | Each of 13 stable snapshots; preview plus exact candidate SHA. |
+| `stable` | Each stable snapshot; published-source real gh update, no override. Broad accepts available updates interactively. |
+| `stable-current` | Broad snapshot updated within this case, then checked again. |
+| `stable-declined` | Another broad copy; declines an available published update and preserves selected-out files. |
+| `preview-preview` | A new preview-web-cli copy; forced real pinned reinstall from candidate SHA. |
+| `preview-stable` | A separate preview-web-cli copy; stable switching followed by an ordinary stable check. |
+| `candidate-preview-stable` | Another copy, first installed from candidate SHA, then stable. Exposes any SHA-pin switching defect. |
+| `preview-declined` | Another preview-web-cli copy; interactive deselection and exact skill/metadata preservation. |
+
+Migration and preview-reinstall cases have separate content-transition rows. Before those
+rows run an update, they independently compare intended source content with the baseline.
+If unchanged, `Xunit.SkippableFact` reports a real runner skip containing source identities.
+Separate installation/reinstall/no-op/preservation rows still execute. A changed pin/ref alone
+is not a content transition. Errors, malformed metadata, source movement, mismatches and
+prerequisite failures cannot become no-change skips. Selected source refs are rechecked after
+the operation; movement is reported as an infrastructure failure, with no hidden retry.
+
+Stable tests verify published content, not unreleased candidate content. Preview-only skills
+outside the stable manifest must retain their existing bytes. Stable-manifest skills must
+lose preview pins through the real product path; tests never call manual `--unpin` to help.
+If selected published content requires a companion incompatible with supplied candidates,
+verification fails and reports that mismatch.
+
+Companion checks run help/version and a Unicode/escaped prompt-log stdin -> wrap -> fixture
+Git commit -> show/check round trip. Git HEAD must remain unchanged by companion reading.
+The package-only case also commits and clones an installed target, then restores with clean
+NuGet caches and checks preservation of an unrelated real tool manifest entry. The 2.2.0
+baseline exercises **first companion installation**, not a binary upgrade. Existing synthetic
+SDK version-resolution tests remain separate and are not historical release evidence.
+
+## Regressions and recordings
+
+```sh
+dotnet test tests/Agentic.Check.Tests --logger 'trx;LogFileName=check.trx'
+dotnet test tests/Agentic.Tests --logger 'trx;LogFileName=companion.trx'
+dotnet test tests/Agentic.LiveTests --logger 'trx;LogFileName=sdk.trx'
+dotnet test tests/Agentic.Check.LiveTests \
+  --filter 'Category!=PackageNetwork&Category!=CandidatePackage&Category!=BaselineNetwork&Category!=SkillMaintenance' \
+  --logger 'trx;LogFileName=local-cli.trx'
+AGENTIC_E2E_NETWORK=1 dotnet test tests/Agentic.Check.LiveTests --filter 'Category=BaselineNetwork'
+```
+
+The existing AgenticCheckEndToEndTests use a real local apphost and recorded terminal with
+**fake gh and companion SDK commands**. They cover deterministic UI/failure branches, not
+real skill installation/update. Existing maintenance tests use
+`AGENTIC_CHECK_SKILL_MAINTENANCE=1` for discovery/preview only; this suite does not reuse that opt-in.
+
+Interactive recordings use Hex1b with fixed dimensions and disabled input recording.
+They survive target cleanup, including failures, and are not committed. Each case prints:
+
+```sh
+asciinema play '<absolute-report-directory>/recordings/<fixture>-<scenario>-<id>-apply.cast'
+asciinema play 'tests/Agentic.LiveTests/TestResults/recordings/companion-<id>.cast'
+```
+
+New PTY scenarios explicitly skip unsupported platforms; process/package checks are portable.
+This task validates macOS. Windows PTY and a CI OS matrix remain future work.
+
+## Rolling and historical baseline policy
+
+| Baseline/scenario | Future policy |
+| --- | --- |
+| Fresh targets | Keep every applicable trigger permanently and test each candidate. |
+| Previous published release | After a successful release, deliberately capture a new dated full collection using the actual published package(s), then use it for normal next-candidate upgrades. |
+| 2.2.0 | Keep representative broad-stack, foundation-only and preview-web-cli history while migration from pre-companion installs is supported. This future reduction does not reduce the fourteen fixtures prepared/tested in this task. |
+| Significant migrations | Retain selected releases when manifests, source tracking, directive storage, or compatibility rules change; add explicit migration expectations. |
+
+Add a successor definition with its published installer identity/URL and companion expectation,
+then run the same preparation utility with a new ID. Set `companionExpected: true` and
+`companion: { "id": "InnoWvate.Agentic", "version": "<published-version>", "url": "<exact-NuGet-URL>" }`
+when that release includes a companion. The utility uses this actual package in the isolated
+feed and records/restores its bytes; it does not hardcode companion absence in reusable helpers.
+A baseline containing a companion must retain its original published package URL/checksum.
+Migration helpers download or verify that exact cached artifact, then restore/execute it in
+isolation before migration. Select historical IDs explicitly for direct upgrades; do not assume installation
+of intervening releases. Parameterized source/package/copy helpers keep the candidate SHA and
+hashes fixed regardless of the chosen baseline. Additional release captures, reduced historical
+coverage, and new migration boundaries are future work.

@@ -1,0 +1,5 @@
+{
+  "README.md": "# aspnetcore-framework-reference\n\nParseable detector inputs; these projects are not built or restored.\n",
+  "Api.csproj": "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup><ItemGroup><FrameworkReference Include=\"Microsoft.AspNetCore.App\" /></ItemGroup></Project>\n",
+  "Program.cs": "var builder = WebApplication.CreateBuilder(args);\n"
+}

@@ -1,0 +1,15 @@
+{
+  "name": "preview-web-cli",
+  "agents": "codex",
+  "baselinePreview": true,
+  "technologies": [
+    "foundation",
+    "dotnet",
+    "aspnetcore"
+  ],
+  "gates": {
+    "cli": [
+      "cli"
+    ]
+  }
+}

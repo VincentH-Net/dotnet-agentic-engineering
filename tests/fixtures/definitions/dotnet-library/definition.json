@@ -1,0 +1,10 @@
+{
+  "name": "dotnet-library",
+  "agents": "codex",
+  "baselinePreview": false,
+  "technologies": [
+    "foundation",
+    "dotnet"
+  ],
+  "gates": {}
+}

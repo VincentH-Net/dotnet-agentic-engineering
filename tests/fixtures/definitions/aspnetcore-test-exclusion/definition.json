@@ -1,0 +1,10 @@
+{
+  "name": "aspnetcore-test-exclusion",
+  "agents": "codex",
+  "baselinePreview": false,
+  "technologies": [
+    "foundation",
+    "dotnet"
+  ],
+  "gates": {}
+}

@@ -1,0 +1,11 @@
+{
+  "name": "orleans",
+  "agents": "codex",
+  "baselinePreview": false,
+  "technologies": [
+    "foundation",
+    "dotnet",
+    "orleans"
+  ],
+  "gates": {}
+}

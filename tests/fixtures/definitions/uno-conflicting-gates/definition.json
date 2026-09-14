@@ -1,0 +1,25 @@
+{
+  "name": "uno-conflicting-gates",
+  "agents": "codex",
+  "baselinePreview": false,
+  "technologies": [
+    "foundation",
+    "dotnet",
+    "uno"
+  ],
+  "gates": {
+    "presentation": [
+      "mvvm",
+      "mvux"
+    ],
+    "markup": [
+      "csharp",
+      "csharp2",
+      "xaml"
+    ],
+    "theme": [
+      "material",
+      "simple"
+    ]
+  }
+}

@@ -1,0 +1,4 @@
+{
+  "README.md": "# uno-simple\n\nParseable detector inputs; these projects are not built or restored.\n",
+  "Uno.csproj": "<Project Sdk=\"Uno.Sdk/6.3.0\"><PropertyGroup><TargetFramework>net10.0</TargetFramework><UnoFeatures>SimpleTheme</UnoFeatures></PropertyGroup></Project>\n"
+}

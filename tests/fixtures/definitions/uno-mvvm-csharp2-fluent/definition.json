@@ -1,0 +1,22 @@
+{
+  "name": "uno-mvvm-csharp2-fluent",
+  "agents": "codex",
+  "baselinePreview": false,
+  "technologies": [
+    "foundation",
+    "dotnet",
+    "uno"
+  ],
+  "gates": {
+    "presentation": [
+      "mvvm"
+    ],
+    "markup": [
+      "csharp2",
+      "xaml"
+    ],
+    "theme": [
+      "fluent"
+    ]
+  }
+}

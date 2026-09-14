@@ -39,12 +39,20 @@ sealed record SourceVersionInfo(string SourceRepo, string Ref, DateTimeOffset La
     }
 }
 
-sealed class GitHubSourceVersionResolver(HttpClient? httpClient = null, IReporter? reporter = null) : ISourceVersionResolver
+sealed class GitHubSourceVersionResolver(HttpClient? httpClient = null, IReporter? reporter = null, string? previewSourceRef = null) : ISourceVersionResolver
 {
     const string NoReleaseSentinel = "__agentic_check_no_latest_release__";
 
     readonly HttpClient httpClient = httpClient ?? CreateHttpClient();
     readonly IReporter? reporter = reporter;
+
+    internal static bool IsValidPreviewRef(string? value)
+        => !string.IsNullOrWhiteSpace(value)
+            && !value.StartsWith('-') && !value.StartsWith('/') && !value.EndsWith('/')
+            && !value.EndsWith('.') && !value.Contains("..", StringComparison.Ordinal)
+            && !value.Contains("//", StringComparison.Ordinal) && !value.Contains("@{", StringComparison.Ordinal)
+            && !value.Any(character => char.IsWhiteSpace(character) || char.IsControl(character) || "~^:?*[\\".Contains(character, StringComparison.Ordinal))
+            && value.Split('/').All(part => !part.StartsWith('.') && !part.EndsWith(".lock", StringComparison.Ordinal));
 
     public async Task<IReadOnlyDictionary<string, SourceVersionInfo>> ResolveVersionsAsync(
         IEnumerable<string> sourceRepos,
@@ -54,8 +62,19 @@ sealed class GitHubSourceVersionResolver(HttpClient? httpClient = null, IReporte
     {
         DirectiveHttpCache cache = new(cacheSettings, reporter);
         Dictionary<string, SourceVersionInfo> versions = new(StringComparer.OrdinalIgnoreCase);
+        if (previewSourceRef is not null)
+        {
+            if (sourceVersionMode != SourceVersionMode.Preview || !IsValidPreviewRef(previewSourceRef))
+                throw new DirectiveException("--preview-source-ref requires --preview and a valid branch reference or commit SHA.");
+
+            var selected = await ResolvePreviewRefAsync(previewSourceRef, cache, cancellationToken).ConfigureAwait(false);
+            versions[CompanionDependency.SourceRepo] = selected;
+            reporter?.Info($"Preview source {selected.SourceRepo}: {previewSourceRef} -> {selected.CommitSha}");
+        }
         foreach (string sourceRepo in sourceRepos.Distinct(StringComparer.OrdinalIgnoreCase))
         {
+            if (versions.ContainsKey(sourceRepo))
+                continue;
             try
             {
                 if (sourceVersionMode == SourceVersionMode.Stable)
@@ -79,6 +98,34 @@ sealed class GitHubSourceVersionResolver(HttpClient? httpClient = null, IReporte
         }
 
         return versions;
+    }
+
+    async Task<SourceVersionInfo> ResolvePreviewRefAsync(string sourceRef, DirectiveHttpCache cache, CancellationToken cancellationToken)
+    {
+        bool isCommit = sourceRef.Length == 40 && sourceRef.All(char.IsAsciiHexDigit);
+        string branch = sourceRef.StartsWith("refs/heads/", StringComparison.Ordinal) ? sourceRef[11..] : sourceRef;
+        string url = $"https://api.github.com/repos/{CompanionDependency.SourceRepo}/{(isCommit ? "commits" : "branches")}/{Uri.EscapeDataString(isCommit ? sourceRef : branch)}";
+        try
+        {
+            string content = await GetStringAsync(new Uri(url), url, "explicit preview source", cache, cancellationToken).ConfigureAwait(false);
+            using var document = JsonDocument.Parse(content);
+            var resolvedCommit = isCommit ? document.RootElement : document.RootElement.GetProperty("commit");
+            string? sha = resolvedCommit.GetProperty("sha").GetString();
+            string? date = resolvedCommit.GetProperty("commit").GetProperty("committer").GetProperty("date").GetString();
+            if (sha is null || sha.Length != 40 || !sha.All(char.IsAsciiHexDigit)
+                || !DateTimeOffset.TryParse(date, System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.AssumeUniversal, out var committedAt))
+            {
+                throw new DirectiveException($"Invalid commit metadata for --preview-source-ref '{sourceRef}'.");
+            }
+            if (isCommit && !sourceRef.Equals(sha, StringComparison.OrdinalIgnoreCase))
+                throw new DirectiveException($"Resolved commit does not match --preview-source-ref '{sourceRef}'.");
+            return new SourceVersionInfo(CompanionDependency.SourceRepo, sourceRef, committedAt.ToUniversalTime(), sha);
+        }
+        catch (Exception exception) when (exception is JsonException or KeyNotFoundException or InvalidOperationException or DirectiveException)
+        {
+            throw new DirectiveException($"Could not resolve --preview-source-ref '{sourceRef}': {exception.Message}", exception);
+        }
     }
 
     async Task<SourceVersionInfo?> TryResolveLatestReleaseAsync(

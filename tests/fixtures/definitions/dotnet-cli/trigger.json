@@ -1,0 +1,4 @@
+{
+  "Cli.csproj": "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net10.0</TargetFramework><OutputType>Exe</OutputType></PropertyGroup></Project>\n",
+  "README.md": "# dotnet-cli\n\nParseable detector inputs; these projects are not built or restored.\n"
+}

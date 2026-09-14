@@ -1,0 +1,2819 @@
+{
+  "name": "uno-defaults",
+  "preparedAtUtc": "2026-09-14T15:40:48.041483+00:00",
+  "label": "Installed using Agentic.Check 2.2.0 on 2026-09-14T15:40:48.0414830\u002B00:00",
+  "definition": {
+    "name": "uno-defaults",
+    "agents": "codex",
+    "baselinePreview": false,
+    "technologies": [
+      "foundation",
+      "dotnet",
+      "uno"
+    ],
+    "gates": {
+      "presentation": [],
+      "markup": [
+        "xaml"
+      ],
+      "theme": [
+        "fluent"
+      ]
+    }
+  },
+  "triggerHashes": {
+    "README.md": "cd04f23c70811d9d6cddbdab665a477eccee13c8d68ff8e60d4f013360e97ac2",
+    "Uno.csproj": "21dbe435442165ae00fc1172c702c1559b9783d43eeecc078655572dcf0b7e9e"
+  },
+  "files": {
+    ".agents/skills/crap-score/SKILL.md": "2eb68298940e156f66defba9205d772bb9c8ba12928d7e9e28ced2ab96b10279",
+    ".agents/skills/detect-static-dependencies/SKILL.md": "5073d66b256d1700c32fd859e3fa9ea12eeae638080e7998814d8c2225b1844b",
+    ".agents/skills/dotnet-livecharts2/SKILL.md": "d72e6de56a769c65541f52622ef0fe27c402c169925984d1ddbffe1510e49a27",
+    ".agents/skills/dotnet-modern-csharp-editorconfig/SKILL.md": "f39c94bdb089fea6d830dde78b7d6726bd81d627100ec2919f486512ded47537",
+    ".agents/skills/dotnet-test-frameworks/SKILL.md": "a476174343fd642ef7bd7aaf3bfacdb2eaa725be69351ff88b7c0bc47ac4421b",
+    ".agents/skills/filter-syntax/SKILL.md": "f2ad6f75ffbdc2fa3f387fb04aae8917e53ab2c7c242076f21063f9f462145bb",
+    ".agents/skills/generate-testability-wrappers/SKILL.md": "6a426ad6ba79e5b79c4978581605f59c53b6c41eb81c497ba9827ca0c2aae23f",
+    ".agents/skills/migrate-static-to-wrapper/SKILL.md": "4a7aeee3ad671dfbeff764c5e921b7b1079ab4231890973e02a45880dcc179ca",
+    ".agents/skills/mtp-hot-reload/SKILL.md": "73445a5872636f43c113843b77a29ed9669e88edeb7a55ed73437d89d4ddea52",
+    ".agents/skills/platform-detection/SKILL.md": "ef61671178a2ac5c6163d3b980b17a01450b47f3e3bb28a09b821027fad8f2ba",
+    ".agents/skills/run-tests/SKILL.md": "34c946743e0ecf82849f0bee5d37fe89029329a9204dd1729585f8f264d6e9f3",
+    ".agents/skills/test-anti-patterns/SKILL.md": "2c483ce812ac88fe7f33f4b56b05b5f9cb7c40a23267032754385930d9d5446c",
+    ".agents/skills/uno-agentic-support/SKILL.md": "84d1f2d93d219cac66b1aaec923e4f9cdcf70754ad4493ec2554198d631296d2",
+    ".agents/skills/uno-extensions-services/SKILL.md": "d12fa498198f82d6d18a8992af28ca5b6c3f10e0cf109aa01cfccbee8994ce15",
+    ".agents/skills/uno-extensions-services/references/01-hosting-di.md": "d8f8b06cdd4d7554e5cfc0c8fb566829a3e3a8dc690fc8b4bf2009f3610ff4c9",
+    ".agents/skills/uno-extensions-services/references/02-authentication.md": "98de2bf0322db52c423731662f31aadbeead15310f8aff685d7399b6c561857f",
+    ".agents/skills/uno-extensions-services/references/03-http-clients.md": "dea04c3ec4d34a26a9bb1b1468e54dc2abbed476aee7b8b58b06993461efba1d",
+    ".agents/skills/uno-extensions-services/references/04-configuration-logging.md": "620e07778ed3751570a98f0b358b916c38e84f5a5f12d46bdb6416fe7bed36e5",
+    ".agents/skills/uno-fluent2/SKILL.md": "fa403eb52ab747ce7056c1c2f61518a8e7d2bc3b271288c2ab9e6d36c68456bc",
+    ".agents/skills/uno-livecharts2-theme-switching/SKILL.md": "77eed205f93cff19d0feabce825e626c1c28eb7ff18c4fc3eeb145c36378b641",
+    ".agents/skills/uno-navigation-code/SKILL.md": "fc778ab2f6ad98aac0c360b85e29cace2ce19f9bcf3e8b45ef24d36355961fc9",
+    ".agents/skills/uno-navigation-contentcontrol/SKILL.md": "e89c1ddc5a35731328486d68979ca5070f7d36e3d87c5db5495228bb74f3b26a",
+    ".agents/skills/uno-navigation-data/SKILL.md": "dac39ce77baf2dd8afcc877381abb8385e8403ac98ed2021e1e0807c7ea968b6",
+    ".agents/skills/uno-navigation-dialogs/SKILL.md": "6008d2069f5899c0e2cd0108b4e2fced12b6a1953432987b6e9833c8a7f29525",
+    ".agents/skills/uno-navigation-navigationview/SKILL.md": "2ae1ae02b3c0a2abf9fa83bb9258567dcb28c907b5793f589ef49d251e0ca2a8",
+    ".agents/skills/uno-navigation-navigationview/references/shell-navigationview-template.md": "e7f75a2a58a074fb56e505651afc211f0c5a5fa96b7d2942274e55bc029bef1c",
+    ".agents/skills/uno-navigation-panel-visibility/SKILL.md": "ac25410773233dab77a761da5bdc5906a1f2e77cb608fcf4c819853e8c906e47",
+    ".agents/skills/uno-navigation-qualifiers/SKILL.md": "af2ca80811aa4aee78665a13f668716aeef55ad47285d93bbe3ff4782b8c910d",
+    ".agents/skills/uno-navigation-regions/SKILL.md": "3d7ba90d4aaa522c2616c4f9a648daabe69f7b67b33c4bad6dc38fb357ab742c",
+    ".agents/skills/uno-navigation-responsive-shell/SKILL.md": "80788c123f5c4a14a9b3171dad8b28a6a7d9b003d414a88816abac919adf5cae",
+    ".agents/skills/uno-navigation-responsive-shell/references/shell-responsive-template.md": "83ee1ab46b431cc39e39c0cc64e0cf8b8c03677a7d17cd5791669aa3f41ec783",
+    ".agents/skills/uno-navigation-routes/SKILL.md": "0869f2d3acbb64a9989bf1afbc819c5a417fc970f9293d2a4078aa3fc4c0f480",
+    ".agents/skills/uno-navigation-setup/SKILL.md": "79def862c5015b254f0d5e74a9549566d299adc710eacb43975db69d88af4423",
+    ".agents/skills/uno-navigation-tabbar/SKILL.md": "9546eeb0a032d4456c8531a562da297848a967c2d7a7c0b61b3ae9ae7d05bed5",
+    ".agents/skills/uno-navigation-tabbar/references/shell-tabbar-template.md": "b7e40707a3a94334bea2beece809847b145e90364cfda8eefb85b0893d0bcd89",
+    ".agents/skills/uno-navigation-troubleshooting/SKILL.md": "d72291e5c1a70b42561a22b40d9952a0b58d0c8696ab0acdbb57e36846edf342",
+    ".agents/skills/uno-navigation-xaml/SKILL.md": "bfb019358a8531f11f6718338767d42a4352acb386b752bf4029b4f5c67cc991",
+    ".agents/skills/uno-navigation-xaml/references/shell-frame-template.md": "66015cfc98c77c8904d528ce5dc32485a3889d685c9b25cd44fc5b8bdf924759",
+    ".agents/skills/uno-responsive-spanning-gridwrap-layout/ResponsiveSpanningGridWrapLayout.cs": "954b4c4b0a33c25be951241c401b84087a756bd2e4ea4ffbe4c71d929e8d070c",
+    ".agents/skills/uno-responsive-spanning-gridwrap-layout/SKILL.md": "1275db271d0f9c53022c6834bdac04be66eb122841041c0ea51e05eb4f2f5c08",
+    ".agents/skills/uno-test-resize-app-window/SKILL.md": "2d824ed3cb7baf24e532cc756e67eaaffcd595c3eb26eefa7ef0aa4c215dd504",
+    ".agents/skills/uno-test-resize-app-window/resize-window.sh": "010ad9e66a8cdc263ff75fa1cd6c2ec7498dc10767882147fb4d78b8827149cb",
+    ".agents/skills/uno-testing-assertions/SKILL.md": "98ff306bd9dd87eda9e22d696b5162dc839e0bac2351c743c48dac52b2695153",
+    ".agents/skills/uno-testing-ui/SKILL.md": "38b1181d4e34ec350aa1882716cc38de830e0ce16a4196ca2ca9e0224ea7fd8f",
+    ".agents/skills/uno-testing-ui/references/INTERACTION-PATTERNS.md": "c8cfd70fbe9a276e242c2ce22d921b379d5f6d908d8fe53f445699f5ad7913c5",
+    ".agents/skills/uno-testing-ui/references/VISUAL-TREE-GUIDE.md": "bedce73dd9bcb871f789e8b63dbe26db0c002bdd87860868a9a2864e3ec1070a",
+    ".agents/skills/uno-toolkit-ancestor-binding/SKILL.md": "2593d17280794c7a52a0a4373b28ec975ad1e7051db88b6b5ed29357ec63c554",
+    ".agents/skills/uno-toolkit-autolayout/SKILL.md": "31d2095cf941343564d821271c5350d1df6d40d570f89b353d7545c7cbf12ed4",
+    ".agents/skills/uno-toolkit-card/SKILL.md": "f9a94e6a053cf002fddff94674a9258f221d02a6ac1834dcb2064463cad27494",
+    ".agents/skills/uno-toolkit-chip/SKILL.md": "841f35d1bef9295720be14da6f19994ef10ba4bedcb29bf46813f783938b1c42",
+    ".agents/skills/uno-toolkit-command-extensions/SKILL.md": "12ec19722af757cc579391cd08cf2b1197b9bf9864472625c3862d5659fe339b",
+    ".agents/skills/uno-toolkit-cupertino-theme/SKILL.md": "407af29c3b8b6ab0bf9a14cbacde98f486176950bfc75a08a0e5b05e66c1f3db",
+    ".agents/skills/uno-toolkit-divider/SKILL.md": "2e1d1acebb384dfcefb55825c3af3d26d2034132909aff6a586b55e186b11c22",
+    ".agents/skills/uno-toolkit-drawer/SKILL.md": "143f888410c55a7ed35cdb846d92e7f5960c4d5ca6e3a43781f5723523cb92e4",
+    ".agents/skills/uno-toolkit-extendedsplashscreen/SKILL.md": "b94b69840ab0f553c55e52f06bd178eaa32ac15f756aa9a04266ff56cd7fef59",
+    ".agents/skills/uno-toolkit-flipview-extensions/SKILL.md": "8688a7d713d67179c6e655fc5939a82689a0c06e8890161f4c214ae27aa95ce8",
+    ".agents/skills/uno-toolkit-getting-started/SKILL.md": "fb8713e3777786b85fb3f8221b5f50a8a7c92eb899bcba88d5c3d478d0ad3e2a",
+    ".agents/skills/uno-toolkit-input-extensions/SKILL.md": "6040ee6c70ba0a2d162174ac32b9428e5b6963223a6a279154a8288f2ef0b66b",
+    ".agents/skills/uno-toolkit-itemsrepeater-extensions/SKILL.md": "e57d9426540f8b7f11f409798dd081bb0ac22e63ed73279d2cea0fafde7aa4bc",
+    ".agents/skills/uno-toolkit-lightweight-styling/SKILL.md": "dc165ccfbc875b62351abe5a9d7dfd260082c4b246d7eb8177fefc97f783ae94",
+    ".agents/skills/uno-toolkit-loadingview/SKILL.md": "dbf4aefcbf838908778bbdc6e4944b85d87e71027b04f1222032869519083b20",
+    ".agents/skills/uno-toolkit-navigationbar/SKILL.md": "9138bec4321fc96bab9ef7c6b1bfb44ad9495c6f45fdad6ce53886d98ec99d9d",
+    ".agents/skills/uno-toolkit-progress-extensions/SKILL.md": "03e2ff0749f0e4e6a7f6c99edab41bd911aa19ac8fa30a4705aa1db567b8d38a",
+    ".agents/skills/uno-toolkit-resource-extensions/SKILL.md": "2c665f886932e0784942303481cbba734c5dac4b19d7327b121fed17b4285b3a",
+    ".agents/skills/uno-toolkit-responsive/SKILL.md": "5a12210f3437a9cc504cbb15b88edf8c4b32044d722c718f2b5283331b6e4b9f",
+    ".agents/skills/uno-toolkit-safearea/SKILL.md": "2a957e3ac96a91293995755c9f4ca19d59c172e6938f8c1557eac5e3225c5d72",
+    ".agents/skills/uno-toolkit-segmented-controls/SKILL.md": "7796fe16fda082ed49275950f686e6671b73c31e63858fa7fbe6566125c53391",
+    ".agents/skills/uno-toolkit-selector-extensions/SKILL.md": "4ab795f4a3311e95d4bff7e0082d4088bfa183391207b7c39745ef7ec91213f3",
+    ".agents/skills/uno-toolkit-shadowcontainer/SKILL.md": "9e5456de4d3610a71a1948f54a4b356f73d4a530272196362a4aeca295ba767e",
+    ".agents/skills/uno-toolkit-statusbar-extensions/SKILL.md": "5ac38ca055682bef5c6a227fe1bacfe9244ec54a4e40cc55b49e156513c0d005",
+    ".agents/skills/uno-toolkit-system-theme-helper/SKILL.md": "151e491be0494038e2de62fe9904d1bb3af122ed2b3db411958084c03749c2fc",
+    ".agents/skills/uno-toolkit-tabbar/SKILL.md": "6ab8864bfd0bac1141212e5c5226c8d9cc325bf7a3673f2dedc767b9dcca5344",
+    ".agents/skills/uno-toolkit-tabbaritem-extensions/SKILL.md": "7515884df4267b807ce3b57f7a8af63c00d8b4f2f163896a8b1a7a52fd9b68a9",
+    ".agents/skills/uno-toolkit-visualstatemanager-extensions/SKILL.md": "ce3379a7a5acd89725c6a0d2ea4b05bf4e3ccbef4316c25dc3bf8f659785e8aa",
+    ".agents/skills/uno-toolkit-zoomcontentcontrol/SKILL.md": "ffcdfa9587e8e6a2832ba49cb16d27b3f7d77c9855d82f24618d7b129652a936",
+    ".agents/skills/uno-xaml/SKILL.md": "91e2d0ad8ee22d930353000f845d86f2bc5a6a3ef19c3e657b14ea2d50a2783f",
+    ".agents/skills/writing-mstest-tests/SKILL.md": "9972c99cdd144c61c0735b00be3e45c9a42ff3e7609c793de826e33d08e7cf0c",
+    "AGENTS.md": "565fd0206bdcd02c829128d4456eafec131a0b93ca311bf48f092ad49fb3bb15",
+    "README.md": "cd04f23c70811d9d6cddbdab665a477eccee13c8d68ff8e60d4f013360e97ac2",
+    "Uno.csproj": "21dbe435442165ae00fc1172c702c1559b9783d43eeecc078655572dcf0b7e9e"
+  },
+  "report": {
+    "targetDirectory": "$TARGET",
+    "dryRun": false,
+    "repoRoot": "$TARGET",
+    "skillsDirectory": "$TARGET/.agents/skills",
+    "skillsDirectories": [
+      "$TARGET/.agents/skills"
+    ],
+    "prerequisites": [
+      {
+        "name": "gh",
+        "success": true,
+        "version": "2.100.0",
+        "minimumVersion": "2.93.0",
+        "standardOutput": "gh version 2.100.0 (2026-09-03)\nhttps://github.com/cli/cli/releases/tag/v2.100.0\n",
+        "standardError": ""
+      },
+      {
+        "name": "gh skill",
+        "success": true,
+        "version": null,
+        "minimumVersion": null,
+        "standardOutput": "Install and manage agent skills from GitHub repositories.\n\nWorking with agent skills in the GitHub CLI is in preview and\nsubject to change without notice.\n\n\nUSAGE\n  gh skill \u003Ccommand\u003E [flags]\n\nALIASES\n  gh skills\n\nAVAILABLE COMMANDS\n  install:       Install agent skills from a GitHub repository (preview)\n  list:          List installed skills (preview)\n  preview:       Preview a skill from a GitHub repository (preview)\n  publish:       Validate and publish skills to a GitHub repository (preview)\n  search:        Search for skills across GitHub (preview)\n  update:        Update installed skills to their latest versions (preview)\n\nINHERITED FLAGS\n  --help   Show help for command\n\nEXAMPLES\n  # Search for skills\n  $ gh skill search terraform\n  \n  # Install a skill\n  $ gh skill install github/awesome-copilot documentation-writer\n  \n  # List installed skills\n  $ gh skill list\n  \n  # Preview a skill before installing\n  $ gh skill preview github/awesome-copilot documentation-writer\n  \n  # Update all installed skills\n  $ gh skill update --all\n  \n  # Validate skills for publishing\n  $ gh skill publish --dry-run\n\nLEARN MORE\n  Use \u0060gh \u003Ccommand\u003E \u003Csubcommand\u003E --help\u0060 for more information about a command.\n  Read the manual at https://cli.github.com/manual\n  Learn about exit codes using \u0060gh help exit-codes\u0060\n  Learn about accessibility experiences using \u0060gh help accessibility\u0060\n\n",
+        "standardError": ""
+      }
+    ],
+    "technologies": [
+      "dotnet",
+      "foundation",
+      "uno"
+    ],
+    "installGates": [
+      {
+        "technology": "uno",
+        "projectPath": "../../../../../../../..$TARGET/Uno.csproj",
+        "values": {
+          "presentation": [],
+          "markup": [
+            "xaml"
+          ],
+          "theme": [
+            "fluent"
+          ]
+        }
+      }
+    ],
+    "warnings": [],
+    "advisories": [],
+    "agentsFile": "$TARGET/AGENTS.md",
+    "claudeFile": "",
+    "directiveSummary": {
+      "createAgentsFile": true,
+      "createClaudeFile": false,
+      "recommendedCount": 4,
+      "missingCount": 4,
+      "outdatedCount": 0
+    },
+    "directives": [
+      {
+        "name": "dotnet-build-errors-and-warnings",
+        "status": "missing"
+      },
+      {
+        "name": "dotnet-cli-run",
+        "status": "missing"
+      },
+      {
+        "name": "foundation-prompt-log",
+        "status": "missing"
+      },
+      {
+        "name": "uno-build-and-run",
+        "status": "missing"
+      }
+    ],
+    "recommendedSkills": [
+      {
+        "sourceRepo": "VincentH-Net/dotnet-agentic-engineering",
+        "installArg": "uno-agentic-support",
+        "localFolder": "uno-agentic-support",
+        "plugin": "uno-platform",
+        "sourceRef": "",
+        "version": "v2.2.0 @ 2026-07-01 15:49 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "VincentH-Net/dotnet-agentic-engineering",
+        "installArg": "uno-fluent2",
+        "localFolder": "uno-fluent2",
+        "plugin": "uno-platform",
+        "sourceRef": "",
+        "version": "v2.2.0 @ 2026-07-01 15:49 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "VincentH-Net/dotnet-agentic-engineering",
+        "installArg": "uno-livecharts2-theme-switching",
+        "localFolder": "uno-livecharts2-theme-switching",
+        "plugin": "uno-platform",
+        "sourceRef": "",
+        "version": "v2.2.0 @ 2026-07-01 15:49 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "VincentH-Net/dotnet-agentic-engineering",
+        "installArg": "uno-responsive-spanning-gridwrap-layout",
+        "localFolder": "uno-responsive-spanning-gridwrap-layout",
+        "plugin": "uno-platform",
+        "sourceRef": "",
+        "version": "v2.2.0 @ 2026-07-01 15:49 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "VincentH-Net/dotnet-agentic-engineering",
+        "installArg": "uno-test-resize-app-window",
+        "localFolder": "uno-test-resize-app-window",
+        "plugin": "uno-platform",
+        "sourceRef": "",
+        "version": "v2.2.0 @ 2026-07-01 15:49 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "VincentH-Net/dotnet-agentic-engineering",
+        "installArg": "uno-xaml",
+        "localFolder": "uno-xaml",
+        "plugin": "uno-platform",
+        "sourceRef": "",
+        "version": "v2.2.0 @ 2026-07-01 15:49 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "VincentH-Net/dotnet-agentic-engineering",
+        "installArg": "dotnet-livecharts2",
+        "localFolder": "dotnet-livecharts2",
+        "plugin": "dotnet",
+        "sourceRef": "",
+        "version": "v2.2.0 @ 2026-07-01 15:49 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "VincentH-Net/dotnet-agentic-engineering",
+        "installArg": "dotnet-modern-csharp-editorconfig",
+        "localFolder": "dotnet-modern-csharp-editorconfig",
+        "plugin": "dotnet",
+        "sourceRef": "",
+        "version": "v2.2.0 @ 2026-07-01 15:49 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "mtmattei/UnoPlatformSkills",
+        "installArg": "uno-extensions-services",
+        "localFolder": "uno-extensions-services",
+        "plugin": "UnoPlatformSkills",
+        "sourceRef": "",
+        "version": "main @ 2026-04-04 17:14 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-code",
+        "localFolder": "uno-navigation-code",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-contentcontrol",
+        "localFolder": "uno-navigation-contentcontrol",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-data",
+        "localFolder": "uno-navigation-data",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-dialogs",
+        "localFolder": "uno-navigation-dialogs",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-navigationview",
+        "localFolder": "uno-navigation-navigationview",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-panel-visibility",
+        "localFolder": "uno-navigation-panel-visibility",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-qualifiers",
+        "localFolder": "uno-navigation-qualifiers",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-regions",
+        "localFolder": "uno-navigation-regions",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-responsive-shell",
+        "localFolder": "uno-navigation-responsive-shell",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-routes",
+        "localFolder": "uno-navigation-routes",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-setup",
+        "localFolder": "uno-navigation-setup",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-tabbar",
+        "localFolder": "uno-navigation-tabbar",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-troubleshooting",
+        "localFolder": "uno-navigation-troubleshooting",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-xaml",
+        "localFolder": "uno-navigation-xaml",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-testing-assertions",
+        "localFolder": "uno-testing-assertions",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-testing-ui",
+        "localFolder": "uno-testing-ui",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-ancestor-binding",
+        "localFolder": "uno-toolkit-ancestor-binding",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-autolayout",
+        "localFolder": "uno-toolkit-autolayout",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-card",
+        "localFolder": "uno-toolkit-card",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-chip",
+        "localFolder": "uno-toolkit-chip",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-command-extensions",
+        "localFolder": "uno-toolkit-command-extensions",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-cupertino-theme",
+        "localFolder": "uno-toolkit-cupertino-theme",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-divider",
+        "localFolder": "uno-toolkit-divider",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-drawer",
+        "localFolder": "uno-toolkit-drawer",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-extendedsplashscreen",
+        "localFolder": "uno-toolkit-extendedsplashscreen",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-flipview-extensions",
+        "localFolder": "uno-toolkit-flipview-extensions",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-getting-started",
+        "localFolder": "uno-toolkit-getting-started",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-input-extensions",
+        "localFolder": "uno-toolkit-input-extensions",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-itemsrepeater-extensions",
+        "localFolder": "uno-toolkit-itemsrepeater-extensions",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-lightweight-styling",
+        "localFolder": "uno-toolkit-lightweight-styling",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-loadingview",
+        "localFolder": "uno-toolkit-loadingview",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-navigationbar",
+        "localFolder": "uno-toolkit-navigationbar",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-progress-extensions",
+        "localFolder": "uno-toolkit-progress-extensions",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-resource-extensions",
+        "localFolder": "uno-toolkit-resource-extensions",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-responsive",
+        "localFolder": "uno-toolkit-responsive",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-safearea",
+        "localFolder": "uno-toolkit-safearea",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-segmented-controls",
+        "localFolder": "uno-toolkit-segmented-controls",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-selector-extensions",
+        "localFolder": "uno-toolkit-selector-extensions",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-shadowcontainer",
+        "localFolder": "uno-toolkit-shadowcontainer",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-statusbar-extensions",
+        "localFolder": "uno-toolkit-statusbar-extensions",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-system-theme-helper",
+        "localFolder": "uno-toolkit-system-theme-helper",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-tabbar",
+        "localFolder": "uno-toolkit-tabbar",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-tabbaritem-extensions",
+        "localFolder": "uno-toolkit-tabbaritem-extensions",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-visualstatemanager-extensions",
+        "localFolder": "uno-toolkit-visualstatemanager-extensions",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-zoomcontentcontrol",
+        "localFolder": "uno-toolkit-zoomcontentcontrol",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/crap-score",
+        "localFolder": "crap-score",
+        "plugin": "dotnet-test",
+        "sourceRef": "",
+        "version": "v1.0.0 @ 2026-04-21 11:21 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/detect-static-dependencies",
+        "localFolder": "detect-static-dependencies",
+        "plugin": "dotnet-test",
+        "sourceRef": "",
+        "version": "v1.0.0 @ 2026-04-21 11:21 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/dotnet-test-frameworks",
+        "localFolder": "dotnet-test-frameworks",
+        "plugin": "dotnet-test",
+        "sourceRef": "",
+        "version": "v1.0.0 @ 2026-04-21 11:21 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/filter-syntax",
+        "localFolder": "filter-syntax",
+        "plugin": "dotnet-test",
+        "sourceRef": "",
+        "version": "v1.0.0 @ 2026-04-21 11:21 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/generate-testability-wrappers",
+        "localFolder": "generate-testability-wrappers",
+        "plugin": "dotnet-test",
+        "sourceRef": "",
+        "version": "v1.0.0 @ 2026-04-21 11:21 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/migrate-static-to-wrapper",
+        "localFolder": "migrate-static-to-wrapper",
+        "plugin": "dotnet-test",
+        "sourceRef": "",
+        "version": "v1.0.0 @ 2026-04-21 11:21 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/mtp-hot-reload",
+        "localFolder": "mtp-hot-reload",
+        "plugin": "dotnet-test",
+        "sourceRef": "",
+        "version": "v1.0.0 @ 2026-04-21 11:21 GMT\u002B2",
+        "dependencies": [
+          {
+            "sourceRepo": "dotnet/skills",
+            "installArg": "plugins/dotnet-test/skills/filter-syntax",
+            "key": "dotnet/skills\nplugins/dotnet-test/skills/filter-syntax"
+          }
+        ]
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/platform-detection",
+        "localFolder": "platform-detection",
+        "plugin": "dotnet-test",
+        "sourceRef": "",
+        "version": "v1.0.0 @ 2026-04-21 11:21 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/run-tests",
+        "localFolder": "run-tests",
+        "plugin": "dotnet-test",
+        "sourceRef": "",
+        "version": "v1.0.0 @ 2026-04-21 11:21 GMT\u002B2",
+        "dependencies": [
+          {
+            "sourceRepo": "dotnet/skills",
+            "installArg": "plugins/dotnet-test/skills/platform-detection",
+            "key": "dotnet/skills\nplugins/dotnet-test/skills/platform-detection"
+          },
+          {
+            "sourceRepo": "dotnet/skills",
+            "installArg": "plugins/dotnet-test/skills/filter-syntax",
+            "key": "dotnet/skills\nplugins/dotnet-test/skills/filter-syntax"
+          }
+        ]
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/test-anti-patterns",
+        "localFolder": "test-anti-patterns",
+        "plugin": "dotnet-test",
+        "sourceRef": "",
+        "version": "v1.0.0 @ 2026-04-21 11:21 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/writing-mstest-tests",
+        "localFolder": "writing-mstest-tests",
+        "plugin": "dotnet-test",
+        "sourceRef": "",
+        "version": "v1.0.0 @ 2026-04-21 11:21 GMT\u002B2",
+        "dependencies": []
+      }
+    ],
+    "missingSkills": [
+      {
+        "sourceRepo": "VincentH-Net/dotnet-agentic-engineering",
+        "installArg": "uno-agentic-support",
+        "localFolder": "uno-agentic-support",
+        "plugin": "uno-platform",
+        "sourceRef": "",
+        "version": "v2.2.0 @ 2026-07-01 15:49 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "VincentH-Net/dotnet-agentic-engineering",
+        "installArg": "uno-fluent2",
+        "localFolder": "uno-fluent2",
+        "plugin": "uno-platform",
+        "sourceRef": "",
+        "version": "v2.2.0 @ 2026-07-01 15:49 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "VincentH-Net/dotnet-agentic-engineering",
+        "installArg": "uno-livecharts2-theme-switching",
+        "localFolder": "uno-livecharts2-theme-switching",
+        "plugin": "uno-platform",
+        "sourceRef": "",
+        "version": "v2.2.0 @ 2026-07-01 15:49 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "VincentH-Net/dotnet-agentic-engineering",
+        "installArg": "uno-responsive-spanning-gridwrap-layout",
+        "localFolder": "uno-responsive-spanning-gridwrap-layout",
+        "plugin": "uno-platform",
+        "sourceRef": "",
+        "version": "v2.2.0 @ 2026-07-01 15:49 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "VincentH-Net/dotnet-agentic-engineering",
+        "installArg": "uno-test-resize-app-window",
+        "localFolder": "uno-test-resize-app-window",
+        "plugin": "uno-platform",
+        "sourceRef": "",
+        "version": "v2.2.0 @ 2026-07-01 15:49 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "VincentH-Net/dotnet-agentic-engineering",
+        "installArg": "uno-xaml",
+        "localFolder": "uno-xaml",
+        "plugin": "uno-platform",
+        "sourceRef": "",
+        "version": "v2.2.0 @ 2026-07-01 15:49 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "VincentH-Net/dotnet-agentic-engineering",
+        "installArg": "dotnet-livecharts2",
+        "localFolder": "dotnet-livecharts2",
+        "plugin": "dotnet",
+        "sourceRef": "",
+        "version": "v2.2.0 @ 2026-07-01 15:49 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "VincentH-Net/dotnet-agentic-engineering",
+        "installArg": "dotnet-modern-csharp-editorconfig",
+        "localFolder": "dotnet-modern-csharp-editorconfig",
+        "plugin": "dotnet",
+        "sourceRef": "",
+        "version": "v2.2.0 @ 2026-07-01 15:49 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "mtmattei/UnoPlatformSkills",
+        "installArg": "uno-extensions-services",
+        "localFolder": "uno-extensions-services",
+        "plugin": "UnoPlatformSkills",
+        "sourceRef": "",
+        "version": "main @ 2026-04-04 17:14 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-code",
+        "localFolder": "uno-navigation-code",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-contentcontrol",
+        "localFolder": "uno-navigation-contentcontrol",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-data",
+        "localFolder": "uno-navigation-data",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-dialogs",
+        "localFolder": "uno-navigation-dialogs",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-navigationview",
+        "localFolder": "uno-navigation-navigationview",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-panel-visibility",
+        "localFolder": "uno-navigation-panel-visibility",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-qualifiers",
+        "localFolder": "uno-navigation-qualifiers",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-regions",
+        "localFolder": "uno-navigation-regions",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-responsive-shell",
+        "localFolder": "uno-navigation-responsive-shell",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-routes",
+        "localFolder": "uno-navigation-routes",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-setup",
+        "localFolder": "uno-navigation-setup",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-tabbar",
+        "localFolder": "uno-navigation-tabbar",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-troubleshooting",
+        "localFolder": "uno-navigation-troubleshooting",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-xaml",
+        "localFolder": "uno-navigation-xaml",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-testing-assertions",
+        "localFolder": "uno-testing-assertions",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-testing-ui",
+        "localFolder": "uno-testing-ui",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-ancestor-binding",
+        "localFolder": "uno-toolkit-ancestor-binding",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-autolayout",
+        "localFolder": "uno-toolkit-autolayout",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-card",
+        "localFolder": "uno-toolkit-card",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-chip",
+        "localFolder": "uno-toolkit-chip",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-command-extensions",
+        "localFolder": "uno-toolkit-command-extensions",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-cupertino-theme",
+        "localFolder": "uno-toolkit-cupertino-theme",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-divider",
+        "localFolder": "uno-toolkit-divider",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-drawer",
+        "localFolder": "uno-toolkit-drawer",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-extendedsplashscreen",
+        "localFolder": "uno-toolkit-extendedsplashscreen",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-flipview-extensions",
+        "localFolder": "uno-toolkit-flipview-extensions",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-getting-started",
+        "localFolder": "uno-toolkit-getting-started",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-input-extensions",
+        "localFolder": "uno-toolkit-input-extensions",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-itemsrepeater-extensions",
+        "localFolder": "uno-toolkit-itemsrepeater-extensions",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-lightweight-styling",
+        "localFolder": "uno-toolkit-lightweight-styling",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-loadingview",
+        "localFolder": "uno-toolkit-loadingview",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-navigationbar",
+        "localFolder": "uno-toolkit-navigationbar",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-progress-extensions",
+        "localFolder": "uno-toolkit-progress-extensions",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-resource-extensions",
+        "localFolder": "uno-toolkit-resource-extensions",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-responsive",
+        "localFolder": "uno-toolkit-responsive",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-safearea",
+        "localFolder": "uno-toolkit-safearea",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-segmented-controls",
+        "localFolder": "uno-toolkit-segmented-controls",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-selector-extensions",
+        "localFolder": "uno-toolkit-selector-extensions",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-shadowcontainer",
+        "localFolder": "uno-toolkit-shadowcontainer",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-statusbar-extensions",
+        "localFolder": "uno-toolkit-statusbar-extensions",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-system-theme-helper",
+        "localFolder": "uno-toolkit-system-theme-helper",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-tabbar",
+        "localFolder": "uno-toolkit-tabbar",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-tabbaritem-extensions",
+        "localFolder": "uno-toolkit-tabbaritem-extensions",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-visualstatemanager-extensions",
+        "localFolder": "uno-toolkit-visualstatemanager-extensions",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-zoomcontentcontrol",
+        "localFolder": "uno-toolkit-zoomcontentcontrol",
+        "plugin": "studio",
+        "sourceRef": "",
+        "version": "main @ 2026-06-16 16:53 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/crap-score",
+        "localFolder": "crap-score",
+        "plugin": "dotnet-test",
+        "sourceRef": "",
+        "version": "v1.0.0 @ 2026-04-21 11:21 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/detect-static-dependencies",
+        "localFolder": "detect-static-dependencies",
+        "plugin": "dotnet-test",
+        "sourceRef": "",
+        "version": "v1.0.0 @ 2026-04-21 11:21 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/dotnet-test-frameworks",
+        "localFolder": "dotnet-test-frameworks",
+        "plugin": "dotnet-test",
+        "sourceRef": "",
+        "version": "v1.0.0 @ 2026-04-21 11:21 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/filter-syntax",
+        "localFolder": "filter-syntax",
+        "plugin": "dotnet-test",
+        "sourceRef": "",
+        "version": "v1.0.0 @ 2026-04-21 11:21 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/generate-testability-wrappers",
+        "localFolder": "generate-testability-wrappers",
+        "plugin": "dotnet-test",
+        "sourceRef": "",
+        "version": "v1.0.0 @ 2026-04-21 11:21 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/migrate-static-to-wrapper",
+        "localFolder": "migrate-static-to-wrapper",
+        "plugin": "dotnet-test",
+        "sourceRef": "",
+        "version": "v1.0.0 @ 2026-04-21 11:21 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/mtp-hot-reload",
+        "localFolder": "mtp-hot-reload",
+        "plugin": "dotnet-test",
+        "sourceRef": "",
+        "version": "v1.0.0 @ 2026-04-21 11:21 GMT\u002B2",
+        "dependencies": [
+          {
+            "sourceRepo": "dotnet/skills",
+            "installArg": "plugins/dotnet-test/skills/filter-syntax",
+            "key": "dotnet/skills\nplugins/dotnet-test/skills/filter-syntax"
+          }
+        ]
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/platform-detection",
+        "localFolder": "platform-detection",
+        "plugin": "dotnet-test",
+        "sourceRef": "",
+        "version": "v1.0.0 @ 2026-04-21 11:21 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/run-tests",
+        "localFolder": "run-tests",
+        "plugin": "dotnet-test",
+        "sourceRef": "",
+        "version": "v1.0.0 @ 2026-04-21 11:21 GMT\u002B2",
+        "dependencies": [
+          {
+            "sourceRepo": "dotnet/skills",
+            "installArg": "plugins/dotnet-test/skills/platform-detection",
+            "key": "dotnet/skills\nplugins/dotnet-test/skills/platform-detection"
+          },
+          {
+            "sourceRepo": "dotnet/skills",
+            "installArg": "plugins/dotnet-test/skills/filter-syntax",
+            "key": "dotnet/skills\nplugins/dotnet-test/skills/filter-syntax"
+          }
+        ]
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/test-anti-patterns",
+        "localFolder": "test-anti-patterns",
+        "plugin": "dotnet-test",
+        "sourceRef": "",
+        "version": "v1.0.0 @ 2026-04-21 11:21 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/writing-mstest-tests",
+        "localFolder": "writing-mstest-tests",
+        "plugin": "dotnet-test",
+        "sourceRef": "",
+        "version": "v1.0.0 @ 2026-04-21 11:21 GMT\u002B2",
+        "dependencies": []
+      }
+    ],
+    "outdatedSkills": 0,
+    "installResults": [
+      {
+        "sourceRepo": "VincentH-Net/dotnet-agentic-engineering",
+        "installArg": "uno-agentic-support",
+        "localFolder": "uno-agentic-support",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-platform/uno-agentic-support (from VincentH-Net/dotnet-agentic-engineering@v2.2.0) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref v2.2.0 (ebc711fb)\nNote: found 14 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-platform/uno-agentic-support/\n  (could not read directory)\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview VincentH-Net/dotnet-agentic-engineering uno-platform/uno-agentic-support@ebc711fb6db0912cae2b0c2bc4991d57d5afa007\n\n"
+      },
+      {
+        "sourceRepo": "VincentH-Net/dotnet-agentic-engineering",
+        "installArg": "uno-fluent2",
+        "localFolder": "uno-fluent2",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-platform/uno-fluent2 (from VincentH-Net/dotnet-agentic-engineering@v2.2.0) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref v2.2.0 (ebc711fb)\nNote: found 14 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-platform/uno-fluent2/\n  (could not read directory)\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview VincentH-Net/dotnet-agentic-engineering uno-platform/uno-fluent2@ebc711fb6db0912cae2b0c2bc4991d57d5afa007\n\n"
+      },
+      {
+        "sourceRepo": "VincentH-Net/dotnet-agentic-engineering",
+        "installArg": "uno-livecharts2-theme-switching",
+        "localFolder": "uno-livecharts2-theme-switching",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-platform/uno-livecharts2-theme-switching (from VincentH-Net/dotnet-agentic-engineering@v2.2.0) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref v2.2.0 (ebc711fb)\nNote: found 14 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-platform/uno-livecharts2-theme-switching/\n  (could not read directory)\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview VincentH-Net/dotnet-agentic-engineering uno-platform/uno-livecharts2-theme-switching@ebc711fb6db0912cae2b0c2bc4991d57d5afa007\n\n"
+      },
+      {
+        "sourceRepo": "VincentH-Net/dotnet-agentic-engineering",
+        "installArg": "uno-responsive-spanning-gridwrap-layout",
+        "localFolder": "uno-responsive-spanning-gridwrap-layout",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-platform/uno-responsive-spanning-gridwrap-layout (from VincentH-Net/dotnet-agentic-engineering@v2.2.0) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref v2.2.0 (ebc711fb)\nNote: found 14 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-platform/uno-responsive-spanning-gridwrap-layout/\n  (could not read directory)\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview VincentH-Net/dotnet-agentic-engineering uno-platform/uno-responsive-spanning-gridwrap-layout@ebc711fb6db0912cae2b0c2bc4991d57d5afa007\n\n"
+      },
+      {
+        "sourceRepo": "VincentH-Net/dotnet-agentic-engineering",
+        "installArg": "uno-test-resize-app-window",
+        "localFolder": "uno-test-resize-app-window",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-platform/uno-test-resize-app-window (from VincentH-Net/dotnet-agentic-engineering@v2.2.0) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref v2.2.0 (ebc711fb)\nNote: found 14 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-platform/uno-test-resize-app-window/\n  (could not read directory)\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview VincentH-Net/dotnet-agentic-engineering uno-platform/uno-test-resize-app-window@ebc711fb6db0912cae2b0c2bc4991d57d5afa007\n\n"
+      },
+      {
+        "sourceRepo": "VincentH-Net/dotnet-agentic-engineering",
+        "installArg": "uno-xaml",
+        "localFolder": "uno-xaml",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-platform/uno-xaml (from VincentH-Net/dotnet-agentic-engineering@v2.2.0) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref v2.2.0 (ebc711fb)\nNote: found 14 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-platform/uno-xaml/\n  (could not read directory)\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview VincentH-Net/dotnet-agentic-engineering uno-platform/uno-xaml@ebc711fb6db0912cae2b0c2bc4991d57d5afa007\n\n"
+      },
+      {
+        "sourceRepo": "VincentH-Net/dotnet-agentic-engineering",
+        "installArg": "dotnet-livecharts2",
+        "localFolder": "dotnet-livecharts2",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed dotnet/dotnet-livecharts2 (from VincentH-Net/dotnet-agentic-engineering@v2.2.0) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref v2.2.0 (ebc711fb)\nNote: found 14 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  dotnet/dotnet-livecharts2/\n  (could not read directory)\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview VincentH-Net/dotnet-agentic-engineering dotnet/dotnet-livecharts2@ebc711fb6db0912cae2b0c2bc4991d57d5afa007\n\n"
+      },
+      {
+        "sourceRepo": "VincentH-Net/dotnet-agentic-engineering",
+        "installArg": "dotnet-modern-csharp-editorconfig",
+        "localFolder": "dotnet-modern-csharp-editorconfig",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed dotnet/dotnet-modern-csharp-editorconfig (from VincentH-Net/dotnet-agentic-engineering@v2.2.0) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref v2.2.0 (ebc711fb)\nNote: found 14 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  dotnet/dotnet-modern-csharp-editorconfig/\n  (could not read directory)\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview VincentH-Net/dotnet-agentic-engineering dotnet/dotnet-modern-csharp-editorconfig@ebc711fb6db0912cae2b0c2bc4991d57d5afa007\n\n"
+      },
+      {
+        "sourceRepo": "mtmattei/UnoPlatformSkills",
+        "installArg": "uno-extensions-services",
+        "localFolder": "uno-extensions-services",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-extensions-services (from mtmattei/UnoPlatformSkills@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (802045a4)\nNote: found 14 skill(s) at the repository root\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-extensions-services/\n  \u251C\u2500\u2500 SKILL.md\n  \u2514\u2500\u2500 references/\n      \u251C\u2500\u2500 01-hosting-di.md\n      \u251C\u2500\u2500 02-authentication.md\n      \u251C\u2500\u2500 03-http-clients.md\n      \u2514\u2500\u2500 04-configuration-logging.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview mtmattei/UnoPlatformSkills uno-extensions-services@802045a45ae73eaae9b9ac70c01d0ff0e6c5d401\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-code",
+        "localFolder": "uno-navigation-code",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-navigation-code (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-navigation-code/\n  \u2514\u2500\u2500 SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-navigation-code@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-contentcontrol",
+        "localFolder": "uno-navigation-contentcontrol",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-navigation-contentcontrol (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-navigation-contentcontrol/\n  \u2514\u2500\u2500 SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-navigation-contentcontrol@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-data",
+        "localFolder": "uno-navigation-data",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-navigation-data (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-navigation-data/\n  \u2514\u2500\u2500 SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-navigation-data@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-dialogs",
+        "localFolder": "uno-navigation-dialogs",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-navigation-dialogs (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-navigation-dialogs/\n  \u2514\u2500\u2500 SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-navigation-dialogs@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-navigationview",
+        "localFolder": "uno-navigation-navigationview",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-navigation-navigationview (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-navigation-navigationview/\n  \u251C\u2500\u2500 SKILL.md\n  \u2514\u2500\u2500 references/\n      \u2514\u2500\u2500 shell-navigationview-template.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-navigation-navigationview@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-panel-visibility",
+        "localFolder": "uno-navigation-panel-visibility",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-navigation-panel-visibility (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-navigation-panel-visibility/\n  \u2514\u2500\u2500 SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-navigation-panel-visibility@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-qualifiers",
+        "localFolder": "uno-navigation-qualifiers",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-navigation-qualifiers (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-navigation-qualifiers/\n  \u2514\u2500\u2500 SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-navigation-qualifiers@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-regions",
+        "localFolder": "uno-navigation-regions",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-navigation-regions (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-navigation-regions/\n  \u2514\u2500\u2500 SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-navigation-regions@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-responsive-shell",
+        "localFolder": "uno-navigation-responsive-shell",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-navigation-responsive-shell (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-navigation-responsive-shell/\n  \u251C\u2500\u2500 SKILL.md\n  \u2514\u2500\u2500 references/\n      \u2514\u2500\u2500 shell-responsive-template.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-navigation-responsive-shell@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-routes",
+        "localFolder": "uno-navigation-routes",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-navigation-routes (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-navigation-routes/\n  \u2514\u2500\u2500 SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-navigation-routes@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-setup",
+        "localFolder": "uno-navigation-setup",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-navigation-setup (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-navigation-setup/\n  \u2514\u2500\u2500 SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-navigation-setup@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-tabbar",
+        "localFolder": "uno-navigation-tabbar",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-navigation-tabbar (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-navigation-tabbar/\n  \u251C\u2500\u2500 SKILL.md\n  \u2514\u2500\u2500 references/\n      \u2514\u2500\u2500 shell-tabbar-template.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-navigation-tabbar@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-troubleshooting",
+        "localFolder": "uno-navigation-troubleshooting",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-navigation-troubleshooting (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-navigation-troubleshooting/\n  \u2514\u2500\u2500 SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-navigation-troubleshooting@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-navigation-xaml",
+        "localFolder": "uno-navigation-xaml",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-navigation-xaml (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-navigation-xaml/\n  \u251C\u2500\u2500 SKILL.md\n  \u2514\u2500\u2500 references/\n      \u2514\u2500\u2500 shell-frame-template.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-navigation-xaml@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-testing-assertions",
+        "localFolder": "uno-testing-assertions",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-testing-assertions (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-testing-assertions/\n  \u2514\u2500\u2500 SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-testing-assertions@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-testing-ui",
+        "localFolder": "uno-testing-ui",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-testing-ui (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-testing-ui/\n  \u251C\u2500\u2500 SKILL.md\n  \u2514\u2500\u2500 references/\n      \u251C\u2500\u2500 INTERACTION-PATTERNS.md\n      \u2514\u2500\u2500 VISUAL-TREE-GUIDE.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-testing-ui@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-ancestor-binding",
+        "localFolder": "uno-toolkit-ancestor-binding",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-toolkit-ancestor-binding (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-toolkit-ancestor-binding/\n  \u2514\u2500\u2500 SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-toolkit-ancestor-binding@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-autolayout",
+        "localFolder": "uno-toolkit-autolayout",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-toolkit-autolayout (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-toolkit-autolayout/\n  \u2514\u2500\u2500 SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-toolkit-autolayout@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-card",
+        "localFolder": "uno-toolkit-card",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-toolkit-card (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-toolkit-card/\n  \u2514\u2500\u2500 SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-toolkit-card@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-chip",
+        "localFolder": "uno-toolkit-chip",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-toolkit-chip (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-toolkit-chip/\n  \u2514\u2500\u2500 SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-toolkit-chip@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-command-extensions",
+        "localFolder": "uno-toolkit-command-extensions",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-toolkit-command-extensions (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-toolkit-command-extensions/\n  \u2514\u2500\u2500 SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-toolkit-command-extensions@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-cupertino-theme",
+        "localFolder": "uno-toolkit-cupertino-theme",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-toolkit-cupertino-theme (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-toolkit-cupertino-theme/\n  \u2514\u2500\u2500 SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-toolkit-cupertino-theme@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-divider",
+        "localFolder": "uno-toolkit-divider",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-toolkit-divider (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-toolkit-divider/\n  \u2514\u2500\u2500 SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-toolkit-divider@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-drawer",
+        "localFolder": "uno-toolkit-drawer",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-toolkit-drawer (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-toolkit-drawer/\n  \u2514\u2500\u2500 SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-toolkit-drawer@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-extendedsplashscreen",
+        "localFolder": "uno-toolkit-extendedsplashscreen",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-toolkit-extendedsplashscreen (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-toolkit-extendedsplashscreen/\n  \u2514\u2500\u2500 SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-toolkit-extendedsplashscreen@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-flipview-extensions",
+        "localFolder": "uno-toolkit-flipview-extensions",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-toolkit-flipview-extensions (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-toolkit-flipview-extensions/\n  \u2514\u2500\u2500 SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-toolkit-flipview-extensions@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-getting-started",
+        "localFolder": "uno-toolkit-getting-started",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-toolkit-getting-started (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-toolkit-getting-started/\n  \u2514\u2500\u2500 SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-toolkit-getting-started@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-input-extensions",
+        "localFolder": "uno-toolkit-input-extensions",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-toolkit-input-extensions (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-toolkit-input-extensions/\n  \u2514\u2500\u2500 SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-toolkit-input-extensions@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-itemsrepeater-extensions",
+        "localFolder": "uno-toolkit-itemsrepeater-extensions",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-toolkit-itemsrepeater-extensions (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-toolkit-itemsrepeater-extensions/\n  \u2514\u2500\u2500 SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-toolkit-itemsrepeater-extensions@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-lightweight-styling",
+        "localFolder": "uno-toolkit-lightweight-styling",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-toolkit-lightweight-styling (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-toolkit-lightweight-styling/\n  \u2514\u2500\u2500 SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-toolkit-lightweight-styling@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-loadingview",
+        "localFolder": "uno-toolkit-loadingview",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-toolkit-loadingview (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-toolkit-loadingview/\n  \u2514\u2500\u2500 SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-toolkit-loadingview@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-navigationbar",
+        "localFolder": "uno-toolkit-navigationbar",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-toolkit-navigationbar (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-toolkit-navigationbar/\n  \u2514\u2500\u2500 SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-toolkit-navigationbar@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-progress-extensions",
+        "localFolder": "uno-toolkit-progress-extensions",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-toolkit-progress-extensions (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-toolkit-progress-extensions/\n  \u2514\u2500\u2500 SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-toolkit-progress-extensions@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-resource-extensions",
+        "localFolder": "uno-toolkit-resource-extensions",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-toolkit-resource-extensions (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-toolkit-resource-extensions/\n  \u2514\u2500\u2500 SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-toolkit-resource-extensions@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-responsive",
+        "localFolder": "uno-toolkit-responsive",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-toolkit-responsive (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-toolkit-responsive/\n  \u2514\u2500\u2500 SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-toolkit-responsive@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-safearea",
+        "localFolder": "uno-toolkit-safearea",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-toolkit-safearea (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-toolkit-safearea/\n  \u2514\u2500\u2500 SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-toolkit-safearea@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-segmented-controls",
+        "localFolder": "uno-toolkit-segmented-controls",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-toolkit-segmented-controls (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-toolkit-segmented-controls/\n  \u2514\u2500\u2500 SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-toolkit-segmented-controls@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-selector-extensions",
+        "localFolder": "uno-toolkit-selector-extensions",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-toolkit-selector-extensions (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-toolkit-selector-extensions/\n  \u2514\u2500\u2500 SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-toolkit-selector-extensions@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-shadowcontainer",
+        "localFolder": "uno-toolkit-shadowcontainer",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-toolkit-shadowcontainer (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-toolkit-shadowcontainer/\n  \u2514\u2500\u2500 SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-toolkit-shadowcontainer@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-statusbar-extensions",
+        "localFolder": "uno-toolkit-statusbar-extensions",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-toolkit-statusbar-extensions (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-toolkit-statusbar-extensions/\n  \u2514\u2500\u2500 SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-toolkit-statusbar-extensions@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-system-theme-helper",
+        "localFolder": "uno-toolkit-system-theme-helper",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-toolkit-system-theme-helper (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-toolkit-system-theme-helper/\n  \u2514\u2500\u2500 SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-toolkit-system-theme-helper@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-tabbar",
+        "localFolder": "uno-toolkit-tabbar",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-toolkit-tabbar (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-toolkit-tabbar/\n  \u2514\u2500\u2500 SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-toolkit-tabbar@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-tabbaritem-extensions",
+        "localFolder": "uno-toolkit-tabbaritem-extensions",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-toolkit-tabbaritem-extensions (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-toolkit-tabbaritem-extensions/\n  \u2514\u2500\u2500 SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-toolkit-tabbaritem-extensions@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-visualstatemanager-extensions",
+        "localFolder": "uno-toolkit-visualstatemanager-extensions",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-toolkit-visualstatemanager-extensions (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-toolkit-visualstatemanager-extensions/\n  \u2514\u2500\u2500 SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-toolkit-visualstatemanager-extensions@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "unoplatform/studio",
+        "installArg": "uno-toolkit-zoomcontentcontrol",
+        "localFolder": "uno-toolkit-zoomcontentcontrol",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed uno-toolkit-zoomcontentcontrol (from unoplatform/studio@main) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref main (d57c60a1)\nNote: found 61 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  uno-toolkit-zoomcontentcontrol/\n  \u2514\u2500\u2500 SKILL.md\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview unoplatform/studio uno-toolkit-zoomcontentcontrol@d57c60a1ce66a5acb899aa15e2344e614b807983\n\n"
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/crap-score",
+        "localFolder": "crap-score",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed dotnet-test/crap-score (from dotnet/skills@v1.0.0) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref v1.0.0 (cb7c10bd)\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  dotnet-test/crap-score/\n  (could not read directory)\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview dotnet/skills dotnet-test/crap-score@cb7c10bd32b250459632df9e6fa1350cdaf00b18\n\n"
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/detect-static-dependencies",
+        "localFolder": "detect-static-dependencies",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed dotnet-test/detect-static-dependencies (from dotnet/skills@v1.0.0) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref v1.0.0 (cb7c10bd)\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  dotnet-test/detect-static-dependencies/\n  (could not read directory)\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview dotnet/skills dotnet-test/detect-static-dependencies@cb7c10bd32b250459632df9e6fa1350cdaf00b18\n\n"
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/dotnet-test-frameworks",
+        "localFolder": "dotnet-test-frameworks",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed dotnet-test/dotnet-test-frameworks (from dotnet/skills@v1.0.0) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref v1.0.0 (cb7c10bd)\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  dotnet-test/dotnet-test-frameworks/\n  (could not read directory)\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview dotnet/skills dotnet-test/dotnet-test-frameworks@cb7c10bd32b250459632df9e6fa1350cdaf00b18\n\n"
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/filter-syntax",
+        "localFolder": "filter-syntax",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed dotnet-test/filter-syntax (from dotnet/skills@v1.0.0) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref v1.0.0 (cb7c10bd)\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  dotnet-test/filter-syntax/\n  (could not read directory)\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview dotnet/skills dotnet-test/filter-syntax@cb7c10bd32b250459632df9e6fa1350cdaf00b18\n\n"
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/generate-testability-wrappers",
+        "localFolder": "generate-testability-wrappers",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed dotnet-test/generate-testability-wrappers (from dotnet/skills@v1.0.0) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref v1.0.0 (cb7c10bd)\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  dotnet-test/generate-testability-wrappers/\n  (could not read directory)\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview dotnet/skills dotnet-test/generate-testability-wrappers@cb7c10bd32b250459632df9e6fa1350cdaf00b18\n\n"
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/migrate-static-to-wrapper",
+        "localFolder": "migrate-static-to-wrapper",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed dotnet-test/migrate-static-to-wrapper (from dotnet/skills@v1.0.0) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref v1.0.0 (cb7c10bd)\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  dotnet-test/migrate-static-to-wrapper/\n  (could not read directory)\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview dotnet/skills dotnet-test/migrate-static-to-wrapper@cb7c10bd32b250459632df9e6fa1350cdaf00b18\n\n"
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/mtp-hot-reload",
+        "localFolder": "mtp-hot-reload",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed dotnet-test/mtp-hot-reload (from dotnet/skills@v1.0.0) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref v1.0.0 (cb7c10bd)\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  dotnet-test/mtp-hot-reload/\n  (could not read directory)\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview dotnet/skills dotnet-test/mtp-hot-reload@cb7c10bd32b250459632df9e6fa1350cdaf00b18\n\n"
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/platform-detection",
+        "localFolder": "platform-detection",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed dotnet-test/platform-detection (from dotnet/skills@v1.0.0) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref v1.0.0 (cb7c10bd)\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  dotnet-test/platform-detection/\n  (could not read directory)\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview dotnet/skills dotnet-test/platform-detection@cb7c10bd32b250459632df9e6fa1350cdaf00b18\n\n"
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/run-tests",
+        "localFolder": "run-tests",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed dotnet-test/run-tests (from dotnet/skills@v1.0.0) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref v1.0.0 (cb7c10bd)\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  dotnet-test/run-tests/\n  (could not read directory)\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview dotnet/skills dotnet-test/run-tests@cb7c10bd32b250459632df9e6fa1350cdaf00b18\n\n"
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/test-anti-patterns",
+        "localFolder": "test-anti-patterns",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed dotnet-test/test-anti-patterns (from dotnet/skills@v1.0.0) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref v1.0.0 (cb7c10bd)\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  dotnet-test/test-anti-patterns/\n  (could not read directory)\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview dotnet/skills dotnet-test/test-anti-patterns@cb7c10bd32b250459632df9e6fa1350cdaf00b18\n\n"
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/writing-mstest-tests",
+        "localFolder": "writing-mstest-tests",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed dotnet-test/writing-mstest-tests (from dotnet/skills@v1.0.0) in $TARGET/.agents/skills\n",
+        "standardError": "Using ref v1.0.0 (cb7c10bd)\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  dotnet-test/writing-mstest-tests/\n  (could not read directory)\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview dotnet/skills dotnet-test/writing-mstest-tests@cb7c10bd32b250459632df9e6fa1350cdaf00b18\n\n"
+      }
+    ],
+    "actions": [
+      "Ran gh skill update --dir $TARGET/.agents/skills --all --dry-run.",
+      "Added directive dotnet-build-errors-and-warnings to AGENTS.",
+      "Added directive dotnet-cli-run to AGENTS.",
+      "Added directive foundation-prompt-log to AGENTS.",
+      "Added directive uno-build-and-run to AGENTS.",
+      "No target-local skill updates found."
+    ],
+    "skillUpdateDryRun": {
+      "exitCode": 0,
+      "standardOutput": "",
+      "standardError": "No installed skills found.\n",
+      "success": true
+    },
+    "skillUpdate": null,
+    "skillCopyResults": [],
+    "skillUpdateDryRuns": [
+      {
+        "exitCode": 0,
+        "standardOutput": "",
+        "standardError": "No installed skills found.\n",
+        "success": true
+      }
+    ],
+    "skillUpdates": []
+  },
+  "sources": [
+    {
+      "localPath": ".agents/skills/uno-toolkit-card",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "f6f5a9340f49cc4e3cfde333423e5546661da544",
+      "sourcePath": "skills/uno-toolkit-card",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "854feb792af2bb35b45ede2a4aa10b3b59c401c1ad8da14860a3240f3564e6c4"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-navigation-responsive-shell",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "e7d6654d9021c19e98f1d2f191aceff77fba388b",
+      "sourcePath": "skills/uno-navigation-responsive-shell",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "1e05500a5b80159afcdaa30445f153cdab2fd9fed3e37f87d9eb30b4525a6bbe",
+        "references/shell-responsive-template.md": "83ee1ab46b431cc39e39c0cc64e0cf8b8c03677a7d17cd5791669aa3f41ec783"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-toolkit-itemsrepeater-extensions",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "ce020ef29c05f1da2d3b0cb1f4b8b3eb3a2d0b90",
+      "sourcePath": "skills/uno-toolkit-itemsrepeater-extensions",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "f200a4fbed43495ae9f3251e273fa41e6684175c29bc74e4b17ce4485be09f4e"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-toolkit-getting-started",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "eeaaee8739e51681c3be7e94a612cf45ddef718e",
+      "sourcePath": "skills/uno-toolkit-getting-started",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "94ae3100ef5eec238fefb9a5c246e2ed55439f085ae7db25467196065f208c90"
+      }
+    },
+    {
+      "localPath": ".agents/skills/dotnet-modern-csharp-editorconfig",
+      "repository": "VincentH-Net/dotnet-agentic-engineering",
+      "reference": "refs/tags/v2.2.0",
+      "commit": "ebc711fb6db0912cae2b0c2bc4991d57d5afa007",
+      "tree": "d0b2d8c3feab12b59c225f56f5425bf2fb0ad079",
+      "sourcePath": "plugins/dotnet/skills/dotnet-modern-csharp-editorconfig",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "8f596a8bc3165cd1cba1d5627fac313e1ec11223a4ecf2f2866638495c217397"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-toolkit-input-extensions",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "cc6ba5ef8bee0a4594c3338d1229ecb3e7947081",
+      "sourcePath": "skills/uno-toolkit-input-extensions",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "1c9dfb28e116e8830808f2d3fe3893186c542c07d5367af5c3ecb877f80bab5e"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-xaml",
+      "repository": "VincentH-Net/dotnet-agentic-engineering",
+      "reference": "refs/tags/v2.2.0",
+      "commit": "ebc711fb6db0912cae2b0c2bc4991d57d5afa007",
+      "tree": "5ce96366741242aa1d3e8e86a0e1210e431c0f1d",
+      "sourcePath": "plugins/uno-platform/skills/uno-xaml",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "f9bf5d9302cebe82d175b268f884da83f9c0022039c44ec99c9d42adb35b0be1"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-navigation-contentcontrol",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "e2521bca9ad0882c00780c02baf9bebb5097553d",
+      "sourcePath": "skills/uno-navigation-contentcontrol",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "9c04f8a630cffe1efcf7a1c7d31c8f42e473f19d23f395ea93e724f884f10511"
+      }
+    },
+    {
+      "localPath": ".agents/skills/generate-testability-wrappers",
+      "repository": "dotnet/skills",
+      "reference": "refs/tags/v1.0.0",
+      "commit": "cb7c10bd32b250459632df9e6fa1350cdaf00b18",
+      "tree": "cfcb9685f3471aedab12b01807fce1acbce6d329",
+      "sourcePath": "plugins/dotnet-test/skills/generate-testability-wrappers",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "75784d8481c374a84fec6685cfc147520c352deb32e04647f3da5980bfc835ca"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-fluent2",
+      "repository": "VincentH-Net/dotnet-agentic-engineering",
+      "reference": "refs/tags/v2.2.0",
+      "commit": "ebc711fb6db0912cae2b0c2bc4991d57d5afa007",
+      "tree": "f89ab1fb3b125bd6836cd53b755d8170b4142eb4",
+      "sourcePath": "plugins/uno-platform/skills/uno-fluent2",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "a5d09986ff8e48df8d603b7e580da7ed7ab7cc6691f3c076b391b89eea886770"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-navigation-dialogs",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "55da0bced34a28cb33f522f6cdb10b56f240dc0d",
+      "sourcePath": "skills/uno-navigation-dialogs",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "a10d50292c189e8dea1988606d8bb75ff89d618596886bf495f4639928f196ce"
+      }
+    },
+    {
+      "localPath": ".agents/skills/dotnet-test-frameworks",
+      "repository": "dotnet/skills",
+      "reference": "refs/tags/v1.0.0",
+      "commit": "cb7c10bd32b250459632df9e6fa1350cdaf00b18",
+      "tree": "e63b5feebdab4ff15d5e7c961b082222bfb74afa",
+      "sourcePath": "plugins/dotnet-test/skills/dotnet-test-frameworks",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "24ea84fd509d4570a8bdc5a188ee695d73b00cb2e9936c73ed004c0456721670"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-toolkit-tabbar",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "48728ffa0e6d9a34f7a02cfec0ed72ecd37911c4",
+      "sourcePath": "skills/uno-toolkit-tabbar",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "34e8f35cac498db8d61ebce019006d5d563943bedec5942b715fec6fe51e6f15"
+      }
+    },
+    {
+      "localPath": ".agents/skills/migrate-static-to-wrapper",
+      "repository": "dotnet/skills",
+      "reference": "refs/tags/v1.0.0",
+      "commit": "cb7c10bd32b250459632df9e6fa1350cdaf00b18",
+      "tree": "e3a4f6e73b34408597d56b8256c29c2495fadd47",
+      "sourcePath": "plugins/dotnet-test/skills/migrate-static-to-wrapper",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "12a94cfc265d424f5e256f7ac3c7974facd9fa28e77afe612605c58f4da28dcb"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-toolkit-divider",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "9eed5c71e01258f568372556d8abaf2a4ff1da90",
+      "sourcePath": "skills/uno-toolkit-divider",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "3a4376ac7df0eddf3c708aab15a82827176da839f3289c74d08c15059c68bce6"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-toolkit-segmented-controls",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "521293484f18d158d05ca7148d9d376e15d2a518",
+      "sourcePath": "skills/uno-toolkit-segmented-controls",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "1225259a3049be7b90767ff377c627e327fc3c354ec3597c8b4682ee5a0f477b"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-toolkit-shadowcontainer",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "a68b11635d8de462b8bcc3dba8ac6fe699db5d79",
+      "sourcePath": "skills/uno-toolkit-shadowcontainer",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "71ade11d4f0996168d752920cac90b57c0c231fa0156e53ef1c19b66a6cc8e17"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-navigation-qualifiers",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "bfcc7a6d44fa1e70280f4c324cf412c372012e31",
+      "sourcePath": "skills/uno-navigation-qualifiers",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "a0ef86e62939c5868936b383be417b23e5e80fa428940673083a52da7e8f507c"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-toolkit-flipview-extensions",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "e400ba703947a4cc9cc20e4f256dca39e0fafc0e",
+      "sourcePath": "skills/uno-toolkit-flipview-extensions",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "9fa9e695dc00d45c698196645623ed66e5cf5119102f1e99efc86fc6548dfc8e"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-toolkit-safearea",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "a4fc1ec8347fac1583df5d32881917ddb1ab58fd",
+      "sourcePath": "skills/uno-toolkit-safearea",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "83b3d5d89dfab29f1047ddcb15452caf978cd07945d8f1d9b60194bf729c5dd0"
+      }
+    },
+    {
+      "localPath": ".agents/skills/filter-syntax",
+      "repository": "dotnet/skills",
+      "reference": "refs/tags/v1.0.0",
+      "commit": "cb7c10bd32b250459632df9e6fa1350cdaf00b18",
+      "tree": "852508c90bde5e11124f12fd97ec579a1bd5a65d",
+      "sourcePath": "plugins/dotnet-test/skills/filter-syntax",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "67c5562c257d7f1e23390adf1bec68cd2d101d6a7b384aae0ebf2339251b4824"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-navigation-setup",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "514c6120444638e215528fcf563b85b75a88064a",
+      "sourcePath": "skills/uno-navigation-setup",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "f7d18e76f8538b2d5abaa0d3c07c84fe6e9ec4ab0ef6554b07e84b4d7ef5c4f2"
+      }
+    },
+    {
+      "localPath": ".agents/skills/mtp-hot-reload",
+      "repository": "dotnet/skills",
+      "reference": "refs/tags/v1.0.0",
+      "commit": "cb7c10bd32b250459632df9e6fa1350cdaf00b18",
+      "tree": "23208ab01f89be5b56a268aac613c34510dbe139",
+      "sourcePath": "plugins/dotnet-test/skills/mtp-hot-reload",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "93f42c2f4324c058dc5bb79173ab317fd49b979c1135daf2e4025f7f0f5924ef"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-toolkit-command-extensions",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "f96b5046e7d31232b1e8b492c03e1fb8c8686aa3",
+      "sourcePath": "skills/uno-toolkit-command-extensions",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "1ae875abff5257970f1755de67523336e79e47b20ba1baed9226be3bc3d30caf"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-toolkit-drawer",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "c7ccbc5864b5cb42c27f58543071cddece60649e",
+      "sourcePath": "skills/uno-toolkit-drawer",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "92fd3d2885d4f08caece213524e99b736d6fd244975e76cfd1a041ed3514a3ce"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-toolkit-loadingview",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "8d64c5b64bbea27567c34a663a3a3aff8c6964d5",
+      "sourcePath": "skills/uno-toolkit-loadingview",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "d9cdbe2915e8b77354a22cce8cdbb1110bec4696e110604337eced55a49188e9"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-toolkit-lightweight-styling",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "7f8cf75316329cc8bbf6af3aa165660dc49760a1",
+      "sourcePath": "skills/uno-toolkit-lightweight-styling",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "4d2a421232f59ac75851303c88221a7ae7c3b43ca91b7a701424dc9ca88d9efc"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-navigation-code",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "1eefa3e77dad288b161e3883d3887f4f92d20516",
+      "sourcePath": "skills/uno-navigation-code",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "eead50cb32551c9dcb2690279325f5c14edf0ebaa13ce67ee2f08b3920d49c2e"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-toolkit-navigationbar",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "d7dadaa87dee77f5ba5fef112e0e3dfb9a878af1",
+      "sourcePath": "skills/uno-toolkit-navigationbar",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "f6ccd43ec94b6e8f02b0fa23198be5303b4f216718e9ff2876f902421b272a0d"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-toolkit-visualstatemanager-extensions",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "518670a54495b6ecb319370ecc2c0ba19fe0ab5d",
+      "sourcePath": "skills/uno-toolkit-visualstatemanager-extensions",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "8a4dfe159564246eb04f335bf5b4b5ceaae555a475e1465659e8ee67b7f3a791"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-toolkit-zoomcontentcontrol",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "09e77e5fd43573da081d3c1d1a010a418f6aae68",
+      "sourcePath": "skills/uno-toolkit-zoomcontentcontrol",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "82a4b5fbc4203cb88bb63e13fdfd306bf2a88310072ae2a6bc535a065deb09bc"
+      }
+    },
+    {
+      "localPath": ".agents/skills/crap-score",
+      "repository": "dotnet/skills",
+      "reference": "refs/tags/v1.0.0",
+      "commit": "cb7c10bd32b250459632df9e6fa1350cdaf00b18",
+      "tree": "e67783e180c97e3631f50aa304b7256a25f182f9",
+      "sourcePath": "plugins/dotnet-test/skills/crap-score",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "effa2762dd27d5a282ca53f19c919d690744680ef4ac3072b5bc98e713333ca4"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-toolkit-chip",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "b039bc79f64c0b2140f2d05ee70f399260ba8a0a",
+      "sourcePath": "skills/uno-toolkit-chip",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "f795a9eb1ada04864776de2f71043c199b88d8bd156fdca9df6014efb2c61b07"
+      }
+    },
+    {
+      "localPath": ".agents/skills/writing-mstest-tests",
+      "repository": "dotnet/skills",
+      "reference": "refs/tags/v1.0.0",
+      "commit": "cb7c10bd32b250459632df9e6fa1350cdaf00b18",
+      "tree": "02ca0ad8517efa911ef1748d70b6942bcbaff7d2",
+      "sourcePath": "plugins/dotnet-test/skills/writing-mstest-tests",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "2b64c9b4ae8d8347c2a34d7850450bb648dc4e14bc6d07c47725271544ec91cf"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-extensions-services",
+      "repository": "mtmattei/UnoPlatformSkills",
+      "reference": "refs/heads/main",
+      "commit": "802045a45ae73eaae9b9ac70c01d0ff0e6c5d401",
+      "tree": "aaf1410a5abce667494d3cd68a9f392e024a92fa",
+      "sourcePath": "uno-extensions-services",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "0fa369d3f6aad002e8daeef162a5488db7768c27c79ba979caa357a6a62772a2",
+        "references/01-hosting-di.md": "d8f8b06cdd4d7554e5cfc0c8fb566829a3e3a8dc690fc8b4bf2009f3610ff4c9",
+        "references/02-authentication.md": "98de2bf0322db52c423731662f31aadbeead15310f8aff685d7399b6c561857f",
+        "references/03-http-clients.md": "dea04c3ec4d34a26a9bb1b1468e54dc2abbed476aee7b8b58b06993461efba1d",
+        "references/04-configuration-logging.md": "620e07778ed3751570a98f0b358b916c38e84f5a5f12d46bdb6416fe7bed36e5"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-navigation-routes",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "1b902e5e1f3c4b110622faecb8aa0af797303f64",
+      "sourcePath": "skills/uno-navigation-routes",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "414faaa6201a5b277a9b53bc96ef7bf8fb39e9633d385e7af28bf45e66d732c4"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-toolkit-statusbar-extensions",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "e55da7005d8d34e45d1be2eb6481614456cec029",
+      "sourcePath": "skills/uno-toolkit-statusbar-extensions",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "564264616d3c82f07a1692bd51e3f73ba598eaa28047b501e7fc6480eee40f28"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-toolkit-responsive",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "60e32b8e43fca467f8f8d4b2a0ad8d903054efcb",
+      "sourcePath": "skills/uno-toolkit-responsive",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "d26d3a78f3c208b8ba678baa33b5b4e02ec0ddbea47f73fcf01c8d4fbdd37b16"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-navigation-troubleshooting",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "b48797f0f12079643b5a89d23031e0b724c2e8bb",
+      "sourcePath": "skills/uno-navigation-troubleshooting",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "6ef2097ed9e80b33baa66d1069832d40ce6aeaa87f143cb6e318d7105a34afb4"
+      }
+    },
+    {
+      "localPath": ".agents/skills/test-anti-patterns",
+      "repository": "dotnet/skills",
+      "reference": "refs/tags/v1.0.0",
+      "commit": "cb7c10bd32b250459632df9e6fa1350cdaf00b18",
+      "tree": "2b9ee0e14e82d7c47681cf48171e650a21ba7532",
+      "sourcePath": "plugins/dotnet-test/skills/test-anti-patterns",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "a0ed15bdd7e2b91b5e7170d470967d653b2fa94f49fe502988f3e9bd245d15ae"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-toolkit-selector-extensions",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "77e4f5fe635bc6f8379e8860bd8f5eef1f924f9e",
+      "sourcePath": "skills/uno-toolkit-selector-extensions",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "329b8045478143a9198a3e5b900d61fef0e0b385852b765656f40ad0c89359f9"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-toolkit-system-theme-helper",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "be121e97958ce9b5b79bc357f802e6db4fa22cf0",
+      "sourcePath": "skills/uno-toolkit-system-theme-helper",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "9948d8c097260ad2dfece0e39628902eec14c14d3e3c95de8875c7c37d55c7ff"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-toolkit-progress-extensions",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "7fe7075d3d12ab89f0e4ffe896661da8e2aa3422",
+      "sourcePath": "skills/uno-toolkit-progress-extensions",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "0cc7f12de662feb3c584b1cbb5b3edb0fac61e29efe88ff902cc2666f631f913"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-navigation-regions",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "291104d418cc3b00efb7753c6b84472e4558f7c8",
+      "sourcePath": "skills/uno-navigation-regions",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "53f9bee5661efe9fb0b8146f425db92616d0d60baceccfd77ff5cf9c3c5fa056"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-toolkit-resource-extensions",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "0a250c2debc69250fd5397290a1d0c034893b271",
+      "sourcePath": "skills/uno-toolkit-resource-extensions",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "04de97b04797a8cc612983ffba1e955eaac5961decff30b8a2c0db6139a83245"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-livecharts2-theme-switching",
+      "repository": "VincentH-Net/dotnet-agentic-engineering",
+      "reference": "refs/tags/v2.2.0",
+      "commit": "ebc711fb6db0912cae2b0c2bc4991d57d5afa007",
+      "tree": "9b8359f343fe9008071dc8212146736d945454a1",
+      "sourcePath": "plugins/uno-platform/skills/uno-livecharts2-theme-switching",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "6135ff5bba1e5aff8e0351a48d41f4e3ce0dbabdda0d14be4849e5e823e165ed"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-toolkit-autolayout",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "a71cd267810bf66505c0ba09fa8ee6d00fd28747",
+      "sourcePath": "skills/uno-toolkit-autolayout",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "675bfd0f592f8ace2123482549b368461fca3a4fa9dfb716ffd03f76a32e2eca"
+      }
+    },
+    {
+      "localPath": ".agents/skills/detect-static-dependencies",
+      "repository": "dotnet/skills",
+      "reference": "refs/tags/v1.0.0",
+      "commit": "cb7c10bd32b250459632df9e6fa1350cdaf00b18",
+      "tree": "ab5fd93bd2c58acf1024aea42e4ca1ddf5da69fd",
+      "sourcePath": "plugins/dotnet-test/skills/detect-static-dependencies",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "3dc5a6715f70eac688313d9815365a1f1cd34e56154030d58e631eb6d2272a64"
+      }
+    },
+    {
+      "localPath": ".agents/skills/dotnet-livecharts2",
+      "repository": "VincentH-Net/dotnet-agentic-engineering",
+      "reference": "refs/tags/v2.2.0",
+      "commit": "ebc711fb6db0912cae2b0c2bc4991d57d5afa007",
+      "tree": "c9fa2d43ee3988284ffd53c7daa82880d1a51f63",
+      "sourcePath": "plugins/dotnet/skills/dotnet-livecharts2",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "a9599f7719500a29b3dbf5eeb77ec74d053d8c1e2ba9f9a12b644d5d870143ff"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-testing-ui",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "50b1d55344428b67cae6fcedbb0bb05165bbbcab",
+      "sourcePath": "skills/uno-testing-ui",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "7354909107c6c22836bfc045a38143454b6384914967cedf2b28d61eb94106e8",
+        "references/INTERACTION-PATTERNS.md": "c8cfd70fbe9a276e242c2ce22d921b379d5f6d908d8fe53f445699f5ad7913c5",
+        "references/VISUAL-TREE-GUIDE.md": "bedce73dd9bcb871f789e8b63dbe26db0c002bdd87860868a9a2864e3ec1070a"
+      }
+    },
+    {
+      "localPath": ".agents/skills/platform-detection",
+      "repository": "dotnet/skills",
+      "reference": "refs/tags/v1.0.0",
+      "commit": "cb7c10bd32b250459632df9e6fa1350cdaf00b18",
+      "tree": "19455e554d7aeabd2cf4abd7c91674de0c67703d",
+      "sourcePath": "plugins/dotnet-test/skills/platform-detection",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "b51cca9f5b2e4299eb0f90a362757a874acca4deb834768023a460377ebf1b70"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-agentic-support",
+      "repository": "VincentH-Net/dotnet-agentic-engineering",
+      "reference": "refs/tags/v2.2.0",
+      "commit": "ebc711fb6db0912cae2b0c2bc4991d57d5afa007",
+      "tree": "b7bae3b3ad22396709bf3cb8ea6ce7e907cafef0",
+      "sourcePath": "plugins/uno-platform/skills/uno-agentic-support",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "4de9076eebfef879e78a8d4b287cb741f6c520530d2e62f4812fba0b9d5224f5"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-navigation-xaml",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "b6edc57b486cf8952f9aeef798e13f3aceb92edc",
+      "sourcePath": "skills/uno-navigation-xaml",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "52b0301469a19d8e6fd7834bf3a0dc18c392b684f1a0329a5da90209feee3e3e",
+        "references/shell-frame-template.md": "66015cfc98c77c8904d528ce5dc32485a3889d685c9b25cd44fc5b8bdf924759"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-testing-assertions",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "01288542bae9ad1bac5fd4fafc4555263307e0b0",
+      "sourcePath": "skills/uno-testing-assertions",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "76fce655e3aa607198246b9b89c20c07272b1d3399934256277f7701442c3f76"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-navigation-navigationview",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "d9415f8c5efed67ea5375fe6bd54f448d9a43029",
+      "sourcePath": "skills/uno-navigation-navigationview",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "68fea3bd8324a2061d037b643c65d90242e8d2798f20e9bd5cb83c39a6554258",
+        "references/shell-navigationview-template.md": "e7f75a2a58a074fb56e505651afc211f0c5a5fa96b7d2942274e55bc029bef1c"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-responsive-spanning-gridwrap-layout",
+      "repository": "VincentH-Net/dotnet-agentic-engineering",
+      "reference": "refs/tags/v2.2.0",
+      "commit": "ebc711fb6db0912cae2b0c2bc4991d57d5afa007",
+      "tree": "b6bdf5e5bc97651b93169d2d4e5fd001d0614f8e",
+      "sourcePath": "plugins/uno-platform/skills/uno-responsive-spanning-gridwrap-layout",
+      "pin": null,
+      "sourceFiles": {
+        "ResponsiveSpanningGridWrapLayout.cs": "954b4c4b0a33c25be951241c401b84087a756bd2e4ea4ffbe4c71d929e8d070c",
+        "SKILL.md": "90c84ac2b842de197f6e2c2ceb79057cf3dec21dc62b4361d994b5faa1c73bfa"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-navigation-panel-visibility",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "673fff3f06330e8120101bed497d976f22499187",
+      "sourcePath": "skills/uno-navigation-panel-visibility",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "8af281f7fb7834597a8a01deda77281fca9e8d2599848d7884923beddbed66a1"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-toolkit-extendedsplashscreen",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "5b610f53cc6a166567be9d8f56a5ae3e397d3b8c",
+      "sourcePath": "skills/uno-toolkit-extendedsplashscreen",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "ffe4453bac21413735cb73de385439eb6f5f5d8e0f6912ffd4972f7ae2a95ef0"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-navigation-data",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "90f2200ff1af8e50b26b5336f56ad5043d70ff54",
+      "sourcePath": "skills/uno-navigation-data",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "54b99b4a067e7ade2a13a5ff603a692fffddf4451c69ed9e816eb8137ddefdc1"
+      }
+    },
+    {
+      "localPath": ".agents/skills/run-tests",
+      "repository": "dotnet/skills",
+      "reference": "refs/tags/v1.0.0",
+      "commit": "cb7c10bd32b250459632df9e6fa1350cdaf00b18",
+      "tree": "1df99bb3ac1d06d88693057255ae159d8458ae52",
+      "sourcePath": "plugins/dotnet-test/skills/run-tests",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "2cbb908b309ef2f2205fac0068885627ed96a90ad51ca833af27430b1ba209a3"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-test-resize-app-window",
+      "repository": "VincentH-Net/dotnet-agentic-engineering",
+      "reference": "refs/tags/v2.2.0",
+      "commit": "ebc711fb6db0912cae2b0c2bc4991d57d5afa007",
+      "tree": "830b6cc8e78805347509a8b3f7f079150fc1e8b8",
+      "sourcePath": "plugins/uno-platform/skills/uno-test-resize-app-window",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "3bdc886d46d04091c64688610fe342670f88e6e28e9763a0b817fc000c4c171a",
+        "resize-window.sh": "010ad9e66a8cdc263ff75fa1cd6c2ec7498dc10767882147fb4d78b8827149cb"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-toolkit-tabbaritem-extensions",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "002c12b5783d3462b2cbb9841748a3abb62e4d34",
+      "sourcePath": "skills/uno-toolkit-tabbaritem-extensions",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "940349946c1f073c5d3b4a3e7cba819f04464b2921877d069557464d61072c9b"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-toolkit-cupertino-theme",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "a1edc993cd75c89b8e212ed28c46d6a0760701af",
+      "sourcePath": "skills/uno-toolkit-cupertino-theme",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "c82b576b4d642913d15f9fa541f158390f9e2d2e26bea64e74fd0eeb6774e420"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-navigation-tabbar",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "724ee90a300ad5a7edec9c3c04efccc861e36460",
+      "sourcePath": "skills/uno-navigation-tabbar",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "43b13adc926c9152e22de53c611127bba6b73450491678923caeb748126b89fd",
+        "references/shell-tabbar-template.md": "b7e40707a3a94334bea2beece809847b145e90364cfda8eefb85b0893d0bcd89"
+      }
+    },
+    {
+      "localPath": ".agents/skills/uno-toolkit-ancestor-binding",
+      "repository": "unoplatform/studio",
+      "reference": "refs/heads/main",
+      "commit": "d57c60a1ce66a5acb899aa15e2344e614b807983",
+      "tree": "bfd56413f3184ee3774f19ee40ca221e441d90ea",
+      "sourcePath": "skills/uno-toolkit-ancestor-binding",
+      "pin": null,
+      "sourceFiles": {
+        "SKILL.md": "93600394511b41d751541d2f59aeb7ed10cded960e9e39d1ed0028e9ff9a0900"
+      }
+    }
+  ],
+  "companion": null,
+  "snapshotSha256": "caaf4bc46c6dfebe40fa4a1b552575429d99a04f71bf67f0f5f551f1307b8aa2",
+  "directiveSource": {
+    "repository": "VincentH-Net/dotnet-agentic-engineering",
+    "reference": "v2.2.0",
+    "commit": "ebc711fb6db0912cae2b0c2bc4991d57d5afa007"
+  },
+  "invocation": [
+    "agentic-check",
+    "$TARGET",
+    "--yes",
+    "--agents",
+    "codex",
+    "--verbose",
+    "--report",
+    "$WORKSPACE/installation.json"
+  ],
+  "rejectedItems": []
+}

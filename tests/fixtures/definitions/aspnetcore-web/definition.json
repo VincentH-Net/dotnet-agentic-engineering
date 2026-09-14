@@ -1,0 +1,11 @@
+{
+  "name": "aspnetcore-web",
+  "agents": "codex",
+  "baselinePreview": false,
+  "technologies": [
+    "foundation",
+    "dotnet",
+    "aspnetcore"
+  ],
+  "gates": {}
+}

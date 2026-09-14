@@ -1,0 +1,4 @@
+{
+  "README.md": "# orleans\n\nParseable detector inputs; these projects are not built or restored.\n",
+  "Orleans.csproj": "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup><ItemGroup><PackageReference Include=\"Microsoft.Orleans.Server\" Version=\"10.0.0\" /></ItemGroup></Project>\n"
+}

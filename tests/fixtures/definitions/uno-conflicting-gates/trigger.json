@@ -1,0 +1,5 @@
+{
+  "README.md": "# uno-conflicting-gates\n\nParseable detector inputs; these projects are not built or restored.\n",
+  "First/Uno.csproj": "<Project Sdk=\"Uno.Sdk/6.3.0\"><PropertyGroup><TargetFramework>net10.0</TargetFramework><UnoFeatures>MVUX;CSharpMarkup;Material</UnoFeatures></PropertyGroup></Project>\n",
+  "Second/Uno.csproj": "<Project Sdk=\"Uno.Sdk/6.3.0\"><PropertyGroup><TargetFramework>net10.0</TargetFramework><UnoFeatures>MVVM;SimpleTheme</UnoFeatures></PropertyGroup><ItemGroup><PackageReference Include=\"CSharpMarkup.WinUI\" Version=\"2.0.0\" /></ItemGroup></Project>\n"
+}

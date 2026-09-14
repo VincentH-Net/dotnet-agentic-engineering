@@ -1,0 +1,14 @@
+{
+  "name": "dotnet-cli",
+  "agents": "codex",
+  "baselinePreview": false,
+  "technologies": [
+    "foundation",
+    "dotnet"
+  ],
+  "gates": {
+    "cli": [
+      "cli"
+    ]
+  }
+}

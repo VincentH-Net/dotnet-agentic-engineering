@@ -39,6 +39,13 @@ sealed class CheckWorkflow(
             DryRun = options.DryRun
         };
 
+        if (options.PreviewSourceRef is not null
+            && (!options.Preview || !GitHubSourceVersionResolver.IsValidPreviewRef(options.PreviewSourceRef)))
+        {
+            reporter.Error("--preview-source-ref requires --preview and a valid branch reference or commit SHA.");
+            return new CheckRunResult(2, report);
+        }
+
         if (!string.IsNullOrWhiteSpace(options.SkillsDirectory) && !string.IsNullOrWhiteSpace(options.Agents))
         {
             reporter.Error("Specify no more than one of --skills-dir and --agents.");
@@ -127,11 +134,21 @@ sealed class CheckWorkflow(
         string firstSkillsDirectory = skillsDirectories[0];
         report.SkillsDirectory = firstSkillsDirectory;
         report.SkillsDirectories.AddRange(skillsDirectories);
-        var manifest = await AddSourceVersionInfoAsync(
-            skillManifest ?? (options.Preview ? StaticSkillManifest.Preview : StaticSkillManifest.All),
-            sourceMode,
-            directiveCacheSettings,
-            cancellationToken).ConfigureAwait(false);
+        IReadOnlyList<SkillManifestEntry> manifest;
+        try
+        {
+            manifest = await AddSourceVersionInfoAsync(
+                skillManifest ?? (options.Preview ? StaticSkillManifest.Preview : StaticSkillManifest.All),
+                sourceMode,
+                directiveCacheSettings,
+                options.PreviewSourceRef,
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch (DirectiveException exception) when (options.PreviewSourceRef is not null)
+        {
+            reporter.Error(exception.Message);
+            return new CheckRunResult(2, report);
+        }
 
         var sourceVersion = manifest.FirstOrDefault(skill => skill.SourceRepo == CompanionDependency.SourceRepo);
         var contentSource = directiveSource ?? new GitHubDirectiveSource(
@@ -512,9 +529,10 @@ sealed class CheckWorkflow(
         IReadOnlyList<SkillManifestEntry> manifest,
         SourceVersionMode sourceVersionMode,
         DirectiveCacheSettings cacheSettings,
+        string? previewSourceRef,
         CancellationToken cancellationToken)
     {
-        var resolver = sourceVersionResolver ?? new GitHubSourceVersionResolver(reporter: reporter);
+        var resolver = sourceVersionResolver ?? new GitHubSourceVersionResolver(reporter: reporter, previewSourceRef: previewSourceRef);
         IReadOnlyDictionary<string, SourceVersionInfo> versions;
         try
         {
@@ -522,7 +540,7 @@ sealed class CheckWorkflow(
                 .ResolveVersionsAsync(manifest.Select(skill => skill.SourceRepo), sourceVersionMode, cacheSettings, cancellationToken)
                 .ConfigureAwait(false);
         }
-        catch (DirectiveException exception)
+        catch (DirectiveException exception) when (previewSourceRef is null)
         {
             reporter.Warning($"Could not resolve skill source versions: {exception.Message}");
             return manifest;

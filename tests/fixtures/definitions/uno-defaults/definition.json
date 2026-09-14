@@ -1,0 +1,19 @@
+{
+  "name": "uno-defaults",
+  "agents": "codex",
+  "baselinePreview": false,
+  "technologies": [
+    "foundation",
+    "dotnet",
+    "uno"
+  ],
+  "gates": {
+    "presentation": [],
+    "markup": [
+      "xaml"
+    ],
+    "theme": [
+      "fluent"
+    ]
+  }
+}

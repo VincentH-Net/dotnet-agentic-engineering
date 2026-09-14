@@ -8,4 +8,5 @@ sealed record AgenticCheckOptions(
     string? SkillsDirectory,
     string? Agents,
     bool Verbose,
-    bool Preview = false);
+    bool Preview = false,
+    string? PreviewSourceRef = null);

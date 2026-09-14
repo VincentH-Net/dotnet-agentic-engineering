@@ -1,0 +1,7 @@
+{
+  "README.md": "# broad-stack\n\nParseable detector inputs; these projects are not built or restored.\n",
+  "Web/Web.csproj": "<Project Sdk=\"Microsoft.NET.Sdk.Web\"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>\n",
+  "Uno/Uno.csproj": "<Project Sdk=\"Uno.Sdk/6.3.0\"><PropertyGroup><TargetFramework>net10.0</TargetFramework><UnoFeatures>MVUX;CSharpMarkup;Material</UnoFeatures></PropertyGroup></Project>\n",
+  "Orleans/Orleans.csproj": "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup><ItemGroup><PackageReference Include=\"Microsoft.Orleans.Server\" Version=\"10.0.0\" /></ItemGroup></Project>\n",
+  "Console/Console.csproj": "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><TargetFramework>net10.0</TargetFramework><OutputType>Exe</OutputType></PropertyGroup></Project>\n"
+}

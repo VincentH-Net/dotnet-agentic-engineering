@@ -1,0 +1,27 @@
+{
+  "name": "broad-stack",
+  "agents": "codex,claude-code",
+  "baselinePreview": false,
+  "technologies": [
+    "foundation",
+    "dotnet",
+    "uno",
+    "orleans",
+    "aspnetcore"
+  ],
+  "gates": {
+    "cli": [
+      "cli"
+    ],
+    "presentation": [
+      "mvux"
+    ],
+    "markup": [
+      "csharp",
+      "xaml"
+    ],
+    "theme": [
+      "material"
+    ]
+  }
+}
