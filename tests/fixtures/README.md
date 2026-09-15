@@ -35,7 +35,8 @@ preparation or candidate network scenarios, a once-per-process preflight checks 
 authentication and reads the live authenticated budget in an isolated workspace. Missing or
 invalid credentials fail with login/token guidance; the harness never starts an interactive
 login. Redirected and terminal children receive the same explicit credentials. No token is
-logged or stored. Git/global agent directories, CLI home, NuGet caches, and configuration are isolated.
+logged or preserved in reports. PTY startup uses a temporary user-only environment file that
+Bash removes before commands run. Git/global agent directories, CLI home, NuGet caches, and configuration are isolated.
 Fixture child processes disable gh telemetry (`GH_TELEMETRY=0`) to prevent delayed telemetry
 writes racing disposal of the temporary home directory.
 
@@ -150,9 +151,15 @@ reruns. Preserve the directories for diagnostics; never seed them from the oracl
 runs. This supersedes the original per-scenario product HTTP isolation requirement.
 With unchanged sources and no expiry/retries, the candidate matrix is estimated to need
 about 17 anonymous API requests (8 preview + 9 stable). This is not a measured guarantee;
-real gh and independent verification still use the separate authenticated budget.
+real gh and independent verification use the separate authenticated budget through one
+run-scoped test-only caching gateway. Every temporary gh configuration points its
+`http_unix_socket` at the same .NET gateway; your ordinary gh configuration is untouched.
+Only quota probes and boundary source validation deliberately bypass read caching.
+See [the quota design and diagnostics](github-api-quota-plan.md) and
+[measured proxy verification results](github-api-proxy-verification.md).
 Target, SDK/NuGet HTTP, CLI, Git, and gh state stay separate. Independently retrieved upstream
-identities are checked around each operation, so stale/moving sources cannot silently pass.
+identities are compared at the start/end of the whole network run. A changed or unavailable
+source invalidates the run with rerun guidance, including otherwise unchanged-source skips.
 Cached installed nupkg bytes and running companion versions are checked, and input hashes are checked again
 on completion/failure. Test fixture commits are local to disposable repositories.
 

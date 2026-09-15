@@ -3,6 +3,7 @@ using Xunit.Abstractions;
 
 namespace Agentic.Check.LiveTests;
 
+[Collection(GitHubNetworkScope.Name)]
 public sealed class PackageFixtureTests(ITestOutputHelper output)
 {
     static readonly PackageTestRun TestRun = new();

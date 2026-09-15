@@ -3,6 +3,7 @@ using Xunit.Abstractions;
 
 namespace Agentic.Check.LiveTests;
 
+[Collection(GitHubNetworkScope.Name)]
 public sealed class SkillDiscoveryLiveTests(ITestOutputHelper output)
 {
     static readonly JsonSerializerOptions ReportJsonOptions = new() { WriteIndented = true };

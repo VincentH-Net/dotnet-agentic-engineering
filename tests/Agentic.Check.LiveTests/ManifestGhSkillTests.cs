@@ -5,6 +5,7 @@ using Xunit.Abstractions;
 
 namespace Agentic.Check.LiveTests;
 
+[Collection(GitHubNetworkScope.Name)]
 public sealed class ManifestGhSkillTests(ITestOutputHelper output)
 {
     [SkillMaintenanceFact]

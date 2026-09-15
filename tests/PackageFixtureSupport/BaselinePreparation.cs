@@ -33,7 +33,6 @@ static class BaselinePreparation
         var retrieved = previous?.RetrievedAtUtc ?? package.RetrievedAtUtc ?? DateTimeOffset.UtcNow;
         if (previous is not null)
             FixtureFiles.Require(previous.Installer.Sha256 == package.Sha256, "Resume installer bytes differ.");
-        _ = Directory.CreateDirectory(destination);
         using FixtureWorkspace tools = new();
         await tools.InitializeAsync().ConfigureAwait(false);
         string sdk = await tools.Process.SuccessAsync("dotnet", ["--version"], tools.Root).ConfigureAwait(false);
@@ -46,6 +45,8 @@ static class BaselinePreparation
         FixtureFiles.Require(version.StartsWith(definition.InstallerVersion, StringComparison.Ordinal), $"Wrong executable: {version}");
         List<string> completed = previous is null ? [] : [.. previous.Completed];
         Dictionary<string, string> failed = previous is null ? new(StringComparer.Ordinal) : new(previous.Failed, StringComparer.Ordinal);
+        string pending = Path.Combine(FixtureFiles.Reports, "preparation", baselineId, "pending-" + Guid.NewGuid().ToString("N"));
+        _ = Directory.CreateDirectory(pending);
         foreach (string fixturePath in Directory.GetDirectories(Path.Combine(FixtureFiles.Checkout, "tests/fixtures/definitions")).Order(StringComparer.Ordinal))
         {
             var fixture = FixtureFiles.ReadJson<FixtureDefinition>(Path.Combine(fixturePath, "definition.json"));
@@ -54,7 +55,7 @@ static class BaselinePreparation
             Console.WriteLine($"Preparing {fixture.Name} with published {package.Id} {package.Version}...");
             try
             {
-                await CaptureAsync(fixture, fixturePath, definition, destination, executable, companion).ConfigureAwait(false);
+                await CaptureAsync(fixture, fixturePath, definition, destination, pending, executable, companion).ConfigureAwait(false);
                 completed.Add(fixture.Name);
                 _ = failed.Remove(fixture.Name);
                 Console.WriteLine($"Completed {fixture.Name}.");
@@ -65,10 +66,20 @@ static class BaselinePreparation
                 FixtureFiles.WriteJson(Path.Combine(FixtureFiles.Reports, "preparation", baselineId, $"{fixture.Name}-failure-{Guid.NewGuid():N}.json"), new { exception.Message, exception.StackTrace });
                 Console.WriteLine($"FAILED {fixture.Name}: {exception.Message}");
             }
-            FixtureFiles.WriteJson(Path.Combine(destination, "collection.json"), new BaselineCollection(baselineId, definition, package with { Path = Path.GetFileName(package.Path) }, retrieved, sdk, gh,
-                RuntimeInformation.OSDescription, [.. completed], failed, version));
         }
         package.Verify();
+        // Only accept captures after the entire preparation operation passes source validation.
+        // Failed validation leaves diagnostic captures under reports and accepted snapshots untouched.
+        await GitHubFixtureRun.Shared.CompleteAsync().ConfigureAwait(false);
+        _ = Directory.CreateDirectory(destination);
+        foreach (string capture in Directory.GetDirectories(pending))
+        {
+            string staged = Path.Combine(destination, ".capture-" + Guid.NewGuid().ToString("N"));
+            FixtureFiles.Copy(capture, staged);
+            Directory.Move(staged, Path.Combine(destination, Path.GetFileName(capture)));
+        }
+        FixtureFiles.WriteJson(Path.Combine(destination, "collection.json"), new BaselineCollection(baselineId, definition, package with { Path = Path.GetFileName(package.Path) }, retrieved, sdk, gh,
+            RuntimeInformation.OSDescription, [.. completed], failed, version));
         return failed.Count == 0 ? 0 : 1;
     }
 
@@ -94,7 +105,7 @@ static class BaselinePreparation
         }
     }
 
-    static async Task CaptureAsync(FixtureDefinition fixture, string fixturePath, BaselineDefinition baseline, string destination, string executable, PackageArtifact? companion)
+    static async Task CaptureAsync(FixtureDefinition fixture, string fixturePath, BaselineDefinition baseline, string destination, string captureDestination, string executable, PackageArtifact? companion)
     {
         using FixtureWorkspace workspace = new();
         FixtureFiles.MaterializeTrigger(fixturePath, workspace.Target);
@@ -135,8 +146,6 @@ static class BaselinePreparation
             var actualFolders = origins.Where(origin => origin.LocalPath.StartsWith(agent + "/", StringComparison.Ordinal)).Select(origin => origin.LocalPath).Order(StringComparer.Ordinal);
             FixtureFiles.Require(expectedFolders.SequenceEqual(actualFolders), $"Incomplete published skill inventory in {agent}.");
         }
-        foreach (var origin in origins.DistinctBy(origin => (origin.Repository, origin.Reference)))
-            await oracle.EnsureUnmovedAsync(await oracle.SnapshotAsync(origin.Repository, origin.Reference).ConfigureAwait(false)).ConfigureAwait(false);
         if (companion is null)
             FixtureFiles.Require(!File.Exists(Path.Combine(workspace.Target, ".config/dotnet-tools.json")), "Unexpected baseline companion manifest.");
         else
@@ -145,7 +154,6 @@ static class BaselinePreparation
         FixtureFiles.Require(agents.Contains("foundation-prompt-log:start", StringComparison.Ordinal), "Missing foundation directive.");
         foreach (var (name, block) in DirectiveOracle.Expected(directiveSource.Directory, fixture.Technologies))
             FixtureFiles.Require(agents.Contains(block, StringComparison.Ordinal), $"Published directive {name} differs from {directiveSource.Commit}.");
-        await oracle.EnsureUnmovedAsync(directiveSource).ConfigureAwait(false);
         if (fixture.Agents.Contains("claude-code", StringComparison.Ordinal))
             FixtureFiles.Require((await File.ReadAllTextAsync(Path.Combine(workspace.Target, "CLAUDE.md")).ConfigureAwait(false)).Contains("AGENTS.md", StringComparison.Ordinal), "Missing Claude import.");
         var capturedAt = DateTimeOffset.UtcNow;
@@ -172,11 +180,11 @@ static class BaselinePreparation
             }
         }
         // Stage on the destination volume so the final rename is also portable across temp/checkout drives.
-        string staged = Path.Combine(destination, $".capture-{Guid.NewGuid():N}");
+        string staged = Path.Combine(captureDestination, $".capture-{Guid.NewGuid():N}");
         try
         {
             FixtureFiles.Copy(capture, staged);
-            Directory.Move(staged, Path.Combine(destination, fixture.Name));
+            Directory.Move(staged, Path.Combine(captureDestination, fixture.Name));
         }
         finally
         {

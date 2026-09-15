@@ -183,7 +183,11 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
                 await auto.WaitUntilTextAsync("Filter: foundation-prompt-log").ConfigureAwait(false);
                 await auto.SpaceAsync().ConfigureAwait(false);
                 await auto.EscapeAsync().ConfigureAwait(false);
+                // The unfiltered selector is paged; bring the dependency back into view.
+                await auto.TypeAsync("InnoWvate.Agentic").ConfigureAwait(false);
+                await auto.WaitUntilTextAsync("Filter: InnoWvate.Agentic").ConfigureAwait(false);
                 await auto.WaitUntilTextAsync("[x] InnoWvate.Agentic").ConfigureAwait(false);
+                await auto.EscapeAsync().ConfigureAwait(false);
                 await auto.RightAsync().ConfigureAwait(false);
             }
             await auto.EnterAsync().ConfigureAwait(false);
@@ -250,8 +254,7 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
                 FixtureFiles.Require(report.GetProperty("installResults").GetArrayLength() == 0, "Subsequent stable check unexpectedly reinstalled skills.");
             }
         }
-        foreach (var source in sources.Values)
-            await oracle.EnsureUnmovedAsync(source).ConfigureAwait(false);
+        // Mutable sources are validated once at the end of the owning network test collection.
     }
 
     async Task VerifyDeliveredAsync()

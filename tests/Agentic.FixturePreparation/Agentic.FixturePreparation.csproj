@@ -6,6 +6,7 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <Compile Include="../PackageFixtureSupport/*.cs" Link="Support/%(Filename)%(Extension)" />
     <PackageReference Include="Hex1b" Version="0.165.0" />
     <PackageReference Include="YamlDotNet" Version="18.1.0" />

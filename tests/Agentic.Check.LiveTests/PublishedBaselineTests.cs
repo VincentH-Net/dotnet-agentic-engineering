@@ -3,6 +3,7 @@ using Xunit.Abstractions;
 
 namespace Agentic.Check.LiveTests;
 
+[Collection(GitHubNetworkScope.Name)]
 public sealed class PublishedBaselineTests(ITestOutputHelper output)
 {
     [SkippableTheory]
@@ -22,7 +23,6 @@ public sealed class PublishedBaselineTests(ITestOutputHelper output)
         var installed = Assert.Single(await oracle.VerifySkillsAsync(workspace.Target).ConfigureAwait(true));
         Assert.Equal(source.Commit, installed.Commit);
         Assert.Equal(pin, installed.Pin);
-        await oracle.EnsureUnmovedAsync(source).ConfigureAwait(true);
         output.WriteLine($"Real-gh helper verification only: {installed.Repository}@{installed.Reference}, pin {installed.Pin}, commit {installed.Commit}, tree {installed.Tree}");
     }
 

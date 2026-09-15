@@ -1,5 +1,4 @@
-﻿using System.Diagnostics;
-using System.Globalization;
+﻿using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using YamlDotNet.Core;
@@ -182,58 +181,8 @@ sealed class MaintenanceGh(Func<IReadOnlyList<string>, CancellationToken, Task<C
     {
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeout.CancelAfter(TimeSpan.FromMinutes(2));
-        ProcessStartInfo startInfo = new("gh")
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            RedirectStandardInput = true,
-            UseShellExecute = false
-        };
-        foreach (string argument in arguments)
-        {
-            startInfo.ArgumentList.Add(argument);
-        }
-
-        startInfo.Environment["GH_PAGER"] = "cat";
-        startInfo.Environment["GH_PROMPT_DISABLED"] = "1";
-        startInfo.Environment["NO_COLOR"] = "1";
-        using Process process = new() { StartInfo = startInfo };
-        try
-        {
-            _ = process.Start();
-        }
-        catch (System.ComponentModel.Win32Exception exception)
-        {
-            throw new IOException("Could not start gh. Install GitHub CLI before running maintenance tests.", exception);
-        }
-
-        process.StandardInput.Close();
-        var stdout = process.StandardOutput.ReadToEndAsync(timeout.Token);
-        var stderr = process.StandardError.ReadToEndAsync(timeout.Token);
-        try
-        {
-            await process.WaitForExitAsync(timeout.Token).ConfigureAwait(false);
-            return new(process.ExitCode, await stdout.ConfigureAwait(false), await stderr.ConfigureAwait(false));
-        }
-        catch (OperationCanceledException)
-        {
-            if (!process.HasExited)
-            {
-                process.Kill(entireProcessTree: true);
-            }
-
-            await process.WaitForExitAsync(CancellationToken.None).ConfigureAwait(false);
-            try
-            {
-                _ = await Task.WhenAll(stdout, stderr).ConfigureAwait(false);
-            }
-            catch (OperationCanceledException)
-            {
-                // Observe both cancelled stream reads after terminating the child process.
-            }
-
-            throw new IOException($"gh {string.Join(' ', arguments)} timed out or was cancelled.");
-        }
+        var result = await PackageFixtures.GitHubFixtureRun.RunGhAsync(arguments, cancellationToken: timeout.Token).ConfigureAwait(false);
+        return new(result.ExitCode, result.Output, result.Error);
     }
 
     static string ResolveCacheDuration()

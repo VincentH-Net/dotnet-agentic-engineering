@@ -18,7 +18,9 @@ static partial class CandidateInputs
         string sha = await process.SuccessAsync("git", ["rev-parse", "HEAD"], checkout).ConfigureAwait(false);
         string remote = await process.SuccessAsync("git", ["ls-remote", "--exit-code", "origin", "refs/heads/" + branch], checkout).ConfigureAwait(false);
         FixtureFiles.Require(remote.Split('\t')[0] == sha, $"SOURCE NOT READY: origin/{branch} must point to committed candidate {sha}.");
-        string defaultBranch = await process.SuccessAsync("gh", ["api", $"repos/{SourceOracle.OwnRepository}", "--jq", ".default_branch"], checkout).ConfigureAwait(false);
+        var branchResult = await GitHubFixtureRun.RunGhAsync(["api", "--hostname", "github.com", $"repos/{SourceOracle.OwnRepository}", "--jq", ".default_branch"], checkout).ConfigureAwait(false);
+        branchResult.RequireSuccess("Candidate default branch");
+        string defaultBranch = branchResult.Output.Trim();
         FixtureFiles.Require(branch != defaultBranch, "Candidate source must be on a non-default development branch.");
         string status = await process.SuccessAsync("git", ["status", "--porcelain", "--untracked-files=all", "--", "src", "skills", "plugins", "directives", ".agents/skills", "Directory.Build.props", "Directory.Build.targets", "Directory.Packages.props", "global.json", "NuGet.Config", "nuget.config", ".editorconfig"], checkout).ConfigureAwait(false);
         FixtureFiles.Require(status.Length == 0, "Candidate build/content inputs must be committed and clean:\n" + status);

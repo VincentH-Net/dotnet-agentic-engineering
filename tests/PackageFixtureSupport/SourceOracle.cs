@@ -86,13 +86,6 @@ sealed class SourceOracle(RealProcess process, string workingDirectory) : IDispo
         return await SnapshotAsync(repository, reference).ConfigureAwait(false);
     }
 
-    internal async Task EnsureUnmovedAsync(SourceSnapshot snapshot)
-    {
-        var current = await ApiAsync($"repos/{snapshot.Repository}/commits/{Uri.EscapeDataString(snapshot.Reference)}").ConfigureAwait(false);
-        FixtureFiles.Require(current.GetProperty("sha").GetString() == snapshot.Commit,
-            $"SOURCE MOVEMENT: {snapshot.Repository}@{snapshot.Reference}: {snapshot.Commit} -> {current.GetProperty("sha").GetString()}");
-    }
-
     internal async Task<IReadOnlyList<SkillOrigin>> VerifySkillsAsync(string target, IReadOnlyDictionary<string, SourceSnapshot>? selected = null, IReadOnlySet<string>? allowedFolders = null)
     {
         List<SkillOrigin> origins = [];

@@ -13,11 +13,32 @@ static class RecordedTerminal
     {
         FixtureFiles.Require(Supported, "PTY automation requires Bash on macOS/Linux.");
         _ = Directory.CreateDirectory(Path.GetDirectoryName(recordingPath)!);
+        // Hex1b 0.165's Unix native PTY uses the inherited native environment, ignoring
+        // managed overrides. Apply them before any command using a private Bash startup file.
+        string startup = Path.Combine(workspace.Root, "terminal-environment-" + Guid.NewGuid().ToString("N"));
+        if (OperatingSystem.IsWindows())
+            throw new PlatformNotSupportedException("Recorded terminal requires Unix Bash.");
+        using (FileStream stream = new(startup, new FileStreamOptions
+        {
+            Mode = FileMode.CreateNew, Access = FileAccess.Write,
+            UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite
+        }))
+        using (StreamWriter writer = new(stream))
+        {
+            await writer.WriteLineAsync("set +x +v; unset HISTFILE").ConfigureAwait(false);
+            foreach (var (name, value) in workspace.Environment)
+            {
+                FixtureFiles.Require(name.All(character => char.IsAsciiLetterOrDigit(character) || character == '_'), "Invalid fixture environment key.");
+                await writer.WriteLineAsync("export " + name + "=" + Quote(value)).ConfigureAwait(false);
+            }
+            await writer.WriteLineAsync("cd -- " + Quote(workspace.Target) + " || exit 1").ConfigureAwait(false);
+            await writer.WriteLineAsync("rm -- " + Quote(startup)).ConfigureAwait(false);
+        }
         var terminal = Hex1bTerminal.CreateBuilder().WithHeadless().WithDimensions(260, 220)
             .WithPtyProcess(options =>
             {
                 options.FileName = "/bin/bash";
-                options.Arguments = ["--noprofile", "--norc", "-i"];
+                options.Arguments = ["--noprofile", "--rcfile", startup, "-i"];
                 options.WorkingDirectory = workspace.Target;
                 options.Environment = workspace.Environment;
             })
