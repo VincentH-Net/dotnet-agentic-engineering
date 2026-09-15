@@ -1,0 +1,790 @@
+{
+  "name": "preview-web-cli",
+  "preparedAtUtc": "2026-09-15T14:14:49.043631+00:00",
+  "label": "Selective preview installation using unchanged published Agentic.Check 2.2.0 on 2026-09-15T14:14:49.0436310\u002B00:00; only removed dotnet-test-frameworks deselected",
+  "definition": {
+    "name": "preview-web-cli",
+    "agents": "codex",
+    "baselinePreview": true,
+    "technologies": [
+      "foundation",
+      "dotnet",
+      "aspnetcore"
+    ],
+    "gates": {
+      "cli": [
+        "cli"
+      ]
+    }
+  },
+  "triggerHashes": {
+    "README.md": "4d32015925ad7030206df4a7a7c61922910df72c4cea2a90f25ae9f4398327ef",
+    "Web.csproj": "8e51e73f894e247ea584094e98a22c2e6155847050ec17b55b3aa2af6a2bb1e0"
+  },
+  "files": {
+    ".agents/skills/cli-e2e-testing/SKILL.md": "490de493b6419ff2d3470f15d469267fdbef0016eda924a51f76e4d5352fc6a1",
+    ".agents/skills/crap-score/SKILL.md": "03339905db74bbd36a450c2a8450d42cf3f2e7387c8b0d1285c0811502ea7cea",
+    ".agents/skills/detect-static-dependencies/SKILL.md": "8d52c4878c4ea93aae1f55c21180fc707bdd844702022e6c1511872b3e889bb5",
+    ".agents/skills/dotnet-livecharts2/SKILL.md": "b4fe2f97b3585b3a3942fe5c55bd2698799c90979461989cc867711f7911f6b3",
+    ".agents/skills/dotnet-modern-csharp-editorconfig/SKILL.md": "c907418f77f62a1c4a803aab4f67b38d4af4d089b7fa4bdf0fe28108c03b317f",
+    ".agents/skills/dotnet-webapi/SKILL.md": "9c8f0adbe51e08880a67786c519347f894189bd94b901b1bb282868492fe332e",
+    ".agents/skills/filter-syntax/SKILL.md": "fa14618875c7605dd12ca613e41ec982edee25c0d72bfbefab25f1ce70342c46",
+    ".agents/skills/generate-testability-wrappers/SKILL.md": "ed52a616675e7015f4d3e1232a40c548de8f27b558291d44fa9f557c3dcdcd7b",
+    ".agents/skills/migrate-static-to-wrapper/SKILL.md": "2b4ef2f2a909c13e2e1acf69b2d22c2b89a33708f98a397fe8fd7afb63fc8543",
+    ".agents/skills/minimal-api-file-upload/SKILL.md": "83d4bbdc34fd484fb2a3ee1c2c2d1c555879c068e513191f9b3082939d722b43",
+    ".agents/skills/mtp-hot-reload/SKILL.md": "ff0a085056789cad05ec9d01b919d466217ec4d4f59bff754b4bb9ded896793b",
+    ".agents/skills/platform-detection/SKILL.md": "f52d5d5622d84ea6f700b1565a51d1b6656616aa7ed26174e85f712b92af1d1e",
+    ".agents/skills/platform-detection/references/command-mode.md": "08e276dcafe6bd5bfbaab435065ca24a5800a4eae3ffd7fc15daa1e81354bbc4",
+    ".agents/skills/run-tests/SKILL.md": "5593ff303cf54346cb653b764eaec214adaa912a7d06ad57a291fbf4fbdda614",
+    ".agents/skills/test-anti-patterns/SKILL.md": "07372896ab337c8723bd9a13386410d707338349b6083231d8806aa6b1306cb3",
+    ".agents/skills/writing-mstest-tests/SKILL.md": "8a93ddd0de7f61656cf23acf7e6a5b37c885c0e6133a1a9e969f45f43d74c110",
+    "AGENTS.md": "e2ca43a7dc683e9be69a792e36f2c00d25a6af0bc117df5cb11e2b1f4bf28a73",
+    "README.md": "4d32015925ad7030206df4a7a7c61922910df72c4cea2a90f25ae9f4398327ef",
+    "Web.csproj": "8e51e73f894e247ea584094e98a22c2e6155847050ec17b55b3aa2af6a2bb1e0"
+  },
+  "report": {
+    "targetDirectory": "$TARGET",
+    "dryRun": false,
+    "repoRoot": "$TARGET",
+    "skillsDirectory": "$TARGET/.agents/skills",
+    "skillsDirectories": [
+      "$TARGET/.agents/skills"
+    ],
+    "prerequisites": [
+      {
+        "name": "gh",
+        "success": true,
+        "version": "2.100.0",
+        "minimumVersion": "2.93.0",
+        "standardOutput": "gh version 2.100.0 (2026-09-03)\nhttps://github.com/cli/cli/releases/tag/v2.100.0\n",
+        "standardError": ""
+      },
+      {
+        "name": "gh skill",
+        "success": true,
+        "version": null,
+        "minimumVersion": null,
+        "standardOutput": "Install and manage agent skills from GitHub repositories.\n\nWorking with agent skills in the GitHub CLI is in preview and\nsubject to change without notice.\n\n\nUSAGE\n  gh skill \u003Ccommand\u003E [flags]\n\nALIASES\n  gh skills\n\nAVAILABLE COMMANDS\n  install:       Install agent skills from a GitHub repository (preview)\n  list:          List installed skills (preview)\n  preview:       Preview a skill from a GitHub repository (preview)\n  publish:       Validate and publish skills to a GitHub repository (preview)\n  search:        Search for skills across GitHub (preview)\n  update:        Update installed skills to their latest versions (preview)\n\nINHERITED FLAGS\n  --help   Show help for command\n\nEXAMPLES\n  # Search for skills\n  $ gh skill search terraform\n  \n  # Install a skill\n  $ gh skill install github/awesome-copilot documentation-writer\n  \n  # List installed skills\n  $ gh skill list\n  \n  # Preview a skill before installing\n  $ gh skill preview github/awesome-copilot documentation-writer\n  \n  # Update all installed skills\n  $ gh skill update --all\n  \n  # Validate skills for publishing\n  $ gh skill publish --dry-run\n\nLEARN MORE\n  Use \u0060gh \u003Ccommand\u003E \u003Csubcommand\u003E --help\u0060 for more information about a command.\n  Read the manual at https://cli.github.com/manual\n  Learn about exit codes using \u0060gh help exit-codes\u0060\n  Learn about accessibility experiences using \u0060gh help accessibility\u0060\n\n",
+        "standardError": ""
+      }
+    ],
+    "technologies": [
+      "aspnetcore",
+      "dotnet",
+      "foundation"
+    ],
+    "installGates": [
+      {
+        "technology": "dotnet",
+        "projectPath": "../../../../../../../..$TARGET/Web.csproj",
+        "values": {
+          "cli": [
+            "cli"
+          ]
+        }
+      }
+    ],
+    "warnings": [],
+    "advisories": [],
+    "agentsFile": "$TARGET/AGENTS.md",
+    "claudeFile": "",
+    "directiveSummary": {
+      "createAgentsFile": true,
+      "createClaudeFile": false,
+      "recommendedCount": 3,
+      "missingCount": 3,
+      "outdatedCount": 0
+    },
+    "directives": [
+      {
+        "name": "dotnet-build-errors-and-warnings",
+        "status": "missing"
+      },
+      {
+        "name": "dotnet-cli-run",
+        "status": "missing"
+      },
+      {
+        "name": "foundation-prompt-log",
+        "status": "missing"
+      }
+    ],
+    "recommendedSkills": [
+      {
+        "sourceRepo": "VincentH-Net/dotnet-agentic-engineering",
+        "installArg": "cli-e2e-testing",
+        "localFolder": "cli-e2e-testing",
+        "plugin": "dotnet",
+        "sourceRef": "main",
+        "version": "main @ 2026-09-08 13:30 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "VincentH-Net/dotnet-agentic-engineering",
+        "installArg": "dotnet-livecharts2",
+        "localFolder": "dotnet-livecharts2",
+        "plugin": "dotnet",
+        "sourceRef": "main",
+        "version": "main @ 2026-09-08 13:30 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "VincentH-Net/dotnet-agentic-engineering",
+        "installArg": "dotnet-modern-csharp-editorconfig",
+        "localFolder": "dotnet-modern-csharp-editorconfig",
+        "plugin": "dotnet",
+        "sourceRef": "main",
+        "version": "main @ 2026-09-08 13:30 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-aspnetcore/skills/dotnet-webapi",
+        "localFolder": "dotnet-webapi",
+        "plugin": "dotnet-aspnetcore",
+        "sourceRef": "main",
+        "version": "main @ 2026-09-15 11:15 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-aspnetcore/skills/minimal-api-file-upload",
+        "localFolder": "minimal-api-file-upload",
+        "plugin": "dotnet-aspnetcore",
+        "sourceRef": "main",
+        "version": "main @ 2026-09-15 11:15 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/crap-score",
+        "localFolder": "crap-score",
+        "plugin": "dotnet-test",
+        "sourceRef": "main",
+        "version": "main @ 2026-09-15 11:15 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/detect-static-dependencies",
+        "localFolder": "detect-static-dependencies",
+        "plugin": "dotnet-test",
+        "sourceRef": "main",
+        "version": "main @ 2026-09-15 11:15 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/dotnet-test-frameworks",
+        "localFolder": "dotnet-test-frameworks",
+        "plugin": "dotnet-test",
+        "sourceRef": "main",
+        "version": "main @ 2026-09-15 11:15 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/filter-syntax",
+        "localFolder": "filter-syntax",
+        "plugin": "dotnet-test",
+        "sourceRef": "main",
+        "version": "main @ 2026-09-15 11:15 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/generate-testability-wrappers",
+        "localFolder": "generate-testability-wrappers",
+        "plugin": "dotnet-test",
+        "sourceRef": "main",
+        "version": "main @ 2026-09-15 11:15 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/migrate-static-to-wrapper",
+        "localFolder": "migrate-static-to-wrapper",
+        "plugin": "dotnet-test",
+        "sourceRef": "main",
+        "version": "main @ 2026-09-15 11:15 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/mtp-hot-reload",
+        "localFolder": "mtp-hot-reload",
+        "plugin": "dotnet-test",
+        "sourceRef": "main",
+        "version": "main @ 2026-09-15 11:15 GMT\u002B2",
+        "dependencies": [
+          {
+            "sourceRepo": "dotnet/skills",
+            "installArg": "plugins/dotnet-test/skills/filter-syntax",
+            "key": "dotnet/skills\nplugins/dotnet-test/skills/filter-syntax"
+          }
+        ]
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/platform-detection",
+        "localFolder": "platform-detection",
+        "plugin": "dotnet-test",
+        "sourceRef": "main",
+        "version": "main @ 2026-09-15 11:15 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/run-tests",
+        "localFolder": "run-tests",
+        "plugin": "dotnet-test",
+        "sourceRef": "main",
+        "version": "main @ 2026-09-15 11:15 GMT\u002B2",
+        "dependencies": [
+          {
+            "sourceRepo": "dotnet/skills",
+            "installArg": "plugins/dotnet-test/skills/platform-detection",
+            "key": "dotnet/skills\nplugins/dotnet-test/skills/platform-detection"
+          },
+          {
+            "sourceRepo": "dotnet/skills",
+            "installArg": "plugins/dotnet-test/skills/filter-syntax",
+            "key": "dotnet/skills\nplugins/dotnet-test/skills/filter-syntax"
+          }
+        ]
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/test-anti-patterns",
+        "localFolder": "test-anti-patterns",
+        "plugin": "dotnet-test",
+        "sourceRef": "main",
+        "version": "main @ 2026-09-15 11:15 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/writing-mstest-tests",
+        "localFolder": "writing-mstest-tests",
+        "plugin": "dotnet-test",
+        "sourceRef": "main",
+        "version": "main @ 2026-09-15 11:15 GMT\u002B2",
+        "dependencies": []
+      }
+    ],
+    "missingSkills": [
+      {
+        "sourceRepo": "VincentH-Net/dotnet-agentic-engineering",
+        "installArg": "cli-e2e-testing",
+        "localFolder": "cli-e2e-testing",
+        "plugin": "dotnet",
+        "sourceRef": "main",
+        "version": "main @ 2026-09-08 13:30 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "VincentH-Net/dotnet-agentic-engineering",
+        "installArg": "dotnet-livecharts2",
+        "localFolder": "dotnet-livecharts2",
+        "plugin": "dotnet",
+        "sourceRef": "main",
+        "version": "main @ 2026-09-08 13:30 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "VincentH-Net/dotnet-agentic-engineering",
+        "installArg": "dotnet-modern-csharp-editorconfig",
+        "localFolder": "dotnet-modern-csharp-editorconfig",
+        "plugin": "dotnet",
+        "sourceRef": "main",
+        "version": "main @ 2026-09-08 13:30 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-aspnetcore/skills/dotnet-webapi",
+        "localFolder": "dotnet-webapi",
+        "plugin": "dotnet-aspnetcore",
+        "sourceRef": "main",
+        "version": "main @ 2026-09-15 11:15 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-aspnetcore/skills/minimal-api-file-upload",
+        "localFolder": "minimal-api-file-upload",
+        "plugin": "dotnet-aspnetcore",
+        "sourceRef": "main",
+        "version": "main @ 2026-09-15 11:15 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/crap-score",
+        "localFolder": "crap-score",
+        "plugin": "dotnet-test",
+        "sourceRef": "main",
+        "version": "main @ 2026-09-15 11:15 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/detect-static-dependencies",
+        "localFolder": "detect-static-dependencies",
+        "plugin": "dotnet-test",
+        "sourceRef": "main",
+        "version": "main @ 2026-09-15 11:15 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/dotnet-test-frameworks",
+        "localFolder": "dotnet-test-frameworks",
+        "plugin": "dotnet-test",
+        "sourceRef": "main",
+        "version": "main @ 2026-09-15 11:15 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/filter-syntax",
+        "localFolder": "filter-syntax",
+        "plugin": "dotnet-test",
+        "sourceRef": "main",
+        "version": "main @ 2026-09-15 11:15 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/generate-testability-wrappers",
+        "localFolder": "generate-testability-wrappers",
+        "plugin": "dotnet-test",
+        "sourceRef": "main",
+        "version": "main @ 2026-09-15 11:15 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/migrate-static-to-wrapper",
+        "localFolder": "migrate-static-to-wrapper",
+        "plugin": "dotnet-test",
+        "sourceRef": "main",
+        "version": "main @ 2026-09-15 11:15 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/mtp-hot-reload",
+        "localFolder": "mtp-hot-reload",
+        "plugin": "dotnet-test",
+        "sourceRef": "main",
+        "version": "main @ 2026-09-15 11:15 GMT\u002B2",
+        "dependencies": [
+          {
+            "sourceRepo": "dotnet/skills",
+            "installArg": "plugins/dotnet-test/skills/filter-syntax",
+            "key": "dotnet/skills\nplugins/dotnet-test/skills/filter-syntax"
+          }
+        ]
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/platform-detection",
+        "localFolder": "platform-detection",
+        "plugin": "dotnet-test",
+        "sourceRef": "main",
+        "version": "main @ 2026-09-15 11:15 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/run-tests",
+        "localFolder": "run-tests",
+        "plugin": "dotnet-test",
+        "sourceRef": "main",
+        "version": "main @ 2026-09-15 11:15 GMT\u002B2",
+        "dependencies": [
+          {
+            "sourceRepo": "dotnet/skills",
+            "installArg": "plugins/dotnet-test/skills/platform-detection",
+            "key": "dotnet/skills\nplugins/dotnet-test/skills/platform-detection"
+          },
+          {
+            "sourceRepo": "dotnet/skills",
+            "installArg": "plugins/dotnet-test/skills/filter-syntax",
+            "key": "dotnet/skills\nplugins/dotnet-test/skills/filter-syntax"
+          }
+        ]
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/test-anti-patterns",
+        "localFolder": "test-anti-patterns",
+        "plugin": "dotnet-test",
+        "sourceRef": "main",
+        "version": "main @ 2026-09-15 11:15 GMT\u002B2",
+        "dependencies": []
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/writing-mstest-tests",
+        "localFolder": "writing-mstest-tests",
+        "plugin": "dotnet-test",
+        "sourceRef": "main",
+        "version": "main @ 2026-09-15 11:15 GMT\u002B2",
+        "dependencies": []
+      }
+    ],
+    "outdatedSkills": 0,
+    "installResults": [
+      {
+        "sourceRepo": "VincentH-Net/dotnet-agentic-engineering",
+        "installArg": "cli-e2e-testing",
+        "localFolder": "cli-e2e-testing",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed dotnet/cli-e2e-testing (from VincentH-Net/dotnet-agentic-engineering@main) in .agents/skills\n",
+        "standardError": "Using ref main (af190c34)\nNote: found 14 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  dotnet/cli-e2e-testing/\n  (could not read directory)\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview VincentH-Net/dotnet-agentic-engineering dotnet/cli-e2e-testing@af190c3474079ea5b5143e170deb331c431c59a9\n\n"
+      },
+      {
+        "sourceRepo": "VincentH-Net/dotnet-agentic-engineering",
+        "installArg": "dotnet-livecharts2",
+        "localFolder": "dotnet-livecharts2",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed dotnet/dotnet-livecharts2 (from VincentH-Net/dotnet-agentic-engineering@main) in .agents/skills\n",
+        "standardError": "Using ref main (af190c34)\nNote: found 14 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  dotnet/dotnet-livecharts2/\n  (could not read directory)\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview VincentH-Net/dotnet-agentic-engineering dotnet/dotnet-livecharts2@af190c3474079ea5b5143e170deb331c431c59a9\n\n"
+      },
+      {
+        "sourceRepo": "VincentH-Net/dotnet-agentic-engineering",
+        "installArg": "dotnet-modern-csharp-editorconfig",
+        "localFolder": "dotnet-modern-csharp-editorconfig",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed dotnet/dotnet-modern-csharp-editorconfig (from VincentH-Net/dotnet-agentic-engineering@main) in .agents/skills\n",
+        "standardError": "Using ref main (af190c34)\nNote: found 14 skill(s) using the plugins/ convention\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  dotnet/dotnet-modern-csharp-editorconfig/\n  (could not read directory)\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview VincentH-Net/dotnet-agentic-engineering dotnet/dotnet-modern-csharp-editorconfig@af190c3474079ea5b5143e170deb331c431c59a9\n\n"
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-aspnetcore/skills/dotnet-webapi",
+        "localFolder": "dotnet-webapi",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed dotnet-aspnetcore/dotnet-webapi (from dotnet/skills@main) in .agents/skills\n",
+        "standardError": "Using ref main (43dec998)\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  dotnet-aspnetcore/dotnet-webapi/\n  (could not read directory)\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview dotnet/skills dotnet-aspnetcore/dotnet-webapi@43dec99816ae6bfafae082698a01437d237a3f90\n\n"
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-aspnetcore/skills/minimal-api-file-upload",
+        "localFolder": "minimal-api-file-upload",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed dotnet-aspnetcore/minimal-api-file-upload (from dotnet/skills@main) in .agents/skills\n",
+        "standardError": "Using ref main (43dec998)\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  dotnet-aspnetcore/minimal-api-file-upload/\n  (could not read directory)\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview dotnet/skills dotnet-aspnetcore/minimal-api-file-upload@43dec99816ae6bfafae082698a01437d237a3f90\n\n"
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/crap-score",
+        "localFolder": "crap-score",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed dotnet-test/crap-score (from dotnet/skills@main) in .agents/skills\n",
+        "standardError": "Using ref main (43dec998)\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  dotnet-test/crap-score/\n  (could not read directory)\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview dotnet/skills dotnet-test/crap-score@43dec99816ae6bfafae082698a01437d237a3f90\n\n"
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/detect-static-dependencies",
+        "localFolder": "detect-static-dependencies",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed dotnet-test/detect-static-dependencies (from dotnet/skills@main) in .agents/skills\n",
+        "standardError": "Using ref main (43dec998)\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  dotnet-test/detect-static-dependencies/\n  (could not read directory)\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview dotnet/skills dotnet-test/detect-static-dependencies@43dec99816ae6bfafae082698a01437d237a3f90\n\n"
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/filter-syntax",
+        "localFolder": "filter-syntax",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed dotnet-test/filter-syntax (from dotnet/skills@main) in .agents/skills\n",
+        "standardError": "Using ref main (43dec998)\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  dotnet-test/filter-syntax/\n  (could not read directory)\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview dotnet/skills dotnet-test/filter-syntax@43dec99816ae6bfafae082698a01437d237a3f90\n\n"
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/generate-testability-wrappers",
+        "localFolder": "generate-testability-wrappers",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed dotnet-test/generate-testability-wrappers (from dotnet/skills@main) in .agents/skills\n",
+        "standardError": "Using ref main (43dec998)\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  dotnet-test/generate-testability-wrappers/\n  (could not read directory)\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview dotnet/skills dotnet-test/generate-testability-wrappers@43dec99816ae6bfafae082698a01437d237a3f90\n\n"
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/migrate-static-to-wrapper",
+        "localFolder": "migrate-static-to-wrapper",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed dotnet-test/migrate-static-to-wrapper (from dotnet/skills@main) in .agents/skills\n",
+        "standardError": "Using ref main (43dec998)\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  dotnet-test/migrate-static-to-wrapper/\n  (could not read directory)\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview dotnet/skills dotnet-test/migrate-static-to-wrapper@43dec99816ae6bfafae082698a01437d237a3f90\n\n"
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/mtp-hot-reload",
+        "localFolder": "mtp-hot-reload",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed dotnet-test/mtp-hot-reload (from dotnet/skills@main) in .agents/skills\n",
+        "standardError": "Using ref main (43dec998)\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  dotnet-test/mtp-hot-reload/\n  (could not read directory)\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview dotnet/skills dotnet-test/mtp-hot-reload@43dec99816ae6bfafae082698a01437d237a3f90\n\n"
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/platform-detection",
+        "localFolder": "platform-detection",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed dotnet-test/platform-detection (from dotnet/skills@main) in .agents/skills\n",
+        "standardError": "Using ref main (43dec998)\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  dotnet-test/platform-detection/\n  (could not read directory)\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview dotnet/skills dotnet-test/platform-detection@43dec99816ae6bfafae082698a01437d237a3f90\n\n"
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/run-tests",
+        "localFolder": "run-tests",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed dotnet-test/run-tests (from dotnet/skills@main) in .agents/skills\n",
+        "standardError": "Using ref main (43dec998)\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  dotnet-test/run-tests/\n  (could not read directory)\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview dotnet/skills dotnet-test/run-tests@43dec99816ae6bfafae082698a01437d237a3f90\n\n"
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/test-anti-patterns",
+        "localFolder": "test-anti-patterns",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed dotnet-test/test-anti-patterns (from dotnet/skills@main) in .agents/skills\n",
+        "standardError": "Using ref main (43dec998)\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  dotnet-test/test-anti-patterns/\n  (could not read directory)\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview dotnet/skills dotnet-test/test-anti-patterns@43dec99816ae6bfafae082698a01437d237a3f90\n\n"
+      },
+      {
+        "sourceRepo": "dotnet/skills",
+        "installArg": "plugins/dotnet-test/skills/writing-mstest-tests",
+        "localFolder": "writing-mstest-tests",
+        "success": true,
+        "exitCode": 0,
+        "standardOutput": "\u2713 Installed dotnet-test/writing-mstest-tests (from dotnet/skills@main) in .agents/skills\n",
+        "standardError": "Using ref main (43dec998)\n\n! Skills are not verified by GitHub and may contain prompt injections, hidden instructions, or malicious scripts. Always review skill contents before use.\n\n\n  dotnet-test/writing-mstest-tests/\n  (could not read directory)\n\n! Skills may contain prompt injections or malicious scripts.\n  Review installed content before use:\n\n    gh skill preview dotnet/skills dotnet-test/writing-mstest-tests@43dec99816ae6bfafae082698a01437d237a3f90\n\n"
+      }
+    ],
+    "actions": [
+      "Added directive dotnet-build-errors-and-warnings to AGENTS.",
+      "Added directive dotnet-cli-run to AGENTS.",
+      "Added directive foundation-prompt-log to AGENTS."
+    ],
+    "skillUpdateDryRun": null,
+    "skillUpdate": null,
+    "skillCopyResults": [],
+    "skillUpdateDryRuns": [],
+    "skillUpdates": []
+  },
+  "sources": [
+    {
+      "localPath": ".agents/skills/dotnet-modern-csharp-editorconfig",
+      "repository": "VincentH-Net/dotnet-agentic-engineering",
+      "reference": "refs/heads/main",
+      "commit": "af190c3474079ea5b5143e170deb331c431c59a9",
+      "tree": "d0b2d8c3feab12b59c225f56f5425bf2fb0ad079",
+      "sourcePath": "plugins/dotnet/skills/dotnet-modern-csharp-editorconfig",
+      "pin": "main",
+      "sourceFiles": {
+        "SKILL.md": "8f596a8bc3165cd1cba1d5627fac313e1ec11223a4ecf2f2866638495c217397"
+      }
+    },
+    {
+      "localPath": ".agents/skills/generate-testability-wrappers",
+      "repository": "dotnet/skills",
+      "reference": "refs/heads/main",
+      "commit": "43dec99816ae6bfafae082698a01437d237a3f90",
+      "tree": "72ee369f202debf1c2a1f7b010ecd55a166fcc5f",
+      "sourcePath": "plugins/dotnet-test/skills/generate-testability-wrappers",
+      "pin": "main",
+      "sourceFiles": {
+        "SKILL.md": "58aac0affca5c0a56dab9e8e751f52ac4014533150355b734d6b5597ac8acec1"
+      }
+    },
+    {
+      "localPath": ".agents/skills/migrate-static-to-wrapper",
+      "repository": "dotnet/skills",
+      "reference": "refs/heads/main",
+      "commit": "43dec99816ae6bfafae082698a01437d237a3f90",
+      "tree": "6bf024615b3cfca3f9778779f9a3c1bb03b084a6",
+      "sourcePath": "plugins/dotnet-test/skills/migrate-static-to-wrapper",
+      "pin": "main",
+      "sourceFiles": {
+        "SKILL.md": "509f9060b541af3dd4702f2c334be927bd5f7c9cce413fa23c51ae970e88f471"
+      }
+    },
+    {
+      "localPath": ".agents/skills/filter-syntax",
+      "repository": "dotnet/skills",
+      "reference": "refs/heads/main",
+      "commit": "43dec99816ae6bfafae082698a01437d237a3f90",
+      "tree": "e70cad1dc6cabb743ba0878a9aa4d57508d7fac6",
+      "sourcePath": "plugins/dotnet-test/skills/filter-syntax",
+      "pin": "main",
+      "sourceFiles": {
+        "SKILL.md": "64c294d0fc2d0c4d5887d391c6684429fc4d7a66b6b9f99a475e6abe390c5d19"
+      }
+    },
+    {
+      "localPath": ".agents/skills/mtp-hot-reload",
+      "repository": "dotnet/skills",
+      "reference": "refs/heads/main",
+      "commit": "43dec99816ae6bfafae082698a01437d237a3f90",
+      "tree": "685fd5c0a6f6adfca0782c6d54d7ae152b97148e",
+      "sourcePath": "plugins/dotnet-test/skills/mtp-hot-reload",
+      "pin": "main",
+      "sourceFiles": {
+        "SKILL.md": "0057050d168fc95817ed375915f0428a688e81b491c6f9a749ca02cffdd9c1c5"
+      }
+    },
+    {
+      "localPath": ".agents/skills/minimal-api-file-upload",
+      "repository": "dotnet/skills",
+      "reference": "refs/heads/main",
+      "commit": "43dec99816ae6bfafae082698a01437d237a3f90",
+      "tree": "f36203871fb8ff06662a5c8920a6d198e2047f25",
+      "sourcePath": "plugins/dotnet-aspnetcore/skills/minimal-api-file-upload",
+      "pin": "main",
+      "sourceFiles": {
+        "SKILL.md": "18232bea3b8bdfdc6b9cc3a2081e193b923150431b90d7c033f57943a96af21e"
+      }
+    },
+    {
+      "localPath": ".agents/skills/crap-score",
+      "repository": "dotnet/skills",
+      "reference": "refs/heads/main",
+      "commit": "43dec99816ae6bfafae082698a01437d237a3f90",
+      "tree": "c663105b7e07ae279fdf01695b8ffe8b42e6c106",
+      "sourcePath": "plugins/dotnet-test/skills/crap-score",
+      "pin": "main",
+      "sourceFiles": {
+        "SKILL.md": "4254327d4d224f588b7a20601cb5b43637a71467844e512010755a5591a3952d"
+      }
+    },
+    {
+      "localPath": ".agents/skills/writing-mstest-tests",
+      "repository": "dotnet/skills",
+      "reference": "refs/heads/main",
+      "commit": "43dec99816ae6bfafae082698a01437d237a3f90",
+      "tree": "d6cb8d8529361aa3b9c4e8f7b7c47041b92aa8d9",
+      "sourcePath": "plugins/dotnet-test/skills/writing-mstest-tests",
+      "pin": "main",
+      "sourceFiles": {
+        "SKILL.md": "9da7a07ba196350c5bf9e53a1dbdc4820080a4178804748211c12e58622459a0"
+      }
+    },
+    {
+      "localPath": ".agents/skills/test-anti-patterns",
+      "repository": "dotnet/skills",
+      "reference": "refs/heads/main",
+      "commit": "43dec99816ae6bfafae082698a01437d237a3f90",
+      "tree": "b89b1a2cf62218bef9a0b8a6201f3ad495768a67",
+      "sourcePath": "plugins/dotnet-test/skills/test-anti-patterns",
+      "pin": "main",
+      "sourceFiles": {
+        "SKILL.md": "9f948b9df0c704c9c5aaf3aabf56104f0ce2116be35b9be541b4a4edf4b1ea55"
+      }
+    },
+    {
+      "localPath": ".agents/skills/cli-e2e-testing",
+      "repository": "VincentH-Net/dotnet-agentic-engineering",
+      "reference": "refs/heads/main",
+      "commit": "af190c3474079ea5b5143e170deb331c431c59a9",
+      "tree": "00e1b75ce490a385c1d12c86865e974cd38b0e11",
+      "sourcePath": "plugins/dotnet/skills/cli-e2e-testing",
+      "pin": "main",
+      "sourceFiles": {
+        "SKILL.md": "11118023729d2f0c7195a9adfbdef71bb6893fc5f030af572a76af8c6a3d8da6"
+      }
+    },
+    {
+      "localPath": ".agents/skills/dotnet-webapi",
+      "repository": "dotnet/skills",
+      "reference": "refs/heads/main",
+      "commit": "43dec99816ae6bfafae082698a01437d237a3f90",
+      "tree": "707993793ce3383a787f4e2c9f8810b33330ada6",
+      "sourcePath": "plugins/dotnet-aspnetcore/skills/dotnet-webapi",
+      "pin": "main",
+      "sourceFiles": {
+        "SKILL.md": "70e10d74aa367ee63060b64edc397c5998c03da0fbdaf120f5aa8c94d373b77d"
+      }
+    },
+    {
+      "localPath": ".agents/skills/detect-static-dependencies",
+      "repository": "dotnet/skills",
+      "reference": "refs/heads/main",
+      "commit": "43dec99816ae6bfafae082698a01437d237a3f90",
+      "tree": "9cc8e6d3b52163824e7b419a4635517dfcdcb7c1",
+      "sourcePath": "plugins/dotnet-test/skills/detect-static-dependencies",
+      "pin": "main",
+      "sourceFiles": {
+        "SKILL.md": "f7f6edd9b24b4fb9286a5e8a2228aa2c38cb05e2216a3bd57dd62c365086d796"
+      }
+    },
+    {
+      "localPath": ".agents/skills/dotnet-livecharts2",
+      "repository": "VincentH-Net/dotnet-agentic-engineering",
+      "reference": "refs/heads/main",
+      "commit": "af190c3474079ea5b5143e170deb331c431c59a9",
+      "tree": "c9fa2d43ee3988284ffd53c7daa82880d1a51f63",
+      "sourcePath": "plugins/dotnet/skills/dotnet-livecharts2",
+      "pin": "main",
+      "sourceFiles": {
+        "SKILL.md": "a9599f7719500a29b3dbf5eeb77ec74d053d8c1e2ba9f9a12b644d5d870143ff"
+      }
+    },
+    {
+      "localPath": ".agents/skills/platform-detection",
+      "repository": "dotnet/skills",
+      "reference": "refs/heads/main",
+      "commit": "43dec99816ae6bfafae082698a01437d237a3f90",
+      "tree": "fbfc45c81faa98c8ab87a4f9126bc5a9f6315b36",
+      "sourcePath": "plugins/dotnet-test/skills/platform-detection",
+      "pin": "main",
+      "sourceFiles": {
+        "SKILL.md": "a73b7c126af6249490a62454c55097cef93657f537b40794c2c52a4bbf58c35f",
+        "references/command-mode.md": "08e276dcafe6bd5bfbaab435065ca24a5800a4eae3ffd7fc15daa1e81354bbc4"
+      }
+    },
+    {
+      "localPath": ".agents/skills/run-tests",
+      "repository": "dotnet/skills",
+      "reference": "refs/heads/main",
+      "commit": "43dec99816ae6bfafae082698a01437d237a3f90",
+      "tree": "913e5460159254fbbcded60b6f8f9ff20f19d61d",
+      "sourcePath": "plugins/dotnet-test/skills/run-tests",
+      "pin": "main",
+      "sourceFiles": {
+        "SKILL.md": "971e4d888a4435eb4c050079adfb6cb91fc73e3c756fa7a622b059c72fad7e3c"
+      }
+    }
+  ],
+  "companion": null,
+  "snapshotSha256": "ff71a7887ba798e03549d2da76e4170495646c146c91181c0ee3f83d123f4319",
+  "directiveSource": {
+    "repository": "VincentH-Net/dotnet-agentic-engineering",
+    "reference": "main",
+    "commit": "af190c3474079ea5b5143e170deb331c431c59a9"
+  },
+  "invocation": [
+    "agentic-check",
+    "$TARGET",
+    "--agents",
+    "codex",
+    "--verbose",
+    "--report",
+    "$WORKSPACE/installation.json",
+    "--preview"
+  ],
+  "rejectedItems": [
+    "dotnet/skills:plugins/dotnet-test/skills/dotnet-test-frameworks \u2014 explicitly deselected in the published installer UI because this historical recommendation was removed upstream; all other recommendations installed and verified"
+  ]
+}

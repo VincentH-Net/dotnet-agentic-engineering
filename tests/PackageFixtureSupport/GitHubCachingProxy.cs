@@ -115,7 +115,7 @@ sealed class GitHubCachingProxy : IAsyncDisposable
                 // Expected missing refs are stable within the run; auth/quota/transient errors are never cached.
                 if (!bypass)
                     cache[key] = response;
-                string? identity = method == "GET" ? SourceIdentity(path, response) : null;
+                string? identity = method == "GET" && !phase.StartsWith("budget-", StringComparison.Ordinal) ? SourceIdentity(path, response) : null;
                 if (identity is not null && phase != "end-validation")
                 {
                     string sourceKey = Key("GET", path, new(StringComparer.OrdinalIgnoreCase) { ["Authorization"] = headers.GetValueOrDefault("Authorization") ?? [] }, []);
@@ -233,7 +233,9 @@ sealed class GitHubCachingProxy : IAsyncDisposable
 
     static bool IsCommit(string value) => value.Length == 40 && value.All(Uri.IsHexDigit);
 
-    internal async Task CompleteAsync()
+    internal Task CompleteAsync() => CompleteAsync(null);
+
+    internal async Task CompleteAsync(Func<Task>? measureBudgets)
     {
         if (completed)
             return;
@@ -258,6 +260,8 @@ sealed class GitHubCachingProxy : IAsyncDisposable
                 unavailable.Add(source.Path);
             }
         }
+        if (measureBudgets is not null)
+            await measureBudgets().ConfigureAwait(false);
         string outcome = changed.Count > 0 ? "inconclusive-source-movement" : unavailable.Count > 0 || failures > 0 ? "incomplete-network-verification" : "validated";
         FixtureFiles.WriteJson(Path.Combine(Reports, "summary.json"), new
         {

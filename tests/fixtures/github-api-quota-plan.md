@@ -80,6 +80,31 @@ A gateway summary validates network/source consistency, not the individual scena
 read it alongside TRX results and terminal recordings. Responses live in memory and disappear
 at run end; the socket directory is removed. No response cache persists into another run.
 
+`budgets.json` and `budgets.txt` automatically report authenticated and anonymous REST core
+budgets before and after each network test host/preparation/packing operation. Both use a fresh
+GET to the same ordinary public repository endpoint, with authorization supplied only for the
+authenticated sample. The start pair precedes gh authentication and source priming; the end
+pair follows source validation, including when source validation fails. These four explicit
+probe requests are uncached, carry unique query parameters, and do not add source-boundary
+checks. Final gateway counts include the ending probes. Offline-only runs make no probes.
+
+Each sample preserves UTC time, HTTP status, limit, remaining, used, reset, resource and GitHub
+request ID. An unavailable, malformed or unexpected authentication-budget response is recorded
+as such, never as zero use. A comparable start/end pair reports its observed delta; a reset,
+limit/resource change, backwards counter or inconsistent arithmetic suppresses that delta.
+Counter sequences from uncached core responses are also grouped by authentication, resource,
+limit and reset, with a flag for multiple sequences or decreasing counters. This can represent
+a reset or the previously observed differing endpoint counters; it is not silently combined.
+
+Deltas describe the shared account/IP budget, not exclusive test consumption. They include
+unrelated activity and the ending probe, and exclude the already-consumed starting probe.
+The report separately counts authenticated/anonymous REST/GraphQL upstream attempts and cache
+hits. Product direct HTTP requests do not pass through this gh gateway: anonymous upstream
+counts in this report count its two probes, while the anonymous budget samples bracket product
+activity too. Separate test hosts have separate reports; do not sum overlapping budget deltas.
+A crashed/killed host leaves a `started` report without fabricated end measurements. Console
+output also gives the before/after budgets and the artifact path.
+
 All real-GitHub tests share the serial xUnit collection. Existing opt-in variables and scenario
 selectors remain unchanged. Build both shared-support consumers, run local proxy/authentication
 and terminal regressions, then run exact candidate packages with matching committed/pushed
@@ -94,26 +119,26 @@ shared gateway reduces authenticated traffic according to actual repeated reques
 600–1200 authenticated full-run estimates were extrapolations, not measured guarantees.
 Use run traces for actual totals; unrelated processes can also consume the account/IP budget.
 
-The incomplete historical preview fixture and existing production update defects remain
-separate work. This quota implementation does not prepare or modify baseline snapshots.
+Historical preview preparation and existing production update defects are separate from the
+quota implementation. The preview capture was subsequently completed as described below.
 
-### Proposed historical-preview exception
+### Completed one-time historical-preview exception
 
-The missing preview fixture can instead be prepared as an authentic selective installation:
-run the unchanged published 2.2.0 package interactively and deselect only
-`dotnet/skills:plugins/dotnet-test/skills/dotnet-test-frameworks`. Its embedded source commit
-`43e68fd7a975dde9a1dbf7933fe13776d61a8428` lists no other skill depending on that entry,
-and its workflow accepts selected recommendations through the normal UI. Real-package
-execution must still confirm this behavior before accepting a snapshot.
+On 2026-09-15 the missing preview fixture was captured as an authentic selective installation:
+the unchanged published 2.2.0 package ran interactively with only
+`dotnet/skills:plugins/dotnet-test/skills/dotnet-test-frameworks` deselected. Its embedded source
+commit `43e68fd7a975dde9a1dbf7933fe13776d61a8428` lists no other skill depending on that entry.
+The real package exited successfully and installed all fifteen selected skills. Every selected
+skill and directive was independently verified; source identities were rechecked before acceptance.
 
-This is a proposed exception to accepting every baseline recommendation, not a general
-assertion exclusion. Record the omitted identity, reason, actual selections and UTC capture
-time in baseline provenance, and preserve a terminal recording. Require success and complete
-content verification for every selected item; do not merely ignore a failed installation.
-Retain the failed attempt's evidence and leave all thirteen accepted snapshots untouched.
+This was an explicitly approved one-time exception to accepting every baseline recommendation.
+A temporary C# harness reused the existing preparation helpers; no preparation-tool or test
+assertion changes were retained. Provenance records the omitted identity, reason, actual
+selections and UTC capture time. The terminal recording and failed attempt's evidence remain
+local test artifacts. All thirteen earlier accepted snapshots remain unchanged. See the
+[capture record](baselines/agentic-check-2.2.0-2026-09-14-capture02/preview-web-cli/README.md).
 
-Candidate preview tests must still require the current `test-analysis-extensions` skill and
-its declared dependencies. Stable coverage of `dotnet-test-frameworks` from the published
-stable source remains required. The exception must never become a global skill-name ignore
-list. It removes one obsolete preview recommendation from the historical starting state;
-it does not claim a complete unmodified-manifest 2.2.0 preview installation.
+Candidate preview tests still require the current `test-analysis-extensions` skill and its
+declared dependencies. Stable coverage of `dotnet-test-frameworks` from the published stable
+source remains required. There is no global skill-name ignore list. This is a selective
+historical starting state, not a complete unmodified-manifest 2.2.0 preview installation.

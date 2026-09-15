@@ -45,6 +45,8 @@ sealed class FixtureAuthentication
         using FixtureWorkspace workspace = new();
         await ApplyAsync(workspace.Environment).ConfigureAwait(false);
         var gateway = useProxy ? await GitHubFixtureRun.Shared.ProxyAsync.ConfigureAwait(false) : null;
+        if (gateway is not null && workspace.Environment["GH_TOKEN"].Length > 0)
+            await GitHubFixtureRun.Shared.MeasureStartAsync(workspace.Environment["GH_TOKEN"]).ConfigureAwait(false);
         int requestsBefore = gateway?.UpstreamCount ?? 0;
         var budget = await VerifyAsync(workspace.Environment["GH_TOKEN"], args => workspace.Process.RunAsync("gh", args, workspace.Root)).ConfigureAwait(false);
         if (gateway is not null)

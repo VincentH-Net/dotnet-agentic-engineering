@@ -68,6 +68,16 @@ baseline migrations remain independently runnable, but the complete candidate ga
 pass. The snapshot-inventory regression also rejects a collection with capture failures.
 Do not invent a snapshot or remove a failure merely to make the suite green.
 
+The 2.2.0 collection was completed on 2026-09-15 with an explicitly approved one-time
+selective capture of `preview-web-cli`: the unchanged published installer ran interactively
+with only the upstream-removed `dotnet-test-frameworks` recommendation deselected. All other
+recommendations were installed successfully and independently verified. The existing thirteen
+captures remain byte-for-byte unchanged. This used a temporary harness; the preparation tool
+and its normal all-recommendations checks are unchanged. See the
+[capture provenance and verification](baselines/agentic-check-2.2.0-2026-09-14-capture02/preview-web-cli/README.md).
+The collection ID retains its initial preparation date; the added fixture records its actual
+2026-09-15 UTC capture time. Tests consume the saved snapshot without repeating preparation.
+
 Historical preview pins retain the format emitted by that installer, including branch-name
 pins in 2.2.0. Preparation independently resolves each actual pin to the recorded source
 commit; it does not rewrite the pin into today's candidate SHA format.
@@ -78,6 +88,13 @@ source movement, and failed commands are failures; none become unchanged-source 
 Within one explicit preparation operation the utility permits the product's ordinary response
 cache (3600 seconds), populated only by real product invocations. It does not inject source
 responses. Wait for the API reset and resume an incomplete capture when rate-limited.
+
+Every live test host also writes `github-runs/<id>/budgets.json` and `budgets.txt` under the
+report directory: fresh authenticated and anonymous REST budgets before authentication/source
+priming and after final source validation, observed comparable deltas, reset/counter warnings,
+and upstream request/cache-hit counts. Four uncached probes measure shared account/IP budgets;
+deltas are not exclusive test usage. Missing end measurements remain explicit after a crash.
+See [quota measurement details](github-api-quota-plan.md#evidence-and-operation).
 
 The utility is an unpublishable test-support console project, not a production command/tool.
 

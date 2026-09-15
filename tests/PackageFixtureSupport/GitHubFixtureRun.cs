@@ -11,6 +11,13 @@ sealed class GitHubFixtureRun : IAsyncDisposable
     readonly List<string> contexts = [];
     internal Task<GitHubCachingProxy> ProxyAsync => proxy.Value;
     bool completed;
+    GitHubBudgetMeasurements? budgets;
+
+    internal async Task MeasureStartAsync(string credential)
+    {
+        budgets = new(await proxy.Value.ConfigureAwait(false));
+        await budgets.StartAsync(credential).ConfigureAwait(false);
+    }
 
     static async Task<GitHubCachingProxy> StartAsync()
     {
@@ -102,7 +109,7 @@ sealed class GitHubFixtureRun : IAsyncDisposable
         var gateway = await proxy.Value.ConfigureAwait(false);
         try
         {
-            await gateway.CompleteAsync().ConfigureAwait(false);
+            await gateway.CompleteAsync(budgets is null ? null : budgets.CompleteAsync).ConfigureAwait(false);
         }
         finally
         {
