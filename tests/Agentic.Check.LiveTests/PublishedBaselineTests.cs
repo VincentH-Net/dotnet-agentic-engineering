@@ -12,6 +12,7 @@ public sealed class PublishedBaselineTests(ITestOutputHelper output)
     public async Task RealGhBranchAndShaPinsMatchIndependentSource(bool immutablePin)
     {
         Skip.If(Environment.GetEnvironmentVariable("AGENTIC_E2E_NETWORK") != "1", "Opt in with AGENTIC_E2E_NETWORK=1 for real gh metadata verification.");
+        _ = await FixtureAuthentication.Shared.RequireAsync().ConfigureAwait(true);
         using FixtureWorkspace workspace = new();
         await workspace.InitializeAsync().ConfigureAwait(true);
         using SourceOracle oracle = new(workspace.Process, workspace.Root);

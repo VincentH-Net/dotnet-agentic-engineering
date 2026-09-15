@@ -4,7 +4,7 @@ using Hex1b.Automation;
 
 namespace Agentic.Check.LiveTests;
 
-sealed class PackageScenario(CandidateBuild candidate, string fixtureName, string scenario, Action<string> log) : IDisposable
+sealed class PackageScenario(CandidateBuild candidate, string fixtureName, string scenario, Action<string> log, PackageTestRun testRun) : IDisposable
 {
     const string UserText = "\nFixture-owned instructions: preserve this exact text.\n";
     readonly FixtureWorkspace workspace = new();
@@ -130,6 +130,7 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
 
     async Task InvokeAsync(bool dryRun, bool interactive, string phase)
     {
+        testRun.UseCache(workspace, candidate.Check.Sha256, preview, log);
         string reportPath = Path.Combine(FixtureFiles.Reports, runId + "-" + phase + ".json");
         _ = Directory.CreateDirectory(FixtureFiles.Reports);
         string[] arguments = [workspace.Target, "--agents", definition.Agents, "--report", reportPath, "--verbose",

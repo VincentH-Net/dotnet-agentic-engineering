@@ -5,6 +5,7 @@ namespace Agentic.Check.LiveTests;
 
 public sealed class PackageFixtureTests(ITestOutputHelper output)
 {
+    static readonly PackageTestRun TestRun = new();
     public static TheoryData<string, string, bool> Scenarios()
         => BuildScenarios(Environment.GetEnvironmentVariable("AGENTIC_E2E_BASELINE"));
 
@@ -70,9 +71,11 @@ public sealed class PackageFixtureTests(ITestOutputHelper output)
         }
         bool interactive = fixture == "broad-stack" || scenario == "preview-declined";
         Skip.If(interactive && !RecordedTerminal.Supported, "PTY scenario requires Bash on macOS/Linux; noninteractive scenarios remain portable.");
+        var budget = await FixtureAuthentication.Shared.RequireAsync().ConfigureAwait(true);
+        output.WriteLine($"Preflight authenticated GitHub core budget: {budget.Remaining}/{budget.Limit}, reset {DateTimeOffset.FromUnixTimeSeconds(budget.Reset):O}");
         var candidate = await CandidateInputs.LoadAsync().ConfigureAwait(true);
         output.WriteLine($"{candidate.Configuration}: origin/{candidate.Branch}@{candidate.Commit}\nCheck: {candidate.Check.Path} SHA256 {candidate.Check.Sha256}\nCompanion: {candidate.Companion.Path} SHA256 {candidate.Companion.Sha256}");
-        using PackageScenario run = new(candidate, fixture, scenario, output.WriteLine);
+        using PackageScenario run = new(candidate, fixture, scenario, output.WriteLine, TestRun);
         try
         {
             await run.PrepareAsync().ConfigureAwait(true);
@@ -99,6 +102,7 @@ public sealed class PackageFixtureTests(ITestOutputHelper output)
     {
         Skip.If(Environment.GetEnvironmentVariable("AGENTIC_E2E_NETWORK") != "1" && Environment.GetEnvironmentVariable("AGENTIC_E2E_CHECK_PACKAGE") is null,
             "Supply exact candidate package inputs to opt in.");
+        _ = await FixtureAuthentication.Shared.RequireAsync().ConfigureAwait(true);
         var candidate = await CandidateInputs.LoadAsync().ConfigureAwait(true);
         try
         {

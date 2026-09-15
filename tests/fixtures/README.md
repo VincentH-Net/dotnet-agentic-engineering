@@ -29,8 +29,13 @@ outside the checkout; selected skill files are also verified against GitHub blob
 
 Use .NET 10 and a supported real `gh skill` CLI (this capture was developed against 2.100.0).
 `GH_TOKEN`/`GITHUB_TOKEN` may supply authentication. Otherwise the helper reads the existing
-`gh auth token` into memory and passes it only to child processes. It never logs or stores
-that token. Git/global agent directories, CLI home, NuGet caches, and configuration are isolated.
+`gh auth token` into memory and passes it only to child processes. Credentials are resolved
+once per process (`GH_TOKEN`, then `GITHUB_TOKEN`, then the existing login). Before baseline
+preparation or candidate network scenarios, a once-per-process preflight checks active gh
+authentication and reads the live authenticated budget in an isolated workspace. Missing or
+invalid credentials fail with login/token guidance; the harness never starts an interactive
+login. Redirected and terminal children receive the same explicit credentials. No token is
+logged or stored. Git/global agent directories, CLI home, NuGet caches, and configuration are isolated.
 Fixture child processes disable gh telemetry (`GH_TELEMETRY=0`) to prevent delayed telemetry
 writes racing disposal of the temporary home directory.
 
@@ -134,9 +139,18 @@ push, package directory and affected verification; no candidate is rewritten or 
 Without opt-in, network cases are genuine runner skips. Once verification is opted in,
 missing/invalid package/source/build inputs fail. The harness never builds packages inside
 main candidate tests or substitutes source assemblies, fake gh, SDK responses, or HTTP caches.
-Each target gets an isolated feed containing the unchanged candidates and its own initially
-empty product source-response cache (3600 seconds). Only real invocations in that scenario
-populate it; there are no seeded responses or shared candidate HTTP state.
+Each target gets an isolated feed containing the unchanged candidates. The serial candidate
+rows in one test-host run share two product source-response caches (3600 seconds), one per
+channel. Each starts empty; the first selected scenario in each channel provides its cold
+check, with no separate cold probes. Only actual package invocations populate these caches.
+Cache paths and cold/shared use are logged; installer identity and start time are recorded
+under `TestResults/package-fixtures/runs/<unique-run-id>/`. Different installer packages
+cannot share a run cache. New test-host runs always get new directories, including filtered
+reruns. Preserve the directories for diagnostics; never seed them from the oracle or prior
+runs. This supersedes the original per-scenario product HTTP isolation requirement.
+With unchanged sources and no expiry/retries, the candidate matrix is estimated to need
+about 17 anonymous API requests (8 preview + 9 stable). This is not a measured guarantee;
+real gh and independent verification still use the separate authenticated budget.
 Target, SDK/NuGet HTTP, CLI, Git, and gh state stay separate. Independently retrieved upstream
 identities are checked around each operation, so stale/moving sources cannot silently pass.
 Cached installed nupkg bytes and running companion versions are checked, and input hashes are checked again

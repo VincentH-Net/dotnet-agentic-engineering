@@ -91,13 +91,7 @@ sealed class FixtureWorkspace : IDisposable
         if (source is not null)
             FixtureFiles.Copy(source, Target);
         _ = await Process.SuccessAsync("git", ["init", "--initial-branch=fixture"], Target).ConfigureAwait(false);
-        // Authentication stays in memory and child environment, never in snapshots or command logs.
-        if (string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable("GH_TOKEN")) && string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable("GITHUB_TOKEN")))
-        {
-            var authentication = await new RealProcess().RunAsync("gh", ["auth", "token", "--hostname", "github.com"], Root).ConfigureAwait(false);
-            if (authentication.ExitCode == 0)
-                Environment["GH_TOKEN"] = authentication.Output.Trim();
-        }
+        await FixtureAuthentication.Shared.ApplyAsync(Environment).ConfigureAwait(false);
         SetFeed();
     }
 

@@ -25,6 +25,8 @@ static class BaselinePreparation
             }
         }
         FixtureFiles.Require(definition.CompanionExpected == (definition.Companion is not null), "Companion expectation requires its actual published package definition, or explicit absence.");
+        var budget = await FixtureAuthentication.Shared.RequireAsync().ConfigureAwait(false);
+        Console.WriteLine($"Authenticated GitHub core budget: {budget.Remaining}/{budget.Limit}, reset {DateTimeOffset.FromUnixTimeSeconds(budget.Reset):O}");
         await WaitForSourceBudgetAsync().ConfigureAwait(false);
         var package = await PackageArtifact.DownloadAsync(definition).ConfigureAwait(false);
         var companion = definition.Companion is null ? null : await PackageArtifact.DownloadAsync(definition.Companion).ConfigureAwait(false);
