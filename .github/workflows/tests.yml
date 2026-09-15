@@ -1,8 +1,8 @@
 name: Tests
 
 on:
-  push:
-  pull_request:
+  # Temporarily manual-only while GitHub API quota limits are addressed.
+  workflow_dispatch:
 
 permissions:
   contents: read
