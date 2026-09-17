@@ -726,6 +726,58 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
         AssertRecordingWasWritten(workspace);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    [Trait("Category", "EndToEnd")]
+    public async Task StableAlreadyCurrentSkillsDoNotReinstall(bool defaultBranch)
+    {
+        if (IsUnsupportedPlatform())
+        {
+            return;
+        }
+
+        using var workspace = await TestWorkspace.CreateAsync($"{nameof(StableAlreadyCurrentSkillsDoNotReinstall)}-{defaultBranch}").ConfigureAwait(true);
+        if (defaultBranch)
+        {
+            DirectiveHttpCache cache = new(new(3600, Path.Combine(workspace.RootPath, "cache"), []), null);
+            foreach (string repo in StaticSkillManifest.All.Select(skill => skill.SourceRepo).Distinct(StringComparer.Ordinal))
+                cache.TryWrite(new($"https://api.github.com/repos/{repo}/releases/latest"), "__agentic_check_no_latest_release__");
+        }
+
+        string reference = defaultBranch ? "refs/heads/main" : "refs/tags/v2.3.0";
+        string installed = $"---\nmetadata:\n  github-ref: {reference}\n  github-tree-sha: unchanged-tree\n---\nExisting skill\n";
+        List<string> paths = [];
+        foreach (string agent in new[] { ".agents", ".claude" })
+        {
+            foreach (var skill in StaticSkillManifest.All.Where(skill => skill.Technology == TechnologyNames.Dotnet && skill.GateRequirements.Count == 0))
+            {
+                string path = $"{agent}/skills/{skill.LocalFolder}/SKILL.md";
+                workspace.WriteRepoFile(path, installed);
+                paths.Add(path);
+            }
+        }
+
+        string reportPath = Path.Combine(workspace.RootPath, "report.json");
+        var result = await RunCommandAsync(workspace,
+            $"--yes --agents codex,claude-code --report {Quote(reportPath)} {Quote(workspace.RepoPath)}").ConfigureAwait(true);
+
+        using var report = JsonDocument.Parse(await File.ReadAllTextAsync(reportPath).ConfigureAwait(true));
+        Assert.Empty(report.RootElement.GetProperty("missingSkills").EnumerateArray());
+        Assert.Equal(0, report.RootElement.GetProperty("outdatedSkills").GetInt32());
+        Assert.Empty(report.RootElement.GetProperty("installResults").EnumerateArray());
+        Assert.Empty(report.RootElement.GetProperty("skillCopyResults").EnumerateArray());
+        Assert.DoesNotContain("Switch to stable skill", result.Screen, StringComparison.Ordinal);
+        string log = await workspace.ReadGhLogAsync().ConfigureAwait(true);
+        Assert.DoesNotContain("skill install", log, StringComparison.Ordinal);
+        string[] updateCalls = [.. log.Split('\n').Where(line => line.StartsWith("skill update", StringComparison.Ordinal))];
+        Assert.Equal(2, updateCalls.Length);
+        Assert.All(updateCalls, line => Assert.Contains("--dry-run", line, StringComparison.Ordinal));
+        foreach (string path in paths)
+            Assert.Equal(installed, await workspace.ReadRepoFileAsync(path).ConfigureAwait(true));
+        AssertRecordingWasWritten(workspace);
+    }
+
     async Task<TerminalRunResult> RunCommandAsync(
         TestWorkspace workspace,
         string arguments,

@@ -8,17 +8,32 @@ sealed class SkillInstaller(ICommandRunner commandRunner, IReporter reporter)
     internal static IReadOnlyList<SkillManifestEntry> FindMissing(IReadOnlyList<SkillManifestEntry> skills, IReadOnlyList<string> skillsDirectories)
         => [.. skills.Where(skill => skillsDirectories.Any(directory => IsMissing(skill, directory)))];
 
-    internal static IReadOnlyList<SkillManifestEntry> FindInstalledFromBranch(
+    internal static IReadOnlyList<SkillManifestEntry> FindRequiringStableSwitch(
         IReadOnlyList<SkillManifestEntry> skills,
         IReadOnlyList<string> skillsDirectories)
-        => [.. skills.Where(skill => skillsDirectories.Any(directory => IsInstalledFromBranch(skill, directory)))];
+        => [.. skills.Where(skill => skillsDirectories.Any(directory => RequiresStableSwitch(skill, directory)))];
 
     internal static bool IsMissing(SkillManifestEntry skill, string skillsDirectory)
         => !File.Exists(Path.Combine(skillsDirectory, skill.LocalFolder, "SKILL.md"));
 
-    internal static bool IsInstalledFromBranch(SkillManifestEntry skill, string skillsDirectory)
-        => ReadGitHubRef(Path.Combine(skillsDirectory, skill.LocalFolder, "SKILL.md")) is { } gitHubRef
-            && gitHubRef.StartsWith("refs/heads/", StringComparison.OrdinalIgnoreCase);
+    internal static bool RequiresStableSwitch(SkillManifestEntry skill, string skillsDirectory)
+    {
+        string skillFile = Path.Combine(skillsDirectory, skill.LocalFolder, "SKILL.md");
+        if (!string.IsNullOrWhiteSpace(ReadFrontMatterValue(skillFile, "github-pinned:")))
+        {
+            return true;
+        }
+
+        string? gitHubRef = ReadGitHubRef(skillFile);
+        if (gitHubRef is null || !gitHubRef.StartsWith("refs/heads/", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        // An unpinned default branch is also a valid stable source when no release exists.
+        return skill.ResolvedSource is not { IsDefaultBranch: true } stableSource
+            || !gitHubRef.Equals($"refs/heads/{stableSource.Ref}", StringComparison.Ordinal);
+    }
 
     public async Task<IReadOnlyList<SkillInstallResult>> InstallAsync(
         IReadOnlyList<SkillManifestEntry> skills,
@@ -189,21 +204,22 @@ sealed class SkillInstaller(ICommandRunner commandRunner, IReporter reporter)
             return null;
         }
 
-        foreach (string line in File.ReadLines(skillFile))
+        using var lines = File.ReadLines(skillFile).GetEnumerator();
+        if (!lines.MoveNext() || !lines.Current.Trim().Equals("---", StringComparison.Ordinal))
         {
-            string trimmedLine = line.Trim();
-            if (trimmedLine.Equals("---", StringComparison.Ordinal) && line.Length == 3)
+            return null;
+        }
+
+        while (lines.MoveNext())
+        {
+            string trimmedLine = lines.Current.Trim();
+            if (trimmedLine.Equals("---", StringComparison.Ordinal))
             {
-                continue;
+                return null;
             }
 
             if (!trimmedLine.StartsWith(key, StringComparison.OrdinalIgnoreCase))
             {
-                if (trimmedLine.Equals("---", StringComparison.Ordinal))
-                {
-                    return null;
-                }
-
                 continue;
             }
 

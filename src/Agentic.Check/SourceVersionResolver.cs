@@ -14,6 +14,8 @@ interface ISourceVersionResolver
 
 sealed record SourceVersionInfo(string SourceRepo, string Ref, DateTimeOffset LastChangedAtUtc, string CommitSha = "")
 {
+    public bool IsDefaultBranch { get; init; }
+
     public string ContentRef => string.IsNullOrWhiteSpace(CommitSha) ? Ref : CommitSha;
 
     public string Display
@@ -218,7 +220,10 @@ sealed class GitHubSourceVersionResolver(HttpClient? httpClient = null, IReporte
         }
 
         return new SourceVersionInfo(sourceRepo, defaultBranch, lastChangedAtUtc.ToUniversalTime(),
-            branchDocument.RootElement.GetProperty("commit").TryGetProperty("sha", out var sha) ? sha.GetString() ?? string.Empty : string.Empty);
+            branchDocument.RootElement.GetProperty("commit").TryGetProperty("sha", out var sha) ? sha.GetString() ?? string.Empty : string.Empty)
+        {
+            IsDefaultBranch = true
+        };
     }
 
     async Task<string?> GetOptionalStringAsync(

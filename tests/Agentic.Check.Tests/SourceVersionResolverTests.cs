@@ -26,8 +26,12 @@ public sealed class SourceVersionResolverTests
         GitHubSourceVersionResolver resolver = new(httpClient, new NullReporter());
         DirectiveCacheSettings cacheSettings = new(1800, tempDirectory.CreateDirectory("cache"), []);
 
-        _ = await resolver.ResolveVersionsAsync(["owner/repo"], SourceVersionMode.Stable, cacheSettings, CancellationToken.None);
-        _ = await resolver.ResolveVersionsAsync(["owner/repo"], SourceVersionMode.Stable, cacheSettings, CancellationToken.None);
+        var first = await resolver.ResolveVersionsAsync(["owner/repo"], SourceVersionMode.Stable, cacheSettings, CancellationToken.None);
+        var cached = await resolver.ResolveVersionsAsync(["owner/repo"], SourceVersionMode.Stable, cacheSettings, CancellationToken.None);
+
+        Assert.True(first["owner/repo"].IsDefaultBranch);
+        Assert.Equal("main", first["owner/repo"].Ref);
+        Assert.Equal(first["owner/repo"], cached["owner/repo"]);
 
         Assert.Equal(
             1,
@@ -38,6 +42,24 @@ public sealed class SourceVersionResolverTests
         Assert.Equal(
             1,
             handler.Requests.Count(request => request == "https://api.github.com/repos/owner/repo/branches/main"));
+    }
+
+    [Fact]
+    public async Task StableReleaseNamedMainIsNotClassifiedAsDefaultBranch()
+    {
+        using TempDirectory temp = new();
+        using RecordingHttpMessageHandler handler = new();
+        handler.SetJson("https://api.github.com/repos/owner/repo/releases/latest",
+            /*lang=json,strict*/ """{ "tag_name": "main", "published_at": "2026-09-01T00:00:00Z" }""");
+        using HttpClient client = new(handler);
+        GitHubSourceVersionResolver resolver = new(client);
+
+        var versions = await resolver.ResolveVersionsAsync(["owner/repo"], SourceVersionMode.Stable,
+            new(0, temp.CreateDirectory("cache"), []), CancellationToken.None);
+
+        Assert.False(versions["owner/repo"].IsDefaultBranch);
+        Assert.Equal("main", versions["owner/repo"].Ref);
+        _ = Assert.Single(handler.Requests);
     }
 
     [Theory]

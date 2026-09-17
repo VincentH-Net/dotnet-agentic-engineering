@@ -268,10 +268,10 @@ sealed class CheckWorkflow(
         }
 
         var recommendedDirectives = directivePlan.SelectableDirectives;
-        var branchInstalledSkills = FindBranchInstalledSkillActions(options.Preview, recommended, skillsDirectories);
+        var stableSwitchSkills = FindStableSwitchSkillActions(options.Preview, recommended, skillsDirectories);
         var recommendedSkillActions = options.Preview
             ? [.. recommended.Select(skill => skill with { RecommendationAction = missing.Contains(skill) ? "install" : "re-install" })]
-            : BuildStableSkillActions(recommended, missing, branchInstalledSkills);
+            : BuildStableSkillActions(recommended, missing, stableSwitchSkills);
         ToolVersion? repairRequirement = null;
         bool restoreOnly = false;
         string? repairError = null;
@@ -352,7 +352,7 @@ sealed class CheckWorkflow(
         IReadOnlyList<SkillManifestEntry> selectedSkills = [];
         if (!options.DryRun && !options.Preview)
         {
-            ReportUpToDateItems(directivePlan.Directives, recommended, missing, skillUpdates, branchInstalledSkills);
+            ReportUpToDateItems(directivePlan.Directives, recommended, missing, skillUpdates, stableSwitchSkills);
         }
 
         if (recommendedDirectives.Count > 0 || recommendedSkillActions.Count > 0)
@@ -795,7 +795,7 @@ sealed class CheckWorkflow(
         IReadOnlyList<SkillManifestEntry> recommendedSkills,
         IReadOnlyList<SkillManifestEntry> missingSkills,
         IReadOnlyList<SkillUpdateCandidate> skillUpdates,
-        IReadOnlyList<SkillManifestEntry> branchInstalledSkills)
+        IReadOnlyList<SkillManifestEntry> stableSwitchSkills)
     {
         DirectivePlanItem[] currentDirectives = [.. directives
             .Where(directive => directive.Status == DirectiveStatuses.Current)
@@ -803,7 +803,7 @@ sealed class CheckWorkflow(
         var missingSkillKeys = missingSkills
             .Select(SkillKey)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var branchInstalledSkillKeys = branchInstalledSkills
+        var stableSwitchSkillKeys = stableSwitchSkills
             .Select(SkillKey)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var updateSkillKeys = skillUpdates
@@ -811,7 +811,7 @@ sealed class CheckWorkflow(
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         SkillManifestEntry[] upToDateSkills = [.. recommendedSkills
             .Where(skill => !missingSkillKeys.Contains(SkillKey(skill))
-                && !branchInstalledSkillKeys.Contains(SkillKey(skill))
+                && !stableSwitchSkillKeys.Contains(SkillKey(skill))
                 && !updateSkillKeys.Contains(SkillKey(skill)))
         ];
         if (currentDirectives.Length == 0 && upToDateSkills.Length == 0)
@@ -1005,19 +1005,19 @@ sealed class CheckWorkflow(
     static IReadOnlyList<SkillManifestEntry> BuildStableSkillActions(
         IReadOnlyList<SkillManifestEntry> recommendedSkills,
         IReadOnlyList<SkillManifestEntry> missingSkills,
-        IReadOnlyList<SkillManifestEntry> branchInstalledSkills)
+        IReadOnlyList<SkillManifestEntry> stableSwitchSkills)
     {
         var missingSkillKeys = missingSkills
             .Select(SkillKey)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var branchInstalledSkillKeys = branchInstalledSkills
+        var stableSwitchSkillKeys = stableSwitchSkills
             .Select(SkillKey)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         return
         [
             .. recommendedSkills
-                .Where(skill => missingSkillKeys.Contains(SkillKey(skill)) || branchInstalledSkillKeys.Contains(SkillKey(skill)))
-                .Select(skill => branchInstalledSkillKeys.Contains(SkillKey(skill))
+                .Where(skill => missingSkillKeys.Contains(SkillKey(skill)) || stableSwitchSkillKeys.Contains(SkillKey(skill)))
+                .Select(skill => stableSwitchSkillKeys.Contains(SkillKey(skill))
                     ? skill with
                     {
                         RecommendationAction = "switch to stable",
@@ -1027,11 +1027,11 @@ sealed class CheckWorkflow(
         ];
     }
 
-    static IReadOnlyList<SkillManifestEntry> FindBranchInstalledSkillActions(
+    static IReadOnlyList<SkillManifestEntry> FindStableSwitchSkillActions(
         bool preview,
         IReadOnlyList<SkillManifestEntry> recommendedSkills,
         IReadOnlyList<string> skillsDirectories)
-        => preview ? [] : SkillInstaller.FindInstalledFromBranch(recommendedSkills, skillsDirectories);
+        => preview ? [] : SkillInstaller.FindRequiringStableSwitch(recommendedSkills, skillsDirectories);
 
     internal static RecommendationSelectionResult CloseDependencies(
         IReadOnlyList<DirectivePlanItem> directives,

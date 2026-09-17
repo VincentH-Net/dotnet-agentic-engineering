@@ -296,6 +296,10 @@ sealed class FakeDirectiveSource : IDirectiveSource
 
 sealed class FakeSourceVersionResolver : ISourceVersionResolver
 {
+    public string StableRef { get; init; } = "v1.2.3";
+
+    public bool StableUsesDefaultBranch { get; init; }
+
     public List<string> RequestedSourceRepos { get; } = [];
 
     public Task<IReadOnlyDictionary<string, SourceVersionInfo>> ResolveVersionsAsync(
@@ -316,8 +320,11 @@ sealed class FakeSourceVersionResolver : ISourceVersionResolver
                     new DateTimeOffset(2026, 6, 30, 9, 12, 0, TimeSpan.Zero))
                 : new SourceVersionInfo(
                     sourceRepo,
-                    "v1.2.3",
-                    new DateTimeOffset(2026, 6, 29, 8, 11, 0, TimeSpan.Zero));
+                    StableRef,
+                    new DateTimeOffset(2026, 6, 29, 8, 11, 0, TimeSpan.Zero))
+                {
+                    IsDefaultBranch = StableUsesDefaultBranch
+                };
         }
 
         return Task.FromResult((IReadOnlyDictionary<string, SourceVersionInfo>)result);
