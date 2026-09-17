@@ -22,6 +22,8 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
     string agentsBefore = string.Empty;
     string manifestBefore = string.Empty;
     SortedDictionary<string, string> before = new(StringComparer.Ordinal);
+    SortedDictionary<string, string>? filesBeforeOperation;
+    string operationPhase = string.Empty;
     IReadOnlyList<SkillManifestEntry> expectedSkills = [];
     bool preview = scenario is "fresh" or "migration" or "preview-preview" or "preview-declined";
     internal bool HasContentTransition { get; private set; }
@@ -76,6 +78,16 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
         oracle = new(workspace.Process, workspace.Root);
         if (scenario == "candidate-preview-stable")
         {
+            var stableSource = await oracle.SelectedAsync(SourceOracle.OwnRepository, false).ConfigureAwait(false);
+            SourceIdentity identity = new(stableSource.Repository, stableSource.Reference, stableSource.Commit);
+            string? skipReason = StableTransitionSkipReason(scenario, identity);
+            if (skipReason is not null)
+            {
+                log(skipReason);
+                FixtureFiles.WriteJson(Path.Combine(FixtureFiles.Reports, runId + "-skipped.json"),
+                    new { fixture = fixtureName, scenario, reason = skipReason, stableSource = identity });
+                Skip.If(true, skipReason);
+            }
             preview = true;
             await ResolveSourcesAsync().ConfigureAwait(false);
             await InvokeAsync(false, false, "candidate-preview-setup").ConfigureAwait(false);
@@ -104,6 +116,14 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
         FixtureFiles.WriteJson(Path.Combine(FixtureFiles.Reports, runId + "-sources.json"), sources.Values.Select(source => new { source.Repository, source.Reference, source.Commit }));
     }
 
+    internal static string? StableTransitionSkipReason(string scenario, SourceIdentity source)
+        // This immutable release predates the companion. Do not generalize this to missing projects or HTTP errors.
+        => scenario == "candidate-preview-stable" && source.Repository == SourceOracle.OwnRepository
+            && source.Reference == "v2.2.0" && source.Commit == "ebc711fb6db0912cae2b0c2bc4991d57d5afa007"
+                ? $"PRE-COMPANION STABLE SOURCE: {scenario} cannot switch candidate content to {source.Repository}@{source.Reference} ({source.Commit}): "
+                    + "this release has no companion project. This variation is skipped until another stable source is selected; no stable transition was verified."
+                : null;
+
     async Task ResolveSourcesAsync()
     {
         var stack = StackDetector.Detect(workspace.Target);
@@ -130,6 +150,12 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
 
     async Task InvokeAsync(bool dryRun, bool interactive, string phase)
     {
+        if (!dryRun)
+        {
+            // Each setup/apply/recheck phase gets its own evidence; fresh installs stay strict.
+            filesBeforeOperation = scenario == "fresh" ? null : FixtureFiles.Inventory(workspace.Target);
+            operationPhase = phase;
+        }
         testRun.UseCache(workspace, candidate.Check.Sha256, preview, log);
         string reportPath = Path.Combine(FixtureFiles.Reports, runId + "-" + phase + ".json");
         _ = Directory.CreateDirectory(FixtureFiles.Reports);
@@ -250,6 +276,7 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
             if (scenario is "preview-stable" or "candidate-preview-stable")
             {
                 await InvokeAsync(false, false, "subsequent-stable").ConfigureAwait(false);
+                await VerifyDeliveredAsync().ConfigureAwait(false);
                 FixtureFiles.Require(report.GetProperty("outdatedSkills").GetInt32() == 0, "Subsequent stable update is not current.");
                 FixtureFiles.Require(report.GetProperty("installResults").GetArrayLength() == 0, "Subsequent stable check unexpectedly reinstalled skills.");
             }
@@ -260,7 +287,21 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
     async Task VerifyDeliveredAsync()
     {
         var allowed = expectedSkills.Select(skill => skill.LocalFolder).ToHashSet(StringComparer.Ordinal);
-        var origins = await oracle.VerifySkillsAsync(workspace.Target, sources, allowed).ConfigureAwait(false);
+        SortedDictionary<string, string> retainedFiles = new(StringComparer.Ordinal);
+        IReadOnlyList<SkillOrigin> origins;
+        try
+        {
+            origins = await oracle.VerifySkillsAsync(workspace.Target, sources, allowed, filesBeforeOperation,
+                (path, hash) =>
+                {
+                    retainedFiles.Add(path, hash);
+                    log($"Retained pre-existing skill asset: {path} SHA256 {hash}");
+                }).ConfigureAwait(false);
+        }
+        finally
+        {
+            FixtureFiles.WriteJson(Path.Combine(FixtureFiles.Reports, runId + "-" + operationPhase + "-retained-assets.json"), retainedFiles);
+        }
         if (preview)
         {
             var installed = report.GetProperty("installResults").EnumerateArray().Select(item => item.GetProperty("sourceRepo").GetString() + "\n" + item.GetProperty("installArg").GetString()).Order(StringComparer.Ordinal);

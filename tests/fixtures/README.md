@@ -218,6 +218,16 @@ PowerShell users set the same names with `$env:NAME = 'value'` before running do
 | `candidate-preview-stable` | Another copy, first installed from candidate SHA, then stable. Exposes any SHA-pin switching defect. |
 | `preview-declined` | Another preview-web-cli copy; interactive deselection and exact skill/metadata preservation. |
 
+The `candidate-preview-stable` variation has one temporary, test-only compatibility skip:
+when this repository's selected stable source is exactly `v2.2.0` at
+`ebc711fb6db0912cae2b0c2bc4991d57d5afa007`. That release predates the companion, so switching
+candidate preview content back to it makes the candidate request a nonexistent companion project.
+The runner reports `PRE-COMPANION STABLE SOURCE` with the repository, tag and commit, and saves
+`<run>-skipped.json` before invoking the candidate. This is an explicit coverage gap, not a passed
+transition or an unchanged-source skip. The variation automatically runs for any other stable
+source. Historical `preview-stable`, all baseline-to-candidate migrations, and companion checks
+remain enabled. Other missing sources, HTTP failures and prerequisite errors are not exempted.
+
 Migration and preview-reinstall cases have separate content-transition rows. Before those
 rows run an update, they independently compare intended source content with the baseline.
 If unchanged, `Xunit.SkippableFact` reports a real runner skip containing source identities.
@@ -231,6 +241,17 @@ outside the stable manifest must retain their existing bytes. Stable-manifest sk
 lose preview pins through the real product path; tests never call manual `--unpin` to help.
 If selected published content requires a companion incompatible with supplied candidates,
 verification fails and reports that mismatch.
+
+Skill verification requires every file from the selected source, with correct asset hashes,
+authored `SKILL.md` content, and source/pin metadata. Fresh installations and baseline preparation
+require exact file inventories. For migrations and repeat installations, an extra file is allowed
+only when the same path existed before that particular operation and its SHA256 is unchanged.
+This accommodates `gh skill install --force` retaining files from an earlier version; Agentic.Check
+does not promise to remove obsolete assets. Missing source files, incorrect expected contents,
+new extra files, and modified retained files still fail. Each setup, apply, and subsequent-stable
+phase captures its own pre-operation inventory. Accepted retained files are logged with their
+paths/hashes and saved in `<run>-<phase>-retained-assets.json`; they are not treated as files from
+the selected source. Subsequent stable checks also repeat delivery verification.
 
 Companion checks run help/version and a Unicode/escaped prompt-log stdin -> wrap -> fixture
 Git commit -> show/check round trip. Git HEAD must remain unchanged by companion reading.

@@ -86,7 +86,9 @@ sealed class SourceOracle(RealProcess process, string workingDirectory) : IDispo
         return await SnapshotAsync(repository, reference).ConfigureAwait(false);
     }
 
-    internal async Task<IReadOnlyList<SkillOrigin>> VerifySkillsAsync(string target, IReadOnlyDictionary<string, SourceSnapshot>? selected = null, IReadOnlySet<string>? allowedFolders = null)
+    internal async Task<IReadOnlyList<SkillOrigin>> VerifySkillsAsync(string target, IReadOnlyDictionary<string, SourceSnapshot>? selected = null,
+        IReadOnlySet<string>? allowedFolders = null, IReadOnlyDictionary<string, string>? previousFiles = null,
+        Action<string, string>? reportRetainedFile = null)
     {
         List<SkillOrigin> origins = [];
         foreach (string agent in new[] { ".agents/skills", ".claude/skills" })
@@ -130,22 +132,42 @@ sealed class SourceOracle(RealProcess process, string workingDirectory) : IDispo
                     FixtureFiles.Require(blobHashes[index].TrimEnd('\r') == expectedBlob, $"Independent source cache differs from GitHub blob: {snapshot.Repository}@{snapshot.Commit}/{path}");
                 }
                 var installedFiles = FixtureFiles.Inventory(folder);
-                FixtureFiles.Require(sourceFiles.Keys.SequenceEqual(installedFiles.Keys), $"Skill asset inventory differs: {folder}");
-                foreach (var (file, hash) in sourceFiles)
-                {
-                    if (file == "SKILL.md")
-                        continue;
-                    FixtureFiles.Require(hash == installedFiles[file], $"Skill asset differs: {folder}/{file}");
-                }
+                string localPath = Path.GetRelativePath(target, folder).Replace('\\', '/');
+                var retainedFiles = VerifyAssetInventory(localPath, sourceFiles, installedFiles, previousFiles);
                 var (sourceYaml, sourceBody) = ParseSkill(await File.ReadAllTextAsync(Path.Combine(sourceFolder, "SKILL.md")).ConfigureAwait(false));
                 FixtureFiles.Require(body == sourceBody, $"Skill body differs: {folder}");
                 RemoveTracking(yaml);
                 RemoveTracking(sourceYaml);
                 FixtureFiles.Require(yaml.Equals(sourceYaml), $"Authored frontmatter differs: {folder}");
-                origins.Add(new(Path.GetRelativePath(target, folder).Replace('\\', '/'), repository, reference, snapshot.Commit, tree, sourcePath, pin, sourceFiles));
+                foreach (var (path, hash) in retainedFiles)
+                    reportRetainedFile?.Invoke(path, hash);
+                origins.Add(new(localPath, repository, reference, snapshot.Commit, tree, sourcePath, pin, sourceFiles));
             }
         }
         return origins;
+    }
+
+    internal static SortedDictionary<string, string> VerifyAssetInventory(string localPath,
+        IReadOnlyDictionary<string, string> sourceFiles, IReadOnlyDictionary<string, string> installedFiles,
+        IReadOnlyDictionary<string, string>? previousFiles = null)
+    {
+        foreach (var (file, hash) in sourceFiles)
+        {
+            FixtureFiles.Require(installedFiles.ContainsKey(file), $"Missing skill asset: {localPath}/{file}");
+            // Authored SKILL.md content is verified separately after removing gh tracking metadata.
+            if (file != "SKILL.md")
+                FixtureFiles.Require(hash == installedFiles[file], $"Skill asset differs: {localPath}/{file}");
+        }
+        SortedDictionary<string, string> retained = new(StringComparer.Ordinal);
+        foreach (var (file, hash) in installedFiles.Where(file => !sourceFiles.ContainsKey(file.Key)))
+        {
+            string path = localPath + "/" + file;
+            string? previousHash = previousFiles?.GetValueOrDefault(path);
+            FixtureFiles.Require(previousHash is not null, $"Unexpected skill asset: {path}");
+            FixtureFiles.Require(hash == previousHash, $"Pre-existing skill asset changed: {path}");
+            retained.Add(path, hash);
+        }
+        return retained;
     }
 
     // gh 2.100 parses leading body newlines and ensures one final newline; other body bytes stay significant.

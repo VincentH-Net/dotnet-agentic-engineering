@@ -42,6 +42,33 @@ public sealed class PackageFixtureSupportTests
     }
 
     [Fact]
+    public void CandidatePreviewStableSkipIdentifiesOnlyTheKnownPreCompanionRelease()
+    {
+        const string commit = "ebc711fb6db0912cae2b0c2bc4991d57d5afa007";
+        SourceIdentity source = new(SourceOracle.OwnRepository, "v2.2.0", commit);
+        string? reason = PackageScenario.StableTransitionSkipReason("candidate-preview-stable", source);
+        Assert.NotNull(reason);
+        Assert.Contains($"{source.Repository}@v2.2.0 ({commit})", reason, StringComparison.Ordinal);
+        Assert.Contains("no stable transition was verified", reason, StringComparison.Ordinal);
+
+        foreach (string scenario in PackageFixtureTests.BuildScenarios(null).Select(row => (string)row[1]).Distinct(StringComparer.Ordinal))
+        {
+            if (scenario != "candidate-preview-stable")
+                Assert.Null(PackageScenario.StableTransitionSkipReason(scenario, source));
+        }
+    }
+
+    [Theory]
+    [InlineData(SourceOracle.OwnRepository, "v2.3.0", "ebc711fb6db0912cae2b0c2bc4991d57d5afa007")]
+    [InlineData(SourceOracle.OwnRepository, "v2.2.1", "ebc711fb6db0912cae2b0c2bc4991d57d5afa007")]
+    [InlineData(SourceOracle.OwnRepository, "v2.2.0-preview.1", "ebc711fb6db0912cae2b0c2bc4991d57d5afa007")]
+    [InlineData(SourceOracle.OwnRepository, "main", "ebc711fb6db0912cae2b0c2bc4991d57d5afa007")]
+    [InlineData(SourceOracle.OwnRepository, "v2.2.0", "1111111111111111111111111111111111111111")]
+    [InlineData("dotnet/skills", "v2.2.0", "ebc711fb6db0912cae2b0c2bc4991d57d5afa007")]
+    public void OtherStableSourcesDoNotSkipCandidatePreviewStable(string repository, string reference, string commit)
+        => Assert.Null(PackageScenario.StableTransitionSkipReason("candidate-preview-stable", new(repository, reference, commit)));
+
+    [Fact]
     public void InstalledSnapshotsMatchFrozenInventoriesAndTriggerHashes()
     {
         string root = Path.Combine(FixtureFiles.Checkout, "tests/fixtures/baselines");
