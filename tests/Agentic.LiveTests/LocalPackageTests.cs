@@ -335,13 +335,15 @@ sealed class PackageWorkspace : IDisposable
 
 sealed class IsolatedRunner(IReadOnlyDictionary<string, string> environment) : ICommandRunner
 {
-    public Task<CommandResult> RunAsync(string fileName, IReadOnlyList<string> arguments, string workingDirectory, CancellationToken cancellationToken)
-        => RunCoreAsync(fileName, arguments, workingDirectory, null, cancellationToken);
+    public Task<CommandResult> RunAsync(string fileName, IReadOnlyList<string> arguments, string workingDirectory, CancellationToken cancellationToken,
+        IReadOnlyDictionary<string, string?>? environment = null)
+        => RunCoreAsync(fileName, arguments, workingDirectory, null, cancellationToken, environment);
 
     internal Task<CommandResult> RunWithInputAsync(string fileName, IReadOnlyList<string> arguments, string workingDirectory, string input)
         => RunCoreAsync(fileName, arguments, workingDirectory, input, CancellationToken.None);
 
-    async Task<CommandResult> RunCoreAsync(string fileName, IReadOnlyList<string> arguments, string workingDirectory, string? input, CancellationToken cancellationToken)
+    async Task<CommandResult> RunCoreAsync(string fileName, IReadOnlyList<string> arguments, string workingDirectory, string? input, CancellationToken cancellationToken,
+        IReadOnlyDictionary<string, string?>? overrides = null)
     {
         ProcessStartInfo info = new(fileName)
         {
@@ -365,6 +367,11 @@ sealed class IsolatedRunner(IReadOnlyDictionary<string, string> environment) : I
         foreach (var (key, value) in environment)
         {
             info.Environment[key] = value;
+        }
+        if (overrides is not null)
+        {
+            foreach (var (key, value) in overrides)
+                info.Environment[key] = value;
         }
 
         using Process process = new() { StartInfo = info };

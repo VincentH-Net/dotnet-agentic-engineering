@@ -270,7 +270,7 @@ sealed class GitHubSourceVersionResolver(HttpClient? httpClient = null, IReporte
                     return cachedContent;
                 }
 
-                throw new DirectiveException($"Could not fetch {description}: HTTP {statusCode}.");
+                throw new DirectiveException($"Could not fetch {description}: {await GitHubAuthentication.DescribeFailureAsync(response, cancellationToken).ConfigureAwait(false)}");
             }
 
             string content = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
@@ -317,7 +317,7 @@ sealed class GitHubSourceVersionResolver(HttpClient? httpClient = null, IReporte
                     return cachedContent;
                 }
 
-                throw new DirectiveException($"Could not fetch {description}: HTTP {statusCode}.");
+                throw new DirectiveException($"Could not fetch {description}: {await GitHubAuthentication.DescribeFailureAsync(response, cancellationToken).ConfigureAwait(false)}");
             }
 
             string content = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);

@@ -391,9 +391,11 @@ sealed class ToolRunner : ICommandRunner
     internal bool UpdateCandidate { get; init; }
     internal bool NotRestored { get; init; }
 
-    public Task<CommandResult> RunAsync(string fileName, IReadOnlyList<string> arguments, string workingDirectory, CancellationToken cancellationToken)
+    public Task<CommandResult> RunAsync(string fileName, IReadOnlyList<string> arguments, string workingDirectory, CancellationToken cancellationToken, IReadOnlyDictionary<string, string?>? environment = null)
     {
-        Calls.Add(new(fileName, arguments, workingDirectory));
+        Calls.Add(new(fileName, arguments, workingDirectory) { Environment = environment });
+        if (AuthenticationTestCommands.Response(fileName, arguments) is { } authentication)
+            return Task.FromResult(authentication);
         if (fileName == "dotnet")
         {
             if (Fail || (NotRestored && arguments[1] == "run"))

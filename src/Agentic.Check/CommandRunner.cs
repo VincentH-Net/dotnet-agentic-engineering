@@ -4,7 +4,8 @@ namespace Agentic.Check;
 
 interface ICommandRunner
 {
-    Task<CommandResult> RunAsync(string fileName, IReadOnlyList<string> arguments, string workingDirectory, CancellationToken cancellationToken);
+    Task<CommandResult> RunAsync(string fileName, IReadOnlyList<string> arguments, string workingDirectory, CancellationToken cancellationToken,
+        IReadOnlyDictionary<string, string?>? environment = null);
 }
 
 sealed record CommandResult(int ExitCode, string StandardOutput, string StandardError)
@@ -18,7 +19,8 @@ sealed class ProcessCommandRunner : ICommandRunner
         string fileName,
         IReadOnlyList<string> arguments,
         string workingDirectory,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IReadOnlyDictionary<string, string?>? environment = null)
     {
         ProcessStartInfo startInfo = new()
         {
@@ -32,6 +34,12 @@ sealed class ProcessCommandRunner : ICommandRunner
         foreach (string argument in arguments)
         {
             startInfo.ArgumentList.Add(argument);
+        }
+
+        if (environment is not null)
+        {
+            foreach (var (name, value) in environment)
+                startInfo.Environment[name] = value;
         }
 
         using Process process = new()

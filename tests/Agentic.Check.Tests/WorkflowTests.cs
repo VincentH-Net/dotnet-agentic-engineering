@@ -21,7 +21,7 @@ public sealed class WorkflowTests
                 SelectedSkillInstallArgs = []
             },
             reporter,
-            new FakeDirectiveSource());
+            new FakeDirectiveSource(), new FakeSourceVersionResolver());
 
         var result = await workflow.RunAsync(
             new AgenticCheckOptions(tempDirectory.Path, true, false, null, null, null, false),
@@ -316,7 +316,7 @@ public sealed class WorkflowTests
         commandRunner.Enqueue(new CommandResult(1, string.Empty, "unknown command \"skill\""));
         commandRunner.Enqueue(new CommandResult(1, string.Empty, "unknown command \"skill\""));
         RecordingReporter reporter = new();
-        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), reporter, new FakeDirectiveSource());
+        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), reporter, new FakeDirectiveSource(), new FakeSourceVersionResolver());
 
         var result = await workflow.RunAsync(
             new AgenticCheckOptions(tempDirectory.Path, true, false, null, null, null, false),
@@ -354,7 +354,7 @@ public sealed class WorkflowTests
                 SelectedSkillInstallArgs = []
             },
             reporter,
-            new FakeDirectiveSource());
+            new FakeDirectiveSource(), new FakeSourceVersionResolver());
 
         var result = await workflow.RunAsync(
             new AgenticCheckOptions(tempDirectory.Path, true, false, null, null, "codex", false),
@@ -386,7 +386,7 @@ public sealed class WorkflowTests
                 SelectedSkillInstallArgs = ["dotnet-modern-csharp-editorconfig"]
             },
             reporter,
-            new FakeDirectiveSource());
+            new FakeDirectiveSource(), new FakeSourceVersionResolver());
 
         var result = await workflow.RunAsync(
             new AgenticCheckOptions(tempDirectory.Path, false, false, null, null, null, false),
@@ -409,7 +409,7 @@ public sealed class WorkflowTests
         commandRunner.Enqueue(new CommandResult(0, "claude dry-run", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "trae dry-run", string.Empty));
         RecordingReporter reporter = new();
-        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), reporter, new FakeDirectiveSource());
+        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), reporter, new FakeDirectiveSource(), new FakeSourceVersionResolver());
 
         var result = await workflow.RunAsync(
             new AgenticCheckOptions(tempDirectory.Path, true, false, null, null, "codex,claude-code,trae,trae-cn", false),
@@ -577,7 +577,7 @@ public sealed class WorkflowTests
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "agents dry-run", string.Empty));
-        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), new NullReporter(), new FakeDirectiveSource());
+        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), new NullReporter(), new FakeDirectiveSource(), new FakeSourceVersionResolver());
 
         var result = await workflow.RunAsync(
             new AgenticCheckOptions(tempDirectory.Path, true, false, null, null, "codex,unknown-agent", false),
@@ -596,7 +596,7 @@ public sealed class WorkflowTests
         FakeCommandRunner commandRunner = new();
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
-        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), new NullReporter(), new FakeDirectiveSource());
+        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), new NullReporter(), new FakeDirectiveSource(), new FakeSourceVersionResolver());
 
         var result = await workflow.RunAsync(
             new AgenticCheckOptions(tempDirectory.Path, true, false, null, null, "standard", false),
@@ -615,7 +615,7 @@ public sealed class WorkflowTests
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "agents dry-run", string.Empty));
-        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), new NullReporter(), new FakeDirectiveSource());
+        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), new NullReporter(), new FakeDirectiveSource(), new FakeSourceVersionResolver());
 
         var result = await workflow.RunAsync(
             new AgenticCheckOptions(tempDirectory.Path, true, false, null, null, "codex", false),
@@ -639,7 +639,7 @@ public sealed class WorkflowTests
             commandRunner,
             new FakePrompts { ConfirmResult = false },
             new NullReporter(),
-            new FakeDirectiveSource());
+            new FakeDirectiveSource(), new FakeSourceVersionResolver());
 
         var result = await workflow.RunAsync(
             new AgenticCheckOptions(tempDirectory.Path, false, false, null, null, "codex", false),
@@ -681,7 +681,7 @@ public sealed class WorkflowTests
                 SelectedSkillInstallArgs = []
             },
             reporter,
-            new FakeDirectiveSource());
+            new FakeDirectiveSource(), new FakeSourceVersionResolver());
 
         var result = await workflow.RunAsync(
             new AgenticCheckOptions(tempDirectory.Path, false, false, null, null, null, false),
@@ -805,7 +805,7 @@ public sealed class WorkflowTests
             """,
             string.Empty));
         RecordingReporter reporter = new();
-        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), reporter, new FakeDirectiveSource());
+        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), reporter, new FakeDirectiveSource(), new FakeSourceVersionResolver());
 
         var result = await workflow.RunAsync(
             new AgenticCheckOptions(tempDirectory.Path, true, false, null, null, null, false),
@@ -828,7 +828,7 @@ public sealed class WorkflowTests
         commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "No updates available.", string.Empty));
         FakePrompts prompts = new() { ConfirmResult = true };
-        CheckWorkflow workflow = new(commandRunner, prompts, new NullReporter(), new FakeDirectiveSource());
+        CheckWorkflow workflow = new(commandRunner, prompts, new NullReporter(), new FakeDirectiveSource(), new FakeSourceVersionResolver());
 
         var result = await workflow.RunAsync(
             new AgenticCheckOptions(tempDirectory.Path, false, false, null, null, "codex", false),
@@ -863,7 +863,7 @@ public sealed class WorkflowTests
             SelectedSkillInstallArgs = []
         };
         RecordingReporter reporter = new();
-        CheckWorkflow workflow = new(commandRunner, prompts, reporter, new FakeDirectiveSource());
+        CheckWorkflow workflow = new(commandRunner, prompts, reporter, new FakeDirectiveSource(), new FakeSourceVersionResolver());
 
         var result = await workflow.RunAsync(
             new AgenticCheckOptions(tempDirectory.Path, false, false, null, null, null, false),
@@ -896,7 +896,7 @@ public sealed class WorkflowTests
                 SelectedSkillInstallArgs = []
             },
             reporter,
-            new FakeDirectiveSource());
+            new FakeDirectiveSource(), new FakeSourceVersionResolver());
 
         var result = await workflow.RunAsync(
             new AgenticCheckOptions(tempDirectory.Path, false, false, null, null, "codex", false),
@@ -942,7 +942,7 @@ public sealed class WorkflowTests
                 SelectedSkillInstallArgs = ["plugins/dotnet-test/skills/run-tests"]
             },
             new NullReporter(),
-            new FakeDirectiveSource());
+            new FakeDirectiveSource(), new FakeSourceVersionResolver());
 
         var result = await workflow.RunAsync(
             new AgenticCheckOptions(tempDirectory.Path, false, false, null, null, "codex", false),
@@ -1002,7 +1002,7 @@ public sealed class WorkflowTests
                 SelectedSkillInstallArgs = ["dotnet-modern-csharp-editorconfig"]
             },
             reporter,
-            new FakeDirectiveSource());
+            new FakeDirectiveSource(), new FakeSourceVersionResolver());
 
         var result = await workflow.RunAsync(
             new AgenticCheckOptions(tempDirectory.Path, false, false, null, null, null, false),

@@ -31,6 +31,18 @@ Uno Platform skills are selected depending on detected:
 
 - .NET 10 SDK or later ([install](https://dotnet.microsoft.com/download))
 - `gh` CLI ([install](https://cli.github.com/))
+- GitHub authentication: please run `gh auth login` before using Agentic.Check.
+  GitHub’s anonymous API rate limits are insufficient for the required `gh skill` usage.
+  Automation can supply `GH_TOKEN` or `GITHUB_TOKEN` instead; environment tokens take
+  precedence over the stored GitHub CLI login.
+
+Agentic.Check checks authenticated access to its public source repository before scanning remote
+sources or changing installed content, including during `--dry-run`. It reuses GitHub CLI’s
+effective credential for both skill commands and direct GitHub API reads. The credential is kept
+in memory and is not saved or logged; public file downloads to other hosts do not receive it.
+Help and version output require no login. Network failures and exhausted authenticated quotas
+are reported separately from missing or invalid authentication. Authentication validation needs
+network access even when source responses are cached.
 
 ## Usage
 

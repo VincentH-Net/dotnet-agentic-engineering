@@ -1,5 +1,17 @@
 namespace Agentic.Check.Tests;
 
+static class AuthenticationTestCommands
+{
+    internal const string Token = "fixture-authentication-secret";
+    internal const string RepositoryResponse = "HTTP/2.0 200 OK\r\nX-RateLimit-Limit: 5000\r\nX-RateLimit-Remaining: 4999\r\n\r\n{}";
+
+    internal static CommandResult? Response(string executable, IReadOnlyList<string> arguments)
+        => executable != "gh" ? null
+            : arguments is ["auth", "token", "--hostname", "github.com"] ? new(0, Token, string.Empty)
+            : arguments is ["api", "--hostname", "github.com", "--include", "--method", "GET", GitHubAuthentication.ProbePath]
+                ? new(0, RepositoryResponse, string.Empty) : null;
+}
+
 sealed class TempDirectory : IDisposable
 {
     public TempDirectory()
@@ -50,12 +62,14 @@ sealed class FakeCommandRunner : ICommandRunner
         string fileName,
         IReadOnlyList<string> arguments,
         string workingDirectory,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, IReadOnlyDictionary<string, string?>? environment = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        CommandCall call = new(fileName, [.. arguments], workingDirectory);
+        CommandCall call = new(fileName, [.. arguments], workingDirectory) { Environment = environment };
         Calls.Add(call);
         OnRun?.Invoke(call);
+        if (AuthenticationTestCommands.Response(fileName, arguments) is { } authentication)
+            return Task.FromResult(authentication);
         if (fileName == "dotnet" && arguments[0] == "tool")
         {
             return Task.FromResult(CompanionTestCommands.Succeed(arguments, workingDirectory));
@@ -67,7 +81,10 @@ sealed class FakeCommandRunner : ICommandRunner
     }
 }
 
-sealed record CommandCall(string FileName, IReadOnlyList<string> Arguments, string WorkingDirectory);
+sealed record CommandCall(string FileName, IReadOnlyList<string> Arguments, string WorkingDirectory)
+{
+    internal IReadOnlyDictionary<string, string?>? Environment { get; init; }
+}
 
 sealed class MappedCommandRunner : ICommandRunner
 {
@@ -82,10 +99,12 @@ sealed class MappedCommandRunner : ICommandRunner
         string fileName,
         IReadOnlyList<string> arguments,
         string workingDirectory,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, IReadOnlyDictionary<string, string?>? environment = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        Calls.Add(new CommandCall(fileName, [.. arguments], workingDirectory));
+        Calls.Add(new CommandCall(fileName, [.. arguments], workingDirectory) { Environment = environment });
+        if (!results.ContainsKey(CreateKey(fileName, arguments)) && AuthenticationTestCommands.Response(fileName, arguments) is { } authentication)
+            return Task.FromResult(authentication);
         if (fileName == "dotnet" && arguments[0] == "tool" && !results.ContainsKey(CreateKey(fileName, arguments)))
         {
             return Task.FromResult(CompanionTestCommands.Succeed(arguments, workingDirectory));

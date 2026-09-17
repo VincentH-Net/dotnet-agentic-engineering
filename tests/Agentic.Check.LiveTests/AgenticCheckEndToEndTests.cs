@@ -18,6 +18,31 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
     [InlineData(false)]
     [InlineData(true)]
     [Trait("Category", "EndToEnd")]
+    public async Task MissingAuthenticationExplainsLoginAndLeavesTargetUnchanged(bool dryRun)
+    {
+        if (IsUnsupportedPlatform())
+            return;
+        using var workspace = await TestWorkspace.CreateAsync(nameof(MissingAuthenticationExplainsLoginAndLeavesTargetUnchanged)).ConfigureAwait(true);
+        await File.WriteAllTextAsync(Path.Combine(workspace.RootPath, "gh-auth-missing"), string.Empty).ConfigureAwait(true);
+        workspace.WriteRepoFile("AGENTS.md", "Preserve these user instructions.\n");
+        string before = await workspace.ReadRepoFileAsync("AGENTS.md").ConfigureAwait(true);
+        string reportPath = Path.Combine(workspace.RootPath, "auth-report.json");
+        var result = await RunCommandAsync(workspace, $"{(dryRun ? "--dry-run" : "--yes")} --report {Quote(reportPath)} {Quote(workspace.RepoPath)}", 2).ConfigureAwait(true);
+        Assert.Contains("insufficient for the required `gh skill` usage", result.Screen, StringComparison.Ordinal);
+        Assert.Contains("Please run `gh auth login`, then retry.", result.Screen, StringComparison.Ordinal);
+        Assert.Equal(before, await workspace.ReadRepoFileAsync("AGENTS.md").ConfigureAwait(true));
+        string log = await workspace.ReadGhLogAsync().ConfigureAwait(true);
+        Assert.DoesNotContain("skill install", log, StringComparison.Ordinal);
+        Assert.DoesNotContain("skill update", log, StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(workspace.RootPath, "tool.log")));
+        Assert.DoesNotContain("fixture-authentication-secret", await File.ReadAllTextAsync(reportPath).ConfigureAwait(true), StringComparison.Ordinal);
+        AssertRecordingWasWritten(workspace);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    [Trait("Category", "EndToEnd")]
     public async Task CompanionFailureSkipsDependentDirectiveAndReportsPartialOutcome(bool invalidVersion)
     {
         if (IsUnsupportedPlatform())
@@ -106,6 +131,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
         }
 
         using var workspace = await TestWorkspace.CreateAsync(nameof(HelpListsCoreOptionsAndAgentValues)).ConfigureAwait(true);
+        await File.WriteAllTextAsync(Path.Combine(workspace.RootPath, "gh-auth-missing"), string.Empty).ConfigureAwait(true);
         var result = await RunCommandAsync(workspace, "--help").ConfigureAwait(true);
 
         Assert.Equal(0, result.ExitCode);
@@ -118,6 +144,23 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
         Assert.Contains("Claude Code (claude-code)", result.Screen, StringComparison.Ordinal);
         Assert.Contains("Codex (codex)", result.Screen, StringComparison.Ordinal);
         Assert.DoesNotContain("standard", result.Screen, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(await workspace.ReadGhLogAsync().ConfigureAwait(true));
+        AssertRecordingWasWritten(workspace);
+    }
+
+    [Fact]
+    [Trait("Category", "EndToEnd")]
+    public async Task VersionRequiresNoGitHubAuthentication()
+    {
+        if (IsUnsupportedPlatform())
+            return;
+        using var workspace = await TestWorkspace.CreateAsync(nameof(VersionRequiresNoGitHubAuthentication)).ConfigureAwait(true);
+        await File.WriteAllTextAsync(Path.Combine(workspace.RootPath, "gh-auth-missing"), string.Empty).ConfigureAwait(true);
+        var result = await RunCommandAsync(workspace, "--version").ConfigureAwait(true);
+        Assert.Equal(0, result.ExitCode);
+        string version = typeof(AgenticCheckReport).Assembly.GetName().Version!.ToString(3);
+        Assert.Contains(version, result.Screen, StringComparison.Ordinal);
+        Assert.Empty(await workspace.ReadGhLogAsync().ConfigureAwait(true));
         AssertRecordingWasWritten(workspace);
     }
 
@@ -509,7 +552,6 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
                 await auto.WaitUntilTextAsync("uno-test-resize-app-window (install)", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
                 await auto.WaitUntilTextAsync("dotnet-test", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
                 await auto.WaitUntilTextAsync("run-tests (install)", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
-
                 using (var snapshot = auto.CreateSnapshot())
                 {
                     string filteredScreen = snapshot.GetScreenText();
@@ -867,7 +909,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
     static string AgenticCheckCommand(TestWorkspace workspace, string arguments)
     {
         string path = workspace.BinPath + Path.PathSeparator + (Environment.GetEnvironmentVariable("PATH") ?? string.Empty);
-        return $"AGENTIC_CHECK_CACHE_SECONDS=3600 AGENTIC_CHECK_CACHE_DIR={Quote(Path.Combine(workspace.RootPath, "cache"))} AGENTIC_CHECK_GH_LOG={Quote(workspace.GhLogPath)} PATH={Quote(path)} {Quote(Path.ChangeExtension(ToolAssemblyPath, null))} {arguments}";
+        return $"GH_TOKEN= GITHUB_TOKEN= GH_CONFIG_DIR={Quote(Path.Combine(workspace.RootPath, "gh"))} AGENTIC_CHECK_CACHE_SECONDS=3600 AGENTIC_CHECK_CACHE_DIR={Quote(Path.Combine(workspace.RootPath, "cache"))} AGENTIC_CHECK_GH_LOG={Quote(workspace.GhLogPath)} PATH={Quote(path)} {Quote(Path.ChangeExtension(ToolAssemblyPath, null))} {arguments}";
     }
 
     static Hex1bTerminal CreateTerminal(TestWorkspace workspace)
@@ -1125,6 +1167,24 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
 
                 if [[ "${1:-}" == "--version" ]]; then
                   echo "gh version 2.93.0 (test)"
+                  exit 0
+                fi
+
+                if [[ "${1:-}" == "auth" && "${2:-}" == "token" ]]; then
+                  if [[ -f "$root/gh-auth-missing" ]]; then
+                    echo "no token" >&2
+                    exit 1
+                  fi
+                  echo "fixture-authentication-secret"
+                  exit 0
+                fi
+
+                if [[ "${1:-}" == "api" ]]; then
+                  if [[ "${GH_TOKEN:-}" != "fixture-authentication-secret" ]]; then
+                    echo "HTTP/2.0 401 Unauthorized"
+                    exit 1
+                  fi
+                  printf 'HTTP/2.0 200 OK\r\nX-RateLimit-Limit: 5000\r\n\r\n{}\n'
                   exit 0
                 fi
 
