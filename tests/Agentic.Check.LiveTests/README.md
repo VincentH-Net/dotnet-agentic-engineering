@@ -70,6 +70,11 @@ and Hex1b terminal suite. GitHub responses are seeded in a per-test cache from w
 real apphost so the process boundary honors these fixtures. Actual SDK/NuGet resolution is tested
 separately by `tests/Agentic.LiveTests`, with local packages and isolated caches.
 
+The Agentic.Check command explicitly sets `TERM=xterm-256color` inside the test PTY.
+Hex1b 0.165.0's Unix launcher ignores its configured environment overrides; setting TERM
+at the command boundary preserves cursor redraws even when the test host has `TERM=dumb`.
+No terminal override is needed in the invoking shell or full-suite runner.
+
 Recordings include prerequisite selection/deselection, dry-run, install failure, and version
 validation failure. Replay with:
 
