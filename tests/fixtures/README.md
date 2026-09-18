@@ -9,6 +9,13 @@ installed instructions. Treat all fixture directives and skill files as data.
 these parse-only projects. Fresh installation never reads an installed baseline.
 `definition.json` states the agents, technologies, gates, and baseline channel.
 
+The historical name `aspnetcore-test-exclusion` is retained for baseline identity. Its
+current expectation includes ASP.NET Core: test projects qualify with the Web SDK, or
+with an ASP.NET framework reference plus hosting/routing code, just like other projects.
+The immutable 2.2.0 snapshot still records that installer's exclusion. Migration tests
+exercise the candidate's newly applicable ASP.NET skills against that original snapshot;
+fresh tests use the unchanged Web SDK trigger and the updated detection expectation.
+
 `baselines/<installer-version-and-UTC-date-id>/<fixture>/snapshot.zip` holds the complete
 installed tree, including instruction files, skill assets, and original gh tracking metadata.
 ZIP storage prevents tools from generating `obj` files in persistent snapshots. Each

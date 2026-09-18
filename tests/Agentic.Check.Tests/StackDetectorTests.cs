@@ -55,12 +55,17 @@ public sealed class StackDetectorTests
         Assert.Contains(TechnologyNames.Orleans, result.Technologies);
     }
 
-    [Fact]
-    public void DetectsAspNetCoreFromWebSdk()
+    [Theory]
+    [InlineData("WebApp.csproj")]
+    [InlineData("tests/WebApp/WebApp.csproj")]
+    [InlineData("Test/WebApp/WebApp.csproj")]
+    [InlineData("WebApp.Tests.csproj")]
+    [InlineData("WebApp.Test.csproj")]
+    public void DetectsAspNetCoreFromWebSdk(string projectPath)
     {
         using TempDirectory tempDirectory = new();
         tempDirectory.Write(
-            "WebApp.csproj",
+            projectPath,
             """
             <Project Sdk="Microsoft.NET.Sdk.Web">
               <PropertyGroup>
@@ -102,7 +107,7 @@ public sealed class StackDetectorTests
     }
 
     [Fact]
-    public void DoesNotDetectAspNetCoreForTestProject()
+    public void DetectsAspNetCoreFromWebSdkInTestProject()
     {
         using TempDirectory tempDirectory = new();
         tempDirectory.Write(
@@ -114,6 +119,62 @@ public sealed class StackDetectorTests
               </ItemGroup>
             </Project>
             """);
+
+        var result = StackDetector.Detect(tempDirectory.Path);
+
+        Assert.Contains(TechnologyNames.AspNetCore, result.Technologies);
+    }
+
+    [Theory]
+    [InlineData("var builder = WebApplication.CreateBuilder(args);")]
+    [InlineData("app.MapGet(\"/test\", () => \"ok\");")]
+    public void DetectsAspNetCoreFromFrameworkReferenceAndHostingOrRoutingCodeInTestProject(string code)
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write(
+            "tests/Host.Tests/Host.Tests.csproj",
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <ItemGroup>
+                <FrameworkReference Include="Microsoft.AspNetCore.App" />
+                <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.0" />
+              </ItemGroup>
+            </Project>
+            """);
+        tempDirectory.Write("tests/Host.Tests/HostingTests.cs", code);
+
+        var result = StackDetector.Detect(tempDirectory.Path);
+
+        Assert.Contains(TechnologyNames.AspNetCore, result.Technologies);
+    }
+
+    [Theory]
+    [InlineData("Host.csproj")]
+    [InlineData("tests/Host.Tests/Host.Tests.csproj")]
+    public void DoesNotDetectAspNetCoreFromFrameworkReferenceAlone(string projectPath)
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write(
+            projectPath,
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <ItemGroup>
+                <FrameworkReference Include="Microsoft.AspNetCore.App" />
+              </ItemGroup>
+            </Project>
+            """);
+
+        var result = StackDetector.Detect(tempDirectory.Path);
+
+        Assert.DoesNotContain(TechnologyNames.AspNetCore, result.Technologies);
+    }
+
+    [Fact]
+    public void DoesNotDetectAspNetCoreFromHostingCodeWithoutFrameworkReference()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write("Host.Tests.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\" />");
+        tempDirectory.Write("HostingTests.cs", "var builder = WebApplication.CreateBuilder(args);");
 
         var result = StackDetector.Detect(tempDirectory.Path);
 

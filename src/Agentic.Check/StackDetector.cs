@@ -211,7 +211,7 @@ static class StackDetector
     static bool IsAspNetCoreProject(string projectFile)
     {
         var document = TryParseProject(projectFile, File.ReadAllText(projectFile), []);
-        if (document is null || IsTestProject(projectFile, document))
+        if (document is null)
         {
             return false;
         }
@@ -223,35 +223,6 @@ static class StackDetector
 
         return FrameworkReferences(document).Any(reference => reference.Equals("Microsoft.AspNetCore.App", StringComparison.OrdinalIgnoreCase))
             && HasAspNetCoreCodeSignal(Path.GetDirectoryName(projectFile) ?? ".");
-    }
-
-    static bool IsTestProject(string projectFile, XDocument document)
-    {
-        string fileName = Path.GetFileNameWithoutExtension(projectFile);
-        string[] pathParts = projectFile.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        return fileName.EndsWith(".Tests", StringComparison.OrdinalIgnoreCase)
-            || fileName.EndsWith(".Test", StringComparison.OrdinalIgnoreCase)
-            || pathParts.Any(part => part.Equals("test", StringComparison.OrdinalIgnoreCase)
-                || part.Equals("tests", StringComparison.OrdinalIgnoreCase))
-            || PackageReferences(document).Any(IsTestPackageReference);
-    }
-
-    static bool IsTestPackageReference(string packageId)
-    {
-        string[] testPackages =
-        [
-            "Microsoft.NET.Test.Sdk",
-            "MSTest",
-            "MSTest.TestAdapter",
-            "MSTest.TestFramework",
-            "NUnit",
-            "NUnit3TestAdapter",
-            "TUnit",
-            "xunit",
-            "xunit.runner.visualstudio"
-        ];
-        return testPackages.Any(package => packageId.Equals(package, StringComparison.OrdinalIgnoreCase)
-            || packageId.StartsWith($"{package}.", StringComparison.OrdinalIgnoreCase));
     }
 
     static bool UsesWebSdk(XDocument document)

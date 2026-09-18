@@ -4,7 +4,8 @@
   "baselinePreview": false,
   "technologies": [
     "foundation",
-    "dotnet"
+    "dotnet",
+    "aspnetcore"
   ],
   "gates": {}
 }
