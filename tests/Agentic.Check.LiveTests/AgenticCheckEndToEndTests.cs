@@ -18,23 +18,25 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
     [InlineData(false)]
     [InlineData(true)]
     [Trait("Category", "EndToEnd")]
-    public async Task MissingAuthenticationExplainsLoginAndLeavesTargetUnchanged(bool dryRun)
+    public async Task MissingAuthenticationContinuesWithoutLoginPrompt(bool dryRun)
     {
         if (IsUnsupportedPlatform())
             return;
-        using var workspace = await TestWorkspace.CreateAsync(nameof(MissingAuthenticationExplainsLoginAndLeavesTargetUnchanged)).ConfigureAwait(true);
+        using var workspace = await TestWorkspace.CreateAsync(nameof(MissingAuthenticationContinuesWithoutLoginPrompt)).ConfigureAwait(true);
         await File.WriteAllTextAsync(Path.Combine(workspace.RootPath, "gh-auth-missing"), string.Empty).ConfigureAwait(true);
         workspace.WriteRepoFile("AGENTS.md", "Preserve these user instructions.\n");
         string before = await workspace.ReadRepoFileAsync("AGENTS.md").ConfigureAwait(true);
         string reportPath = Path.Combine(workspace.RootPath, "auth-report.json");
-        var result = await RunCommandAsync(workspace, $"{(dryRun ? "--dry-run" : "--yes")} --report {Quote(reportPath)} {Quote(workspace.RepoPath)}", 2).ConfigureAwait(true);
-        Assert.Contains("insufficient for the required `gh skill` usage", result.Screen, StringComparison.Ordinal);
-        Assert.Contains("Please run `gh auth login`, then retry.", result.Screen, StringComparison.Ordinal);
-        Assert.Equal(before, await workspace.ReadRepoFileAsync("AGENTS.md").ConfigureAwait(true));
+        var result = await RunCommandAsync(workspace, $"{(dryRun ? "--dry-run" : "--yes")} --report {Quote(reportPath)} {Quote(workspace.RepoPath)}").ConfigureAwait(true);
+        Assert.Equal(0, result.ExitCode);
+        Assert.DoesNotContain("gh auth login", result.Screen, StringComparison.Ordinal);
+        string after = await workspace.ReadRepoFileAsync("AGENTS.md").ConfigureAwait(true);
+        Assert.StartsWith(before, after, StringComparison.Ordinal);
+        Assert.Equal(!dryRun, after.Contains("foundation-prompt-log:start", StringComparison.Ordinal));
         string log = await workspace.ReadGhLogAsync().ConfigureAwait(true);
-        Assert.DoesNotContain("skill install", log, StringComparison.Ordinal);
-        Assert.DoesNotContain("skill update", log, StringComparison.Ordinal);
-        Assert.False(File.Exists(Path.Combine(workspace.RootPath, "tool.log")));
+        Assert.Equal(!dryRun, log.Contains("skill install", StringComparison.Ordinal));
+        Assert.Contains("skill update", log, StringComparison.Ordinal);
+        Assert.DoesNotContain("api --hostname", log, StringComparison.Ordinal);
         Assert.DoesNotContain("fixture-authentication-secret", await File.ReadAllTextAsync(reportPath).ConfigureAwait(true), StringComparison.Ordinal);
         AssertRecordingWasWritten(workspace);
     }
@@ -252,13 +254,15 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
                 var unknown = await RunCommandInOpenTerminalAsync(auto, workspace, "--not-real", 1).ConfigureAwait(true);
                 Assert.Contains("Unknown option: --not-real", unknown.Screen, StringComparison.Ordinal);
 
-                _ = await RunCommandInOpenTerminalAsync(auto, workspace, $"--dry-run --agents standard {Quote(workspace.RepoPath)}", 1).ConfigureAwait(true);
+                var invalidAgent = await RunCommandInOpenTerminalAsync(auto, workspace, $"--dry-run --agents standard {Quote(workspace.RepoPath)}", 1).ConfigureAwait(true);
+                Assert.Contains("Unknown agent value(s): standard", invalidAgent.Screen, StringComparison.Ordinal);
 
-                _ = await RunCommandInOpenTerminalAsync(
+                var conflictingOptions = await RunCommandInOpenTerminalAsync(
                     auto,
                     workspace,
                     $"--dry-run --skills-dir {Quote(Path.Combine(workspace.RepoPath, "custom-skills"))} --agents codex {Quote(workspace.RepoPath)}",
                     1).ConfigureAwait(true);
+                Assert.Contains("Specify no more than one of --skills-dir and --agents.", conflictingOptions.Screen, StringComparison.Ordinal);
 
                 var fileTarget = await RunCommandInOpenTerminalAsync(auto, workspace, Quote(Path.Combine(workspace.RepoPath, "target-file")), 2).ConfigureAwait(true);
                 Assert.Contains("Invalid target directory", fileTarget.Screen, StringComparison.Ordinal);
@@ -270,9 +274,6 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
             }
         }
 
-        string recordingText = await workspace.ReadRecordingTextAsync().ConfigureAwait(true);
-        Assert.Contains("Unknown agent value(s): standard", recordingText, StringComparison.Ordinal);
-        Assert.Contains("Specify no more than one of --skills-dir and --agents.", recordingText, StringComparison.Ordinal);
         Assert.Empty(await workspace.ReadGhLogAsync().ConfigureAwait(true));
         AssertRecordingWasWritten(workspace);
     }
@@ -1238,6 +1239,11 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
 
                 log_path="${AGENTIC_CHECK_GH_LOG:-$root/gh.log}"
                 printf '%s\n' "$*" >> "$log_path"
+
+                if [[ -f "$root/gh-auth-missing" && ( -n "${GH_TOKEN:-}" || -n "${GITHUB_TOKEN:-}" ) ]]; then
+                  echo "Unexpected credential in anonymous test" >&2
+                  exit 88
+                fi
 
                 if [[ "${1:-}" == "--version" ]]; then
                   echo "gh version 2.93.0 (test)"

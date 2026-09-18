@@ -39,7 +39,7 @@ public sealed class GitHubAuthenticationTests
     [InlineData(200, "X-RateLimit-Limit: 60", "", "did not confirm")]
     [InlineData(200, "", "", "did not confirm")]
     [InlineData(401, "", "", "rejected the active login")]
-    [InlineData(403, "X-RateLimit-Remaining: 0\nX-RateLimit-Reset: 1893456000", "", "rate limit is exhausted")]
+    [InlineData(403, "X-RateLimit-Remaining: 0", "", "rate limit is exhausted")]
     [InlineData(403, "", "Resource not accessible", "repository permissions")]
     [InlineData(403, "Retry-After: 60", "", "temporarily limited")]
     [InlineData(403, "", "You have exceeded a secondary rate limit", "temporarily limited")]
@@ -104,36 +104,72 @@ public sealed class GitHubAuthenticationTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public async Task MissingAuthenticationStopsNormalAndDryRunsBeforeSourceReadsAndContentWrites(bool dryRun)
+    public async Task MissingAuthenticationContinuesNormalAndDryRunsWithoutLoginGuidance(bool dryRun)
     {
         using TempDirectory temp = new();
-        temp.Write("repo/README.md", "preserve me");
-        string directory = Path.Combine(temp.Path, "repo");
+        temp.Write("App.csproj", "<Project />");
+        temp.Write("AGENTS.md", "preserve me\n");
         string reportPath = Path.Combine(temp.Path, "report.json");
+        string skills = Path.Combine(temp.Path, ".agents", "skills");
         MappedCommandRunner runner = new();
         runner.Set("gh", ["--version"], new(0, "gh version 2.101.0", ""));
         runner.Set("gh", ["skill", "--help"], new(0, "gh skill help", ""));
-        runner.Set("gh", TokenArguments, new(1, "do-not-report-this-secret", "do-not-report-this-secret"));
+        runner.Set("gh", TokenArguments, new(1, "", "no oauth token found"));
+        runner.Set("gh", ["skill", "update", "--dir", skills, "--all", "--dry-run"], new(0, "All skills are up to date.", ""));
+        runner.Set("gh", ["skill", "install", "owner/repo", "sample", "--dir", skills], new(0, "installed", ""));
         FakeSourceVersionResolver resolver = new();
         RecordingReporter reporter = new();
-        CheckWorkflow workflow = new(runner, new FakePrompts(), reporter, new FakeDirectiveSource(), resolver);
-        var result = await workflow.RunAsync(new(directory, dryRun, true, reportPath, null, "codex", false), CancellationToken.None);
-        Assert.Equal(2, result.ExitCode);
-        // The workflow intentionally observes ambient CI token configuration, unlike isolated ConnectAsync tests.
-        string? tokenVariable = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("GH_TOKEN")) ? "GH_TOKEN"
-            : !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("GITHUB_TOKEN")) ? "GITHUB_TOKEN" : null;
-        string expected = tokenVariable is null ? GitHubAuthentication.RequiredMessage
-            : $"GitHub rejected the credential supplied by {tokenVariable}. Update or unset {tokenVariable}, then retry; it overrides the stored gh login.";
-        Assert.Contains(expected, reporter.Errors);
-        Assert.Empty(resolver.RequestedSourceRepos);
-        _ = Assert.Single(Directory.GetFileSystemEntries(directory));
-        Assert.Equal("preserve me", await File.ReadAllTextAsync(Path.Combine(directory, "README.md")));
-        Assert.DoesNotContain(runner.Calls, call => call.Arguments.Contains("api") || call.Arguments.Contains("install") || call.Arguments.Contains("update"));
-        string report = await File.ReadAllTextAsync(reportPath);
-        Assert.DoesNotContain("do-not-report-this-secret", report, StringComparison.Ordinal);
-        using var json = JsonDocument.Parse(report);
+        CheckWorkflow workflow = new(runner, new FakePrompts(), reporter, new FakeDirectiveSource(new Dictionary<string, string>()), resolver,
+            [new("owner/repo", "sample", "sample", TechnologyNames.Dotnet, [])], readEnvironment: _ => null);
+
+        var result = await workflow.RunAsync(new(temp.Path, dryRun, true, reportPath, null, "codex", false), CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("owner/repo", resolver.RequestedSourceRepos);
+        Assert.Empty(reporter.Errors);
+        Assert.DoesNotContain(reporter.Warnings, message => message.Contains("auth login", StringComparison.Ordinal));
+        Assert.Equal("preserve me\n", await File.ReadAllTextAsync(Path.Combine(temp.Path, "AGENTS.md")));
+        Assert.Equal(dryRun ? 0 : 1, runner.Calls.Count(call => call.Arguments is ["skill", "install", ..]));
+        Assert.DoesNotContain(runner.Calls, call => call.Arguments.Contains("api"));
+        foreach (var call in runner.Calls.Where(call => call.Arguments is ["skill", "install" or "update", ..]))
+        {
+            Assert.Null(call.Environment!["GH_TOKEN"]);
+            Assert.Null(call.Environment["GITHUB_TOKEN"]);
+        }
+        using var json = JsonDocument.Parse(await File.ReadAllTextAsync(reportPath));
         Assert.Contains(json.RootElement.GetProperty("prerequisites").EnumerateArray(), item =>
-            item.GetProperty("name").GetString() == "GitHub authentication" && !item.GetProperty("success").GetBoolean());
+            item.GetProperty("name").GetString() == "GitHub access" && item.GetProperty("success").GetBoolean());
+    }
+
+    [Theory]
+    [InlineData(0, "")]
+    [InlineData(1, "")]
+    public async Task MissingCredentialCreatesAnAnonymousClientWithoutAValidationRequest(int exitCode, string token)
+    {
+        MappedCommandRunner runner = new();
+        runner.Set("gh", TokenArguments, new(exitCode, token, "no token"));
+        var (authentication, error) = await GitHubAuthentication.ConnectAsync(runner, ".", CancellationToken.None, _ => null);
+        Assert.Null(error);
+        Assert.NotNull(authentication);
+        Assert.False(authentication.IsAuthenticated);
+        _ = Assert.Single(runner.Calls);
+        using Transport transport = new(request =>
+        {
+            Assert.Null(request.Headers.Authorization);
+            return new(HttpStatusCode.OK) { Content = new StringContent("public content") };
+        });
+        using var client = authentication.CreateHttpClient(transport);
+        Assert.Equal("public content", await client.GetStringAsync(new Uri("https://api.github.com/repos/owner/repo")));
+    }
+
+    [Fact]
+    public async Task CredentialCommandFailureDoesNotSilentlyBecomeAnonymous()
+    {
+        MappedCommandRunner runner = new();
+        runner.Set("gh", TokenArguments, new(127, "", "command not found"));
+        var (authentication, error) = await GitHubAuthentication.ConnectAsync(runner, ".", CancellationToken.None, _ => null);
+        Assert.Null(authentication);
+        Assert.Contains("Could not read GitHub credentials", error!, StringComparison.Ordinal);
     }
 
     [Theory]

@@ -92,6 +92,8 @@ sealed class MappedCommandRunner : ICommandRunner
 
     public List<CommandCall> Calls { get; } = [];
 
+    public Action<CommandCall>? OnRun { get; init; }
+
     public void Set(string fileName, IReadOnlyList<string> arguments, CommandResult result)
         => results[CreateKey(fileName, arguments)] = result;
 
@@ -103,6 +105,7 @@ sealed class MappedCommandRunner : ICommandRunner
     {
         cancellationToken.ThrowIfCancellationRequested();
         Calls.Add(new CommandCall(fileName, [.. arguments], workingDirectory) { Environment = environment });
+        OnRun?.Invoke(Calls[^1]);
         if (!results.ContainsKey(CreateKey(fileName, arguments)) && AuthenticationTestCommands.Response(fileName, arguments) is { } authentication)
             return Task.FromResult(authentication);
         if (fileName == "dotnet" && arguments[0] == "tool" && !results.ContainsKey(CreateKey(fileName, arguments)))

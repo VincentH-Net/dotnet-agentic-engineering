@@ -41,7 +41,8 @@ sealed class SkillInstaller(ICommandRunner commandRunner, IReporter reporter)
         string workingDirectory,
         CancellationToken cancellationToken,
         Action? progressAdvance = null,
-        bool reportPreviewChangeStatus = false)
+        bool reportPreviewChangeStatus = false,
+        Action<SkillInstallResult>? reportResult = null)
     {
         _ = Directory.CreateDirectory(skillsDirectory);
         List<SkillInstallResult> results = [];
@@ -75,6 +76,7 @@ sealed class SkillInstaller(ICommandRunner commandRunner, IReporter reporter)
                 result.StandardOutput,
                 result.StandardError);
             results.Add(installResult);
+            reportResult?.Invoke(installResult);
 
             if (result.Success)
             {

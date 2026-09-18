@@ -7,7 +7,6 @@ namespace Agentic.Check;
 // This object deliberately is not a record: generated ToString output must never expose credentials.
 sealed class GitHubAuthentication(ICommandRunner runner, string token)
 {
-    internal const string RequiredMessage = "Agentic.Check requires GitHub authentication because GitHub’s anonymous API rate limits are insufficient for the required `gh skill` usage.\n\nPlease run `gh auth login`, then retry.";
     internal const string ProbePath = "repos/" + CompanionDependency.SourceRepo;
     static readonly string[] TokenVariables = ["GH_TOKEN", "GITHUB_TOKEN"];
     static readonly IReadOnlyDictionary<string, string?> QuietEnvironment = new Dictionary<string, string?>
@@ -18,6 +17,8 @@ sealed class GitHubAuthentication(ICommandRunner runner, string token)
         ["GH_HOST"] = "github.com"
     };
     readonly string token = token;
+
+    internal bool IsAuthenticated => token.Length > 0;
 
     internal static async Task<(GitHubAuthentication? Authentication, string? Error)> ConnectAsync(
         ICommandRunner runner, string directory, CancellationToken cancellationToken,
@@ -44,8 +45,10 @@ sealed class GitHubAuthentication(ICommandRunner runner, string token)
         var credential = await runner.RunAsync("gh", ["auth", "token", "--hostname", "github.com"], directory,
             cancellationToken, QuietEnvironment).ConfigureAwait(false);
         string token = credential.StandardOutput.Trim();
+        if (credential.ExitCode is not (0 or 1))
+            return (null, "Could not read GitHub credentials. Check that `gh auth status` works, then retry.");
         if (!credential.Success || token.Length == 0)
-            return (null, tokenVariable is null ? RequiredMessage : InvalidCredential(tokenVariable));
+            return tokenVariable is null ? (new(runner, string.Empty), null) : (null, InvalidCredential(tokenVariable));
         if (token.Any(char.IsWhiteSpace) || token.Any(char.IsControl))
             return (null, InvalidCredential(tokenVariable));
 
@@ -75,6 +78,9 @@ sealed class GitHubAuthentication(ICommandRunner runner, string token)
 
     internal ICommandRunner CommandRunner => new AuthenticatedRunner(runner, token);
 
+    internal ICommandRunner CreateSkillRunner()
+        => new GitHubRateLimitRunner(CommandRunner, IsAuthenticated);
+
     internal HttpClient CreateHttpClient(HttpMessageHandler? transport = null)
     {
         GitHubAuthenticationHandler? handler = new(token, transport);
@@ -103,24 +109,8 @@ sealed class GitHubAuthentication(ICommandRunner runner, string token)
             return "GitHub rejected the authentication credential. Check GH_TOKEN/GITHUB_TOKEN or run `gh auth login`, then retry.";
         if (status is 403 or 429)
         {
-            if (response.Headers.TryGetValues("X-RateLimit-Remaining", out var remaining) && remaining.FirstOrDefault() == "0")
-            {
-                string retry = "Wait for the quota to reset, then retry.";
-                if (response.Headers.TryGetValues("X-RateLimit-Reset", out var resets)
-                    && long.TryParse(resets.FirstOrDefault(), CultureInfo.InvariantCulture, out long reset)
-                    && reset is >= 0 and <= 253402300799)
-                {
-                    retry = $"Retry after {DateTimeOffset.FromUnixTimeSeconds(reset).ToLocalTime():g}.";
-                }
-
-                return $"GitHub’s API rate limit is exhausted. {retry}";
-            }
-            string body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-            return status == 429 || response.Headers.RetryAfter is not null
-                || body.Contains("secondary rate limit", StringComparison.OrdinalIgnoreCase)
-                || body.Contains("abuse detection", StringComparison.OrdinalIgnoreCase)
-                ? "GitHub temporarily limited requests. Wait before retrying; signing in again will not resolve this limit."
-                : "GitHub denied access (HTTP 403). Check the credential’s repository permissions and organization access requirements.";
+            return await GitHubRateLimits.DescribeAsync(response, authenticated: true, cancellationToken).ConfigureAwait(false)
+                ?? "GitHub denied access (HTTP 403). Check the credential’s repository permissions and organization access requirements.";
         }
         return status >= 500
             ? $"GitHub is temporarily unavailable (HTTP {status}). Please retry later."
@@ -158,11 +148,13 @@ sealed class GitHubAuthentication(ICommandRunner runner, string token)
             {
                 foreach (var (name, value) in QuietEnvironment)
                     childEnvironment[name] = value;
-                childEnvironment["GH_TOKEN"] = token;
+                childEnvironment["GH_TOKEN"] = token.Length > 0 ? token : null;
                 childEnvironment["GITHUB_TOKEN"] = null;
             }
             var result = await runner.RunAsync(fileName, arguments, workingDirectory, cancellationToken, childEnvironment).ConfigureAwait(false);
             // Never persist a credential accidentally echoed by a child process in reports or recordings.
+            if (token.Length == 0)
+                return result;
             return result with
             {
                 StandardOutput = result.StandardOutput.Replace(token, "[REDACTED]", StringComparison.Ordinal),
@@ -191,9 +183,15 @@ sealed class GitHubAuthenticationHandler : DelegatingHandler
             using HttpRequestMessage hop = new(request.Method, uri);
             foreach (var header in request.Headers.Where(header => !header.Key.Equals("Authorization", StringComparison.OrdinalIgnoreCase)))
                 _ = hop.Headers.TryAddWithoutValidation(header.Key, header.Value);
-            if (uri.Scheme == Uri.UriSchemeHttps && uri.Host.Equals("api.github.com", StringComparison.OrdinalIgnoreCase) && uri.IsDefaultPort)
+            if (token.Length > 0 && uri.Scheme == Uri.UriSchemeHttps && uri.Host.Equals("api.github.com", StringComparison.OrdinalIgnoreCase) && uri.IsDefaultPort)
                 hop.Headers.Authorization = new("Bearer", token);
             var response = await base.SendAsync(hop, cancellationToken).ConfigureAwait(false);
+            string? rateLimit = await GitHubRateLimits.DescribeAsync(response, token.Length > 0, cancellationToken).ConfigureAwait(false);
+            if (rateLimit is not null)
+            {
+                response.Dispose();
+                throw new GitHubRateLimitException(rateLimit);
+            }
             if (response.StatusCode is not (HttpStatusCode.MovedPermanently or HttpStatusCode.Found or HttpStatusCode.SeeOther or HttpStatusCode.TemporaryRedirect or HttpStatusCode.PermanentRedirect)
                 || response.Headers.Location is not { } location)
             {

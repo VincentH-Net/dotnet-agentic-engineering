@@ -35,6 +35,14 @@ retry with different settings, run preliminary smoke tests, or change SDK/worklo
 Other ambient SDK/authentication settings remain inherited. A blocked command must be
 diagnosed as a failed or incomplete standard run, not silently worked around.
 
+Anonymous-access regressions run without changing the developer's GitHub login. Unit tests use
+the existing command-runner and HTTP boundaries to simulate missing credentials and quota errors,
+verify that execution stops without a quota lookup or retry, and preserve completed work.
+The recorded terminal scenarios use the existing fake gh executable and
+seeded source cache. Real anonymous `gh skill` compatibility was verified separately with gh
+2.93.0 and 2.101.0; routine tests do not require a container, logout, or production testing switch.
+The real-package and maintenance tests retain their authenticated fixture setup.
+
 Each invocation creates a new ignored `tests/TestResults/full-suite/<run-id>/` directory:
 
 - `summary.txt`: commands, their exit codes, and the final result (absent if forcibly terminated).

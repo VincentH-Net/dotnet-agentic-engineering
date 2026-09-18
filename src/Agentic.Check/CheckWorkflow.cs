@@ -26,7 +26,8 @@ sealed class CheckWorkflow(
     IDirectiveSource? directiveSource = null,
     ISourceVersionResolver? sourceVersionResolver = null,
     IReadOnlyList<SkillManifestEntry>? skillManifest = null,
-    DnaInstaller? dnaInstaller = null)
+    DnaInstaller? dnaInstaller = null,
+    Func<string, string?>? readEnvironment = null)
 {
     static readonly JsonSerializerOptions ReportSerializerOptions = new(JsonSerializerDefaults.Web)
     {
@@ -39,6 +40,25 @@ sealed class CheckWorkflow(
         {
             DryRun = options.DryRun
         };
+
+        try
+        {
+            return await RunCoreAsync(options, report, cancellationToken).ConfigureAwait(false);
+        }
+        catch (GitHubRateLimitException exception)
+        {
+            reporter.Error(exception.Message);
+            const string incomplete = "The run is incomplete. Changes already applied have been kept; rerun Agentic.Check to finish.";
+            reporter.Warning(incomplete);
+            report.Warnings.Add(exception.Message);
+            report.Warnings.Add(incomplete);
+            await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
+            return new CheckRunResult(1, report);
+        }
+    }
+
+    async Task<CheckRunResult> RunCoreAsync(AgenticCheckOptions options, AgenticCheckReport report, CancellationToken cancellationToken)
+    {
 
         if (options.PreviewSourceRef is not null
             && (!options.Preview || !GitHubSourceVersionResolver.IsValidPreviewRef(options.PreviewSourceRef)))
@@ -96,16 +116,16 @@ sealed class CheckWorkflow(
         string targetDirectory = report.TargetDirectory;
         report.RepoRoot = targetDirectory;
 
-        var (authentication, authenticationError) = await GitHubAuthentication.ConnectAsync(commandRunner, targetDirectory, cancellationToken).ConfigureAwait(false);
-        report.Prerequisites.Add(new("GitHub authentication", authentication is not null, null, null, string.Empty, authenticationError ?? string.Empty));
+        var (authentication, authenticationError) = await GitHubAuthentication.ConnectAsync(commandRunner, targetDirectory, cancellationToken, readEnvironment).ConfigureAwait(false);
+        report.Prerequisites.Add(new("GitHub access", authentication is not null, null, null, string.Empty, authenticationError ?? string.Empty));
         if (authentication is null)
         {
             reporter.Error(authenticationError!);
             await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
             return new CheckRunResult(2, report);
         }
-        var authenticatedRunner = authentication.CommandRunner;
         using var githubClient = authentication.CreateHttpClient();
+        var githubRunner = authentication.CreateSkillRunner();
 
         IReadOnlyList<string> skillsDirectories;
         bool manageClaudeFile;
@@ -169,8 +189,8 @@ sealed class CheckWorkflow(
             resolvedVersion: sourceVersion?.ResolvedSource);
         DirectiveInstaller directiveInstaller = new(contentSource, reporter);
         CompanionSourceVersionReader companionVersions = new(contentSource);
-        CompanionInstaller companionInstaller = new(authenticatedRunner);
-        var shorthandInstaller = dnaInstaller ?? new DnaInstaller(authenticatedRunner);
+        CompanionInstaller companionInstaller = new(githubRunner);
+        var shorthandInstaller = dnaInstaller ?? new DnaInstaller(githubRunner);
         Dictionary<string, bool> prerequisiteResults = new(StringComparer.Ordinal);
 
         async Task<bool> EnsureCompanionAsync(string sourceRef, ToolVersion? localRequirement, bool restoreOnly)
@@ -244,7 +264,7 @@ sealed class CheckWorkflow(
 
                 if (!options.Preview)
                 {
-                    await RunSkillUpdateDryRunAsync(authenticatedRunner, skillsDirectories, targetDirectory, report, cancellationToken).ConfigureAwait(false);
+                    await RunSkillUpdateDryRunAsync(githubRunner, skillsDirectories, targetDirectory, report, cancellationToken).ConfigureAwait(false);
                     skillUpdates = ExtractDistinctSkillUpdates(report.SkillUpdateDryRuns, recommended);
                     report.OutdatedSkills = skillUpdates.Count;
                 }
@@ -329,7 +349,7 @@ sealed class CheckWorkflow(
                 restoreOnly = installed is not null && ToolVersion.Parse(installed).Satisfies(repairRequirement);
                 if (restoreOnly)
                 {
-                    var available = await authenticatedRunner.RunAsync("dotnet", ["tool", "run", "agentic", "--", "--version"], targetDirectory, cancellationToken).ConfigureAwait(false);
+                    var available = await githubRunner.RunAsync("dotnet", ["tool", "run", "agentic", "--", "--version"], targetDirectory, cancellationToken).ConfigureAwait(false);
                     if (available.Success && available.StandardOutput.Trim().Split('+')[0] == installed!.Split('+')[0])
                     {
                         repairRequirement = null;
@@ -509,7 +529,7 @@ sealed class CheckWorkflow(
 
         if (selectedSkills.Count > 0)
         {
-            SkillInstaller skillInstaller = new(authenticatedRunner, reporter);
+            SkillInstaller skillInstaller = new(githubRunner, reporter);
             var firstDirectoryInstallSkills = options.Preview
                 ? selectedSkills
                 : [.. selectedSkills.Where(skill => skill.ForceInstall || SkillInstaller.IsMissing(skill, firstSkillsDirectory))];
@@ -523,16 +543,16 @@ sealed class CheckWorkflow(
                 installOperationCount,
                 async advance =>
                 {
-                    var installResults = await skillInstaller
+                    _ = await skillInstaller
                         .InstallAsync(
                             firstDirectoryInstallSkills,
                             firstSkillsDirectory,
                             targetDirectory,
                             cancellationToken,
                             advance,
-                            reportPreviewChangeStatus: options.Preview)
+                            reportPreviewChangeStatus: options.Preview,
+                            reportResult: report.InstallResults.Add)
                         .ConfigureAwait(false);
-                    report.InstallResults.AddRange(installResults);
 
                     if (skillsDirectories.Count > 1)
                     {
@@ -570,7 +590,7 @@ sealed class CheckWorkflow(
 
         if (!options.Preview)
         {
-            await RunSkillUpdateAsync(authenticatedRunner, options, skillsDirectories, targetDirectory, report, skillUpdates, manifest, async updateSkills =>
+            await RunSkillUpdateAsync(githubRunner, options, skillsDirectories, targetDirectory, report, skillUpdates, manifest, async updateSkills =>
             {
                 var closure = CloseDependencies([], updateSkills, [.. manifest, CompanionDependency.Action()]);
                 return !closure.SelectedSkills.Any(skill => skill.IsCompanion)
@@ -688,7 +708,7 @@ sealed class CheckWorkflow(
     }
 
     async Task RunSkillUpdateAsync(
-        ICommandRunner authenticatedRunner,
+        ICommandRunner githubRunner,
         AgenticCheckOptions options,
         IReadOnlyList<string> skillsDirectories,
         string repoRoot,
@@ -739,7 +759,7 @@ sealed class CheckWorkflow(
                         continue;
                     }
 
-                    var updateResult = await authenticatedRunner.RunAsync(
+                    var updateResult = await githubRunner.RunAsync(
                         "gh",
                         ["skill", "update", "--dir", skillsDirectory, "--all"],
                         repoRoot,
@@ -772,7 +792,7 @@ sealed class CheckWorkflow(
     }
 
     async Task RunSkillUpdateDryRunAsync(
-        ICommandRunner authenticatedRunner,
+        ICommandRunner githubRunner,
         IReadOnlyList<string> skillsDirectories,
         string repoRoot,
         AgenticCheckReport report,
@@ -780,7 +800,7 @@ sealed class CheckWorkflow(
     {
         foreach (string skillsDirectory in skillsDirectories)
         {
-            var dryRunResult = await authenticatedRunner.RunAsync(
+            var dryRunResult = await githubRunner.RunAsync(
                 "gh",
                 ["skill", "update", "--dir", skillsDirectory, "--all", "--dry-run"],
                 repoRoot,

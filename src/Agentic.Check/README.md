@@ -31,18 +31,21 @@ Uno Platform skills are selected depending on detected:
 
 - .NET 10 SDK or later ([install](https://dotnet.microsoft.com/download))
 - `gh` CLI ([install](https://cli.github.com/))
-- GitHub authentication: please run `gh auth login` before using Agentic.Check.
-  GitHub’s anonymous API rate limits are insufficient for the required `gh skill` usage.
-  Automation can supply `GH_TOKEN` or `GITHUB_TOKEN` instead; environment tokens take
-  precedence over the stored GitHub CLI login.
 
-Agentic.Check checks authenticated access to its public source repository before scanning remote
-sources or changing installed content, including during `--dry-run`. It reuses GitHub CLI’s
-effective credential for both skill commands and direct GitHub API reads. The credential is kept
-in memory and is not saved or logged; public file downloads to other hosts do not receive it.
-Help and version output require no login. Network failures and exhausted authenticated quotas
-are reported separately from missing or invalid authentication. Authentication validation needs
-network access even when source responses are cached.
+GitHub login is optional. When no credential is available, Agentic.Check reads public sources
+anonymously without a startup prompt. When you are logged in, it validates and reuses GitHub
+CLI’s effective credential for both skill commands and direct GitHub API reads. Automation can
+supply `GH_TOKEN` or `GITHUB_TOKEN`; these take precedence over the stored login. Invalid
+credentials are reported rather than silently falling back to anonymous access.
+
+Credentials stay in memory and are not saved or logged; downloads to other hosts do not receive
+them. Authentication validation needs network access even when source responses are cached.
+
+If GitHub’s anonymous quota is exhausted, Agentic.Check stops and asks you to run `gh auth login`
+and rerun, or wait for the quota to reset. No reset timestamp is displayed and no additional
+quota lookup or command retry is made. Completed changes are retained and recorded;
+the run exits unsuccessfully so you can rerun to finish. Authenticated quota exhaustion, temporary
+throttling, permission errors, and invalid credentials have separate guidance.
 
 ## Usage
 
