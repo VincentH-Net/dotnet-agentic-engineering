@@ -316,13 +316,9 @@ sealed class CheckWorkflow(
             List<string> installedConsumers = [];
             foreach (var directive in directivePlan.Directives.Where(d => CompanionDependency.ForDirective(d.Name).Count > 0))
             {
-                string start = $"<!-- dotnet-agentic-engineering:{directive.Name}:start -->";
-                string end = $"<!-- dotnet-agentic-engineering:{directive.Name}:end -->";
-                int from = directivePlan.AgentsContent.IndexOf(start, StringComparison.Ordinal);
-                int to = directivePlan.AgentsContent.IndexOf(end, StringComparison.Ordinal);
-                if (from >= 0 && to > from)
+                if (DirectiveMarkers.FindBlock(directivePlan.AgentsContent, directive.Name) is { } range)
                 {
-                    string installed = directivePlan.AgentsContent[from..to];
+                    string installed = directivePlan.AgentsContent[range];
                     if (CompanionDependency.Invocations(installed).Count > 0)
                     {
                         installedConsumers.Add(installed);

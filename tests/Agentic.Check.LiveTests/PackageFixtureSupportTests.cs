@@ -112,4 +112,25 @@ public sealed class PackageFixtureSupportTests
         Assert.Equal(body, installedBody);
         Assert.NotEqual(body, SourceOracle.ParseSkill(injected.Replace("Keep  ", "Keep ", StringComparison.Ordinal)).Body);
     }
+
+    [Theory]
+    [InlineData("", false)]
+    [InlineData("", true)]
+    [InlineData("dotnet-agentic-engineering:", false)]
+    [InlineData("dotnet-agentic-engineering:", true)]
+    public void DirectiveOracleDistinguishesHistoricalAndCandidateMarkers(string prefix, bool candidate)
+    {
+        using FixtureWorkspace workspace = new();
+        string directory = Path.Combine(workspace.Target, "directives");
+        _ = Directory.CreateDirectory(directory);
+        string original = $"<!-- {prefix}foundation-example:start -->\nKeep dotnet-agentic-engineering: and  spacing.\n<!-- {prefix}foundation-example:end -->";
+        File.WriteAllText(Path.Combine(directory, "foundation-example.md"), "~~~md\n" + original + "\n~~~\n");
+
+        var (name, block) = Assert.Single(DirectiveOracle.Expected(workspace.Target, ["foundation"], prefixFreeMarkers: candidate));
+
+        Assert.Equal("foundation-example", name);
+        Assert.Equal(candidate
+            ? "<!-- foundation-example:start -->\nKeep dotnet-agentic-engineering: and  spacing.\n<!-- foundation-example:end -->"
+            : original, block);
+    }
 }

@@ -11,7 +11,7 @@ This lets you:
 Use the `agentic-check` tool to install or update directives for your technology, or manually copy below markdown in your `AGENTS.MD`:
 
 ~~~md
-<!-- dotnet-agentic-engineering:uno-build-and-run:start -->
+<!-- uno-build-and-run:start -->
 ## Build and Run
 Build and run app via `uno_app_start` with the actual desktop target framework from the project file, for example `net10.0-desktop`, and `args: ["AGENT_CONSOLE_LOG=<path>"]`. 
 The specified path is where the app's stdout and stderr output will be captured. You MUST specify this path, 
@@ -32,5 +32,5 @@ Do NOT run `dotnet build` prior to run the app - it would be redundant because `
 
 - Use `uno_app_get_runtime_info` to get PID
 - Use `uno_app_close` to terminate the app
-<!-- dotnet-agentic-engineering:uno-build-and-run:end -->
+<!-- uno-build-and-run:end -->
 ~~~

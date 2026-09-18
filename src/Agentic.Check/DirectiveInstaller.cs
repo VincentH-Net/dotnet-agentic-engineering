@@ -229,36 +229,23 @@ sealed partial class DirectiveInstaller(IDirectiveSource source, IReporter repor
         }
 
         string block = NormalizeNewlines(match.Groups["content"].Value.Trim());
-        string startMarker = StartMarker(directiveName);
-        string endMarker = EndMarker(directiveName);
-        if (!block.Contains(startMarker, StringComparison.Ordinal) || !block.Contains(endMarker, StringComparison.Ordinal))
+        if (DirectiveMarkers.FindBlock(block, directiveName) is null)
         {
             throw new DirectiveException($"Directive block from {sourceFile.DownloadUrl} is missing expected stable markers for {directiveName}.");
         }
 
-        return new DirectiveBlock(directiveName, block, sourceFile.Version, sourceFile.SourceRef);
+        return new DirectiveBlock(directiveName, DirectiveMarkers.Normalize(block, directiveName), sourceFile.Version, sourceFile.SourceRef);
     }
 
     static DirectivePlanItem PlanDirective(string agentsContent, DirectiveBlock directive)
     {
         string content = NormalizeNewlines(agentsContent);
-        string startMarker = StartMarker(directive.Name);
-        string endMarker = EndMarker(directive.Name);
-        int startCount = CountOccurrences(content, startMarker);
-        int endCount = CountOccurrences(content, endMarker);
-        if (startCount != endCount || startCount > 1)
-        {
-            throw new DirectiveException($"Directive marker is inconsistent for {directive.Name}.");
-        }
-
-        if (startCount == 0)
+        if (DirectiveMarkers.FindBlock(content, directive.Name) is not { } range)
         {
             return new DirectivePlanItem(directive.Name, DirectiveStatuses.Missing, directive.Content, directive.Version, directive.SourceRef);
         }
 
-        int startIndex = content.IndexOf(startMarker, StringComparison.Ordinal);
-        int endIndex = content.IndexOf(endMarker, StringComparison.Ordinal);
-        string existingBlock = content[startIndex..(endIndex + endMarker.Length)];
+        string existingBlock = content[range];
         string status = existingBlock.Equals(directive.Content, StringComparison.Ordinal)
             ? DirectiveStatuses.Current
             : DirectiveStatuses.Outdated;
@@ -274,26 +261,15 @@ sealed partial class DirectiveInstaller(IDirectiveSource source, IReporter repor
         string content = NormalizeNewlines(agentsContent);
         foreach (var directive in directiveBlocks)
         {
-            string startMarker = StartMarker(directive.Name);
-            string endMarker = EndMarker(directive.Name);
-            int startCount = CountOccurrences(content, startMarker);
-            int endCount = CountOccurrences(content, endMarker);
-            if (startCount != endCount || startCount > 1)
+            if (DirectiveMarkers.FindBlock(content, directive.Name) is { } range)
             {
-                throw new DirectiveException($"Directive marker is inconsistent for {directive.Name}.");
-            }
-
-            if (startCount == 1)
-            {
-                int startIndex = content.IndexOf(startMarker, StringComparison.Ordinal);
-                int endIndex = content.IndexOf(endMarker, StringComparison.Ordinal);
-                string existingBlock = content[startIndex..(endIndex + endMarker.Length)];
+                string existingBlock = content[range];
                 if (existingBlock.Equals(directive.Content, StringComparison.Ordinal))
                 {
                     continue;
                 }
 
-                content = content[..startIndex] + directive.Content + content[(endIndex + endMarker.Length)..];
+                content = content[..range.Start] + directive.Content + content[range.End..];
                 actions.Add(dryRun
                     ? $"Would update directive {directive.Name} in AGENTS."
                     : $"Updated directive {directive.Name} in AGENTS.");
@@ -381,9 +357,7 @@ sealed partial class DirectiveInstaller(IDirectiveSource source, IReporter repor
         string agentsContent = await File.ReadAllTextAsync(agentsFile, cancellationToken).ConfigureAwait(false);
         foreach (var directive in directiveBlocks)
         {
-            bool hasBlock = agentsContent.Contains(StartMarker(directive.Name), StringComparison.Ordinal)
-                && agentsContent.Contains(EndMarker(directive.Name), StringComparison.Ordinal);
-            if (!hasBlock)
+            if (DirectiveMarkers.FindBlock(agentsContent, directive.Name) is null)
             {
                 throw new DirectiveException($"Validation failed: AGENTS does not contain directive {directive.Name}.");
             }
@@ -453,25 +427,6 @@ sealed partial class DirectiveInstaller(IDirectiveSource source, IReporter repor
 
     static string EnsureTrailingNewline(string value)
         => value.EndsWith('\n') ? value : value + "\n";
-
-    static int CountOccurrences(string value, string pattern)
-    {
-        int count = 0;
-        int index = 0;
-        while ((index = value.IndexOf(pattern, index, StringComparison.Ordinal)) >= 0)
-        {
-            count++;
-            index += pattern.Length;
-        }
-
-        return count;
-    }
-
-    static string StartMarker(string directiveName)
-        => $"<!-- dotnet-agentic-engineering:{directiveName}:start -->";
-
-    static string EndMarker(string directiveName)
-        => $"<!-- dotnet-agentic-engineering:{directiveName}:end -->";
 
     [GeneratedRegex(@"(?ms)^~~~md\s*$\n(?<content>.*?)^~~~\s*$|^```md\s*$\n(?<content>.*?)^```\s*$", RegexOptions.CultureInvariant)]
     private static partial Regex DirectiveFenceRegex();

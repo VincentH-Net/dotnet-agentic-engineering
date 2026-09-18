@@ -4,7 +4,7 @@ namespace Agentic.PackageFixtures;
 
 static partial class DirectiveOracle
 {
-    internal static IEnumerable<(string Name, string Block)> Expected(string sourceDirectory, IReadOnlyCollection<string> technologies)
+    internal static IEnumerable<(string Name, string Block)> Expected(string sourceDirectory, IReadOnlyCollection<string> technologies, bool prefixFreeMarkers = false)
     {
         foreach (string file in Directory.GetFiles(Path.Combine(sourceDirectory, "directives"), "*.md").Order(StringComparer.Ordinal))
         {
@@ -16,7 +16,13 @@ static partial class DirectiveOracle
             }
             var match = BlockRegex().Match(File.ReadAllText(file));
             FixtureFiles.Require(match.Success, $"Missing directive fence: {file}");
-            yield return (name, match.Groups["content"].Value.Trim().Replace("\r\n", "\n", StringComparison.Ordinal));
+            string block = match.Groups["content"].Value.Trim().Replace("\r\n", "\n", StringComparison.Ordinal);
+            if (prefixFreeMarkers)
+            {
+                block = block.Replace($"<!-- dotnet-agentic-engineering:{name}:start -->", $"<!-- {name}:start -->", StringComparison.Ordinal)
+                    .Replace($"<!-- dotnet-agentic-engineering:{name}:end -->", $"<!-- {name}:end -->", StringComparison.Ordinal);
+            }
+            yield return (name, block);
         }
     }
 

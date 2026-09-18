@@ -472,7 +472,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
         Assert.True(File.Exists(Path.Combine(workspace.RepoPath, "AGENTS.md")));
         Assert.True(File.Exists(Path.Combine(workspace.RepoPath, "CLAUDE.md")));
         Assert.Contains("@AGENTS.md", await workspace.ReadRepoFileAsync("CLAUDE.md").ConfigureAwait(true), StringComparison.Ordinal);
-        Assert.Contains("dotnet-agentic-engineering:dotnet-cli-run:start", await workspace.ReadRepoFileAsync("AGENTS.md").ConfigureAwait(true), StringComparison.Ordinal);
+        Assert.Contains("<!-- dotnet-cli-run:start -->", await workspace.ReadRepoFileAsync("AGENTS.md").ConfigureAwait(true), StringComparison.Ordinal);
         Assert.True(File.Exists(Path.Combine(workspace.RepoPath, ".claude", "skills", "dotnet-livecharts2", "SKILL.md")));
         Assert.True(File.Exists(Path.Combine(workspace.RepoPath, ".agents", "skills", "dotnet-livecharts2", "SKILL.md")));
 
@@ -480,6 +480,49 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
         Assert.Contains("skill install VincentH-Net/dotnet-agentic-engineering dotnet-livecharts2 --dir", ghLog, StringComparison.Ordinal);
         Assert.Contains(".claude/skills", ghLog, StringComparison.Ordinal);
         Assert.DoesNotContain("skill install VincentH-Net/dotnet-agentic-engineering dotnet-livecharts2 --dir " + Path.Combine(workspace.RepoPath, ".agents", "skills"), ghLog, StringComparison.Ordinal);
+        AssertRecordingWasWritten(workspace);
+    }
+
+    [Fact]
+    [Trait("Category", "EndToEnd")]
+    public async Task LegacyDirectiveMigratesInPlaceAndNextRunReportsItCurrent()
+    {
+        if (IsUnsupportedPlatform())
+            return;
+        using var workspace = await TestWorkspace.CreateAsync(nameof(LegacyDirectiveMigratesInPlaceAndNextRunReportsItCurrent), writeDotnetProject: false).ConfigureAwait(true);
+        workspace.WriteRepoFile("AGENTS.md", """
+            User instructions before.
+
+            <!-- dotnet-agentic-engineering:foundation-documentation-sources:start -->
+            Old documentation guidance.
+            <!-- dotnet-agentic-engineering:foundation-documentation-sources:end -->
+
+            User instructions after.
+            """);
+        string reportPath = Path.Combine(workspace.RootPath, "migration.json");
+
+        _ = await RunCommandAsync(workspace, $"--yes --agents codex --report {Quote(reportPath)} {Quote(workspace.RepoPath)}").ConfigureAwait(true);
+
+        string agents = await workspace.ReadRepoFileAsync("AGENTS.md").ConfigureAwait(true);
+        Assert.StartsWith("User instructions before.\n", agents, StringComparison.Ordinal);
+        Assert.Contains("\nUser instructions after.\n", agents, StringComparison.Ordinal);
+        Assert.DoesNotContain("Old documentation guidance.", agents, StringComparison.Ordinal);
+        Assert.DoesNotContain("<!-- dotnet-agentic-engineering:", agents, StringComparison.Ordinal);
+        Assert.Equal(2, agents.Split("<!-- foundation-documentation-sources:start -->", StringSplitOptions.None).Length);
+        Assert.Equal(2, agents.Split("<!-- foundation-documentation-sources:end -->", StringSplitOptions.None).Length);
+        Assert.Contains("For documentation, MUST use first-party vendor MCPs first", agents, StringComparison.Ordinal);
+        using var report = JsonDocument.Parse(await File.ReadAllTextAsync(reportPath).ConfigureAwait(true));
+        Assert.Equal("outdated", report.RootElement.GetProperty("directives").EnumerateArray()
+            .Single(directive => directive.GetProperty("name").GetString() == "foundation-documentation-sources").GetProperty("status").GetString());
+
+        string migrationRecording = Path.ChangeExtension(workspace.RecordingPath, ".migration.cast");
+        File.Copy(workspace.RecordingPath, migrationRecording);
+        output.WriteLine($"Migration recording: {migrationRecording}");
+        _ = await RunCommandAsync(workspace, $"--dry-run --agents codex --report {Quote(reportPath)} {Quote(workspace.RepoPath)}").ConfigureAwait(true);
+        using var nextReport = JsonDocument.Parse(await File.ReadAllTextAsync(reportPath).ConfigureAwait(true));
+        Assert.Equal("current", nextReport.RootElement.GetProperty("directives").EnumerateArray()
+            .Single(directive => directive.GetProperty("name").GetString() == "foundation-documentation-sources").GetProperty("status").GetString());
+        Assert.Equal(agents, await workspace.ReadRepoFileAsync("AGENTS.md").ConfigureAwait(true));
         AssertRecordingWasWritten(workspace);
     }
 
@@ -560,7 +603,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
         string agentsContent = File.Exists(Path.Combine(workspace.RepoPath, "AGENTS.md"))
             ? await workspace.ReadRepoFileAsync("AGENTS.md").ConfigureAwait(true)
             : string.Empty;
-        Assert.DoesNotContain("dotnet-agentic-engineering:", agentsContent, StringComparison.Ordinal);
+        Assert.True(string.IsNullOrWhiteSpace(agentsContent), "Deselecting everything must not install any directive content.");
         Assert.DoesNotContain(" skill install ", await workspace.ReadGhLogAsync().ConfigureAwait(true), StringComparison.Ordinal);
         AssertRecordingWasWritten(workspace);
     }
@@ -588,9 +631,9 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
         workspace.WriteRepoFile(
             Path.Combine("backend", "api", "AGENTS.md"),
             """
-            <!-- dotnet-agentic-engineering:foundation-prompt-log:start -->
+            <!-- foundation-prompt-log:start -->
             # foundation-prompt-log
-            <!-- dotnet-agentic-engineering:foundation-prompt-log:end -->
+            <!-- foundation-prompt-log:end -->
             """);
         workspace.WriteRepoFile(Path.Combine("backend", "api", ".agents", "skills", "dotnet-livecharts2", "SKILL.md"), "# descendant skill");
         workspace.WriteRepoFile(

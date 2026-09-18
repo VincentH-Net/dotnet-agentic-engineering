@@ -32,6 +32,12 @@ captures cannot be overwritten. Installer packages, source archives, reports, an
 are not stored in tracked snapshot content. Source archives are checksummed and extracted
 outside the checkout; selected skill files are also verified against GitHub blob identities.
 
+Historical snapshots retain their original directive markers. Candidate runs expect
+prefix-free markers, including when the selected stable source still uses the old prefix.
+The independent oracle normalizes only those boundary markers for candidate verification;
+published baseline preparation continues to compare source blocks verbatim. Migration checks
+require exactly one new marker pair and no remaining legacy pair for each selected directive.
+
 ## Preparing a baseline
 
 Use .NET 10 and a supported real `gh skill` CLI (this capture was developed against 2.100.0).

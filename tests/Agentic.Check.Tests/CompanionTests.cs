@@ -291,13 +291,16 @@ public sealed class CompanionTests
         => new(CompanionDependency.SourceRepo, "fixture-consumer", "fixture-consumer", TechnologyNames.Dotnet, [], dependencies: [CompanionDependency.Identity]);
 
     [Theory]
-    [InlineData("1.4.0", true, "restore")]
-    [InlineData("3.0.0", false, "update")]
-    [InlineData(null, false, "install")]
-    public async Task RepairUsesInstalledConsumerRequirementWithoutFetchingNewProject(string? installed, bool notRestored, string action)
+    [InlineData("1.4.0", true, "restore", "")]
+    [InlineData("3.0.0", false, "update", "")]
+    [InlineData(null, false, "install", "")]
+    [InlineData("1.4.0", true, "restore", "dotnet-agentic-engineering:")]
+    [InlineData("3.0.0", false, "update", "dotnet-agentic-engineering:")]
+    [InlineData(null, false, "install", "dotnet-agentic-engineering:")]
+    public async Task RepairUsesInstalledConsumerRequirementWhenDirectiveIsNotSelected(string? installed, bool notRestored, string action, string prefix)
     {
         using TempDirectory temp = new();
-        const string block = "<!-- dotnet-agentic-engineering:foundation-prompt-log:start -->\n## Prompt log\ndotnet agentic --minver 1.3 prompt-log show\n<!-- dotnet-agentic-engineering:foundation-prompt-log:end -->\n";
+        string block = $"<!-- {prefix}foundation-prompt-log:start -->\n## Prompt log\ndotnet agentic --minver 1.3 prompt-log show\n<!-- {prefix}foundation-prompt-log:end -->\n";
         temp.Write("AGENTS.md", block);
         FakeDirectiveSource source = new(new Dictionary<string, string> { ["foundation-prompt-log.md"] = "~~~md\n" + block + "~~~\n" });
         if (installed is not null)
@@ -306,13 +309,15 @@ public sealed class CompanionTests
         }
 
         ToolRunner runner = new() { Resolved = "1.4.0", NotRestored = notRestored };
-        FakePrompts prompts = new();
+        FakePrompts prompts = new() { SelectedDirectiveNames = [] };
         CheckWorkflow workflow = new(runner, prompts, new RecordingReporter(), source, new FakeSourceVersionResolver());
         var result = await workflow.RunAsync(new(temp.Path, false, false, null, null, "codex", false), CancellationToken.None);
         Assert.Equal(0, result.ExitCode);
-        Assert.Equal(0, source.ProjectFetches);
+        // Legacy markers add an update recommendation whose version is displayed before selection.
+        // Declining that update must still repair using the installed 1.3 requirement, not source 2.3.
+        Assert.Equal(string.IsNullOrEmpty(prefix) ? 0 : 1, source.ProjectFetches);
         var recommendation = Assert.Single(prompts.RecommendedSkillActions, skill => skill.IsCompanion);
-        Assert.Equal(action, recommendation.RecommendationAction);
+        Assert.Equal(!string.IsNullOrEmpty(prefix) && installed is not null ? "update" : action, recommendation.RecommendationAction);
         Assert.True(recommendation.IsRequiredToolRepair);
         Assert.NotNull(result.Report.Companion);
         Assert.Equal(action, result.Report.Companion.Action);

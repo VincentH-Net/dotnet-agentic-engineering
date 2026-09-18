@@ -9,7 +9,7 @@ This lets you:
 Use the `agentic-check` tool to install or update directives for your technology, or manually copy below markdown in your `AGENTS.MD`:
 
 ~~~md
-<!-- dotnet-agentic-engineering:dotnet-build-errors-and-warnings:start -->
+<!-- dotnet-build-errors-and-warnings:start -->
 ## Configure and Fix .NET build errors and warnings
 
 This directive does NOT govern WHEN to initiate a build, only WHAT to do before a build and when to repeat a build.
@@ -46,5 +46,5 @@ All `dotnet ...` commands MUST follow the separate "Running `dotnet ...`" direct
 
    3. Do not broaden the change beyond the files needed to fix the reported diagnostics,
       unless a wider mechanical format pass is explicitly required.
-<!-- dotnet-agentic-engineering:dotnet-build-errors-and-warnings:end -->
+<!-- dotnet-build-errors-and-warnings:end -->
 ~~~

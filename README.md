@@ -68,6 +68,10 @@ This repo offers the following directives (markdown snippets to include in your 
 | [`dotnet-build-errors-and-warnings`](./directives/dotnet-build-errors-and-warnings.md) | Configures .NET build warnings and errors and a modern C# .editorconfig, then directs agents to fix build errors and warnings or document rare justified suppressions. |
 | [`uno-build-and-run`](./directives/uno-build-and-run.md) | Standardizes Uno app launch for agents by skipping redundant pre-builds, writing per-run stdout logs via `AGENT_CONSOLE_LOG`, and verifying or stopping the app with the Uno runtime tools. |
 
+Directive blocks use `<!-- directive-name:start -->` and `<!-- directive-name:end -->`.
+Agentic.Check also recognizes the previous `dotnet-agentic-engineering:` prefix and removes
+it when you select a directive for installation or update. Unselected directives are preserved.
+
 ## Skills catalog
 This repo offers below skills. They are grouped in plugins for ease of [manual installation](/docs/manual-install.md), however the `agentic-check` tool selects or excludes each skill individually.
 

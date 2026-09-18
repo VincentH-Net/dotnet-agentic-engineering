@@ -2,8 +2,12 @@ namespace Agentic.Check.Tests;
 
 public sealed class ScopeDuplicateScannerTests
 {
-    [Fact]
-    public async Task FindsDirectiveAndSkillDuplicatesInAncestorsAndDescendants()
+    [Theory]
+    [InlineData("", "")]
+    [InlineData("", "dotnet-agentic-engineering:")]
+    [InlineData("dotnet-agentic-engineering:", "")]
+    [InlineData("dotnet-agentic-engineering:", "dotnet-agentic-engineering:")]
+    public async Task FindsDirectiveAndSkillDuplicatesInAncestorsAndDescendants(string ancestorPrefix, string descendantPrefix)
     {
         using TempDirectory tempDirectory = new();
         string targetDirectory = tempDirectory.CreateDirectory("repo/backend");
@@ -12,19 +16,19 @@ public sealed class ScopeDuplicateScannerTests
         _ = tempDirectory.CreateDirectory("repo/.git");
         tempDirectory.Write(
             "repo/AGENTS.md",
-            """
-            <!-- dotnet-agentic-engineering:foundation-prompt-log:start -->
+            $$"""
+            <!-- {{ancestorPrefix}}foundation-prompt-log:start -->
             # foundation-prompt-log
-            <!-- dotnet-agentic-engineering:foundation-prompt-log:end -->
+            <!-- {{ancestorPrefix}}foundation-prompt-log:end -->
             """);
         tempDirectory.Write("repo/.agents/skills/dotnet-livecharts2/SKILL.md", "# parent skill");
         tempDirectory.Write("repo/.claude/skills/dotnet-livecharts2/SKILL.md", "# parent claude skill");
         tempDirectory.Write(
             "repo/backend/api/AGENTS.md",
-            """
-            <!-- dotnet-agentic-engineering:foundation-prompt-log:start -->
+            $$"""
+            <!-- {{descendantPrefix}}foundation-prompt-log:start -->
             # foundation-prompt-log
-            <!-- dotnet-agentic-engineering:foundation-prompt-log:end -->
+            <!-- {{descendantPrefix}}foundation-prompt-log:end -->
             """);
         tempDirectory.Write("repo/backend/api/.agents/skills/dotnet-livecharts2/SKILL.md", "# child skill");
         tempDirectory.Write("repo/backend/.hidden/AGENTS.md", "dotnet-agentic-engineering:foundation-prompt-log:start");

@@ -105,9 +105,9 @@ public sealed class DirectiveInstallerTests
         Assert.True(result.Success);
         string agents = await File.ReadAllTextAsync(Path.Combine(tempDirectory.Path, "AGENTS.md"), CancellationToken.None);
         string claude = await File.ReadAllTextAsync(Path.Combine(tempDirectory.Path, "CLAUDE.md"), CancellationToken.None);
-        Assert.Contains("dotnet-agentic-engineering:foundation-prompt-log:start", agents, StringComparison.Ordinal);
-        Assert.Contains("dotnet-agentic-engineering:dotnet-cli-run:start", agents, StringComparison.Ordinal);
-        Assert.DoesNotContain("dotnet-agentic-engineering:uno-build-and-run:start", agents, StringComparison.Ordinal);
+        Assert.Contains("<!-- foundation-prompt-log:start -->", agents, StringComparison.Ordinal);
+        Assert.Contains("<!-- dotnet-cli-run:start -->", agents, StringComparison.Ordinal);
+        Assert.DoesNotContain("uno-build-and-run:start", agents, StringComparison.Ordinal);
         Assert.Contains("@AGENTS.md", claude, StringComparison.Ordinal);
     }
 
@@ -276,8 +276,8 @@ public sealed class DirectiveInstallerTests
 
         Assert.True(result.Success);
         string agents = await File.ReadAllTextAsync(Path.Combine(tempDirectory.Path, "AGENTS.md"), CancellationToken.None);
-        Assert.Contains("dotnet-agentic-engineering:foundation-prompt-log:start", agents, StringComparison.Ordinal);
-        Assert.DoesNotContain("dotnet-agentic-engineering:dotnet-cli-run:start", agents, StringComparison.Ordinal);
+        Assert.Contains("<!-- foundation-prompt-log:start -->", agents, StringComparison.Ordinal);
+        Assert.DoesNotContain("dotnet-cli-run:start", agents, StringComparison.Ordinal);
     }
 
     [Fact]

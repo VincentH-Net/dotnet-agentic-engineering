@@ -82,7 +82,7 @@ static class ScopeDuplicateScanner
         {
             if (item.Directive is not null)
             {
-                if (agentsContent?.Contains($"dotnet-agentic-engineering:{item.Directive.Name}:", StringComparison.Ordinal) == true)
+                if (agentsContent is not null && DirectiveMarkers.Contains(agentsContent, item.Directive.Name))
                 {
                     AddDuplicate(locationsByKey, scopeKeysByKey, item.Key, targetDirectory, candidateDirectory, agentsFile);
                 }

@@ -337,7 +337,11 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
         foreach (var (name, block) in ExpectedDirectives())
         {
             FixtureFiles.Require(agents.Contains(block, StringComparison.Ordinal), $"Directive {name} differs from {sources[SourceOracle.OwnRepository].Commit}");
-            FixtureFiles.Require(agents.Split($"<!-- dotnet-agentic-engineering:{name}:start -->", StringSplitOptions.None).Length == 2, $"Duplicate directive {name}");
+            foreach (string boundary in new[] { "start", "end" })
+            {
+                FixtureFiles.Require(agents.Split($"<!-- {name}:{boundary} -->", StringSplitOptions.None).Length == 2, $"Duplicate directive marker {name}:{boundary}");
+                FixtureFiles.Require(!agents.Contains($"<!-- dotnet-agentic-engineering:{name}:{boundary} -->", StringComparison.Ordinal), $"Legacy marker remains for selected directive {name}:{boundary}");
+            }
         }
         if (definition.Agents.Contains("claude-code", StringComparison.Ordinal))
             FixtureFiles.Require((await File.ReadAllTextAsync(Path.Combine(workspace.Target, "CLAUDE.md")).ConfigureAwait(false)).Contains("@AGENTS.md", StringComparison.Ordinal), "Missing Claude instruction import.");
@@ -378,7 +382,7 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
     }
 
     IEnumerable<(string Name, string Block)> ExpectedDirectives()
-        => DirectiveOracle.Expected(sources[SourceOracle.OwnRepository].Directory, definition.Technologies);
+        => DirectiveOracle.Expected(sources[SourceOracle.OwnRepository].Directory, definition.Technologies, prefixFreeMarkers: true);
 
     bool DetermineContentDifference()
     {

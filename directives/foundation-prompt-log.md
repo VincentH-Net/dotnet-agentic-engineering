@@ -7,7 +7,7 @@ This preserves **intent** in source control, using the same unit of work as your
 Use the `agentic-check` tool to install or update directives for your technology, or manually copy below markdown in your `AGENTS.MD`:
 
 ~~~md
-<!-- dotnet-agentic-engineering:foundation-prompt-log:start -->
+<!-- foundation-prompt-log:start -->
 ## Prompt Log
 
 For every agent-created code commit, include a prompt-log block in its initial commit message.
@@ -57,5 +57,5 @@ dotnet agentic prompt-log check --commit HEAD -m 2.3
 ```
 
 `check` validates block framing and escaping; success does not prove a log is present or complete.
-<!-- dotnet-agentic-engineering:foundation-prompt-log:end -->
+<!-- foundation-prompt-log:end -->
 ~~~

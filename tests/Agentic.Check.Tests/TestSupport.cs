@@ -311,10 +311,10 @@ sealed class FakeDirectiveSource : IDirectiveSource
             # {directiveName}
 
             ~~~md
-            <!-- dotnet-agentic-engineering:{directiveName}:start -->
+            <!-- {directiveName}:start -->
             ## {directiveName}
             Body for {directiveName}.
-            <!-- dotnet-agentic-engineering:{directiveName}:end -->
+            <!-- {directiveName}:end -->
             ~~~
             """;
 }

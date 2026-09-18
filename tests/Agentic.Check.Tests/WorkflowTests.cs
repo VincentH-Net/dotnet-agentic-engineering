@@ -659,10 +659,10 @@ public sealed class WorkflowTests
         tempDirectory.Write(
             "AGENTS.md",
             """
-            <!-- dotnet-agentic-engineering:foundation-prompt-log:start -->
+            <!-- foundation-prompt-log:start -->
             ## foundation-prompt-log
             Body for foundation-prompt-log.
-            <!-- dotnet-agentic-engineering:foundation-prompt-log:end -->
+            <!-- foundation-prompt-log:end -->
             """);
         tempDirectory.Write(".agents/skills/dotnet-livecharts2/SKILL.md", "# Present");
         tempDirectory.Write(".agents/skills/dotnet-modern-csharp-editorconfig/SKILL.md", "# Present");
@@ -871,8 +871,8 @@ public sealed class WorkflowTests
 
         Assert.Equal(0, result.ExitCode);
         string agents = await File.ReadAllTextAsync(Path.Combine(tempDirectory.Path, "AGENTS.md"), CancellationToken.None);
-        Assert.Contains("dotnet-agentic-engineering:foundation-prompt-log:start", agents, StringComparison.Ordinal);
-        Assert.DoesNotContain("dotnet-agentic-engineering:dotnet-cli-run:start", agents, StringComparison.Ordinal);
+        Assert.Contains("<!-- foundation-prompt-log:start -->", agents, StringComparison.Ordinal);
+        Assert.DoesNotContain("dotnet-cli-run:start", agents, StringComparison.Ordinal);
         Assert.Contains("2 actions selected", reporter.InfoMessages);
         Assert.Contains(ActionOutputFormatter.FormatHeader(), reporter.BoldMessages);
         Assert.Contains(ActionOutputFormatter.FormatLine("Installed directive", "foundation-prompt-log"), reporter.Successes);
