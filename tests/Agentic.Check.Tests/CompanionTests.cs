@@ -13,11 +13,12 @@ public sealed class CompanionTests
         string[] directives = Directory.GetFiles(Path.Combine(root, "directives"), "*.md");
         foreach (string path in directives)
         {
-            var invocations = CompanionDependency.Invocations(File.ReadAllText(path));
+            string content = File.ReadAllText(path);
+            var invocations = CompanionDependency.Invocations(content);
             foreach (var (_, minimum) in invocations)
             {
                 Assert.Equal(version.Minimum, minimum);
-                Assert.Contains(CompanionDependency.Identity, CompanionDependency.ForDirective(Path.GetFileNameWithoutExtension(path)));
+                Assert.Contains(CompanionDependency.Identity, CompanionDependency.ForDirective(Path.GetFileNameWithoutExtension(path), content));
             }
 
             if (Path.GetFileName(path) == "foundation-prompt-log.md")
@@ -224,7 +225,7 @@ public sealed class CompanionTests
         var consumer = Consumer();
         SkillManifestEntry transitive = new("fixture", "transitive", "transitive", TechnologyNames.Dotnet, [], dependencies: [new(consumer.SourceRepo, consumer.InstallArg)]);
         var companion = CompanionDependency.Action();
-        DirectivePlanItem directive = new("foundation-prompt-log", "missing", "content");
+        DirectivePlanItem directive = new("foundation-prompt-log", "missing", "dotnet agentic prompt-log show -m 2.3");
         var items = RecommendationSelectionPrompt.BuildItems([directive], [consumer, transitive, companion]);
         RecommendationSelectionState state = new(items);
         state.Apply(new(SkillSelectionCommand.SelectNone));
@@ -239,6 +240,99 @@ public sealed class CompanionTests
         state.ApplySpecializationScanResult(new(new Dictionary<string, IReadOnlyList<string>> { [items[^1].Key] = ["../.agents/skills/InnoWvate.Agentic/SKILL.md"] }));
         Assert.Contains(companion, state.SelectedSkills);
     }
+
+    [Theory]
+    [InlineData("git log --grep=\"^prompt-log:\"", false)]
+    [InlineData("dotnet agentic prompt-log show -m 2.3", true)]
+    public void DirectiveSelectionDependsOnItsCommands(string content, bool requiresCompanion)
+    {
+        DirectivePlanItem directive = new("foundation-prompt-log", "missing", content);
+        var companion = CompanionDependency.Action();
+        RecommendationSelectionState state = new(RecommendationSelectionPrompt.BuildItems([directive], [companion]));
+        state.Apply(new(SkillSelectionCommand.SelectNone));
+        state.SelectWithDependencies("directive:" + directive.Name);
+
+        Assert.Equal(requiresCompanion, state.SelectedSkills.Contains(companion));
+        state.DeselectWithDependents(RecommendationSelectionState.FormatSkillKey(companion.SourceRepo, companion.InstallArg));
+        Assert.Equal(!requiresCompanion, state.SelectedDirectives.Contains(directive));
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task HistoricalDirectiveInstallsAndMigratesWithoutCompanion(bool dryRun, bool installed)
+    {
+        using TempDirectory temp = new();
+        _ = temp.CreateDirectory("target");
+        string block = PromptLogBlock("git log --grep=\"^prompt-log:\"", "dotnet-agentic-engineering:");
+        if (installed)
+            temp.Write("AGENTS.md", "User instructions\n" + block);
+        FakeDirectiveSource source = new(new Dictionary<string, string> { ["foundation-prompt-log.md"] = "~~~md\n" + block + "~~~\n" })
+        {
+            ProjectFailure = new DirectiveException("GitHub returned HTTP 404")
+        };
+        ToolRunner runner = new();
+        FakePrompts prompts = new();
+        var result = await new CheckWorkflow(runner, prompts, new RecordingReporter(), source, new FakeSourceVersionResolver(), [])
+            .RunAsync(new(temp.Path, dryRun, false, null, null, "codex", false), CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Equal(0, source.ProjectFetches);
+        Assert.Null(result.Report.Companion);
+        Assert.Null(result.Report.Dna);
+        Assert.DoesNotContain(prompts.RecommendedSkillActions, skill => skill.IsCompanion || skill.IsDna);
+        Assert.DoesNotContain(runner.Calls, call => call.FileName == "dotnet");
+        Assert.False(File.Exists(CompanionInstaller.ManifestPath(temp.Path)));
+        if (dryRun)
+        {
+            Assert.Equal(installed, File.Exists(result.Report.AgentsFile));
+            if (installed)
+                Assert.Equal("User instructions\n" + block, await File.ReadAllTextAsync(result.Report.AgentsFile));
+        }
+        else
+        {
+            string content = await File.ReadAllTextAsync(result.Report.AgentsFile);
+            Assert.Contains(DirectiveMarkers.Normalize(block, "foundation-prompt-log").TrimEnd(), content, StringComparison.Ordinal);
+            Assert.DoesNotContain("dotnet-agentic-engineering:", content, StringComparison.Ordinal);
+            if (installed)
+                Assert.StartsWith("User instructions\n", content, StringComparison.Ordinal);
+        }
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("dotnet-agentic-engineering:")]
+    public async Task SwitchingToHistoricalDirectivePreservesInstalledTool(string prefix)
+    {
+        using TempDirectory temp = new();
+        temp.Write("AGENTS.md", PromptLogBlock("dotnet agentic prompt-log show -m 2.3", prefix));
+        WriteManifest(temp.Path, "2.3.0");
+        string manifest = await File.ReadAllTextAsync(CompanionInstaller.ManifestPath(temp.Path));
+        string block = PromptLogBlock("git log --grep=\"^prompt-log:\"", "dotnet-agentic-engineering:");
+        FakeDirectiveSource source = new(new Dictionary<string, string> { ["foundation-prompt-log.md"] = "~~~md\n" + block + "~~~\n" })
+        {
+            ProjectFailure = new DirectiveException("GitHub returned HTTP 404")
+        };
+        ToolRunner runner = new();
+        var result = await new CheckWorkflow(runner, new FakePrompts(), new RecordingReporter(), source, new FakeSourceVersionResolver(), [], new DnaInstaller(runner, string.Empty))
+            .RunAsync(new(temp.Path, false, true, null, null, "codex", false), CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Equal(0, source.ProjectFetches);
+        Assert.Null(result.Report.Companion);
+        Assert.NotNull(result.Report.Dna);
+        Assert.True(result.Report.Dna.Success);
+        Assert.Equal("update", result.Report.Dna.Action);
+        Assert.Equal(manifest, await File.ReadAllTextAsync(CompanionInstaller.ManifestPath(temp.Path)));
+        Assert.Contains(DirectiveMarkers.Normalize(block, "foundation-prompt-log").TrimEnd(), await File.ReadAllTextAsync(result.Report.AgentsFile), StringComparison.Ordinal);
+        Assert.Equal(["tool", "run", "agentic", "--", "--version"], Assert.Single(runner.Calls, call => call.FileName == "dotnet" && !call.Arguments.Contains("--global")).Arguments);
+        Assert.DoesNotContain(runner.Calls, call => call.Arguments.Contains("uninstall"));
+    }
+
+    static string PromptLogBlock(string commands, string prefix)
+        => $"<!-- {prefix}foundation-prompt-log:start -->\n## Prompt log\n{commands}\n<!-- {prefix}foundation-prompt-log:end -->\n";
 
     [Theory]
     [InlineData(true, false)]
@@ -287,22 +381,50 @@ public sealed class CompanionTests
         Assert.False(result.Report.Companion.Success);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MissingProjectStillFailsForDirectiveThatUsesCompanion(bool dryRun)
+    {
+        using TempDirectory temp = new();
+        _ = temp.CreateDirectory("target");
+        FakeDirectiveSource source = new() { ProjectFailure = new DirectiveException("GitHub returned HTTP 404") };
+        ToolRunner runner = new();
+        var result = await new CheckWorkflow(runner, new FakePrompts(), new RecordingReporter(), source, new FakeSourceVersionResolver(), [])
+            .RunAsync(new(temp.Path, dryRun, true, null, null, "codex", false), CancellationToken.None);
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.Equal(1, source.ProjectFetches);
+        Assert.NotNull(result.Report.Companion);
+        Assert.False(result.Report.Companion.Success);
+        Assert.DoesNotContain(runner.Calls, call => call.FileName == "dotnet" && call.Arguments[1] is "install" or "update" or "restore");
+        if (File.Exists(result.Report.AgentsFile))
+            Assert.DoesNotContain("foundation-prompt-log:start", await File.ReadAllTextAsync(result.Report.AgentsFile), StringComparison.Ordinal);
+    }
+
     internal static SkillManifestEntry Consumer()
         => new(CompanionDependency.SourceRepo, "fixture-consumer", "fixture-consumer", TechnologyNames.Dotnet, [], dependencies: [CompanionDependency.Identity]);
 
     [Theory]
-    [InlineData("1.4.0", true, "restore", "")]
-    [InlineData("3.0.0", false, "update", "")]
-    [InlineData(null, false, "install", "")]
-    [InlineData("1.4.0", true, "restore", "dotnet-agentic-engineering:")]
-    [InlineData("3.0.0", false, "update", "dotnet-agentic-engineering:")]
-    [InlineData(null, false, "install", "dotnet-agentic-engineering:")]
-    public async Task RepairUsesInstalledConsumerRequirementWhenDirectiveIsNotSelected(string? installed, bool notRestored, string action, string prefix)
+    [InlineData("1.4.0", true, "restore", "", false)]
+    [InlineData("3.0.0", false, "update", "", false)]
+    [InlineData(null, false, "install", "", false)]
+    [InlineData("1.4.0", true, "restore", "dotnet-agentic-engineering:", false)]
+    [InlineData("3.0.0", false, "update", "dotnet-agentic-engineering:", false)]
+    [InlineData(null, false, "install", "dotnet-agentic-engineering:", false)]
+    [InlineData("1.4.0", true, "restore", "", true)]
+    [InlineData("3.0.0", false, "update", "", true)]
+    [InlineData(null, false, "install", "", true)]
+    [InlineData("1.4.0", true, "restore", "dotnet-agentic-engineering:", true)]
+    [InlineData("3.0.0", false, "update", "dotnet-agentic-engineering:", true)]
+    [InlineData(null, false, "install", "dotnet-agentic-engineering:", true)]
+    public async Task RepairUsesInstalledConsumerRequirementWhenDirectiveIsNotSelected(string? installed, bool notRestored, string action, string prefix, bool historicalSource)
     {
         using TempDirectory temp = new();
         string block = $"<!-- {prefix}foundation-prompt-log:start -->\n## Prompt log\ndotnet agentic --minver 1.3 prompt-log show\n<!-- {prefix}foundation-prompt-log:end -->\n";
         temp.Write("AGENTS.md", block);
-        FakeDirectiveSource source = new(new Dictionary<string, string> { ["foundation-prompt-log.md"] = "~~~md\n" + block + "~~~\n" });
+        string sourceBlock = historicalSource ? PromptLogBlock("git log --grep=\"^prompt-log:\"", prefix) : block;
+        FakeDirectiveSource source = new(new Dictionary<string, string> { ["foundation-prompt-log.md"] = "~~~md\n" + sourceBlock + "~~~\n" });
         if (installed is not null)
         {
             WriteManifest(temp.Path, installed);
@@ -315,9 +437,10 @@ public sealed class CompanionTests
         Assert.Equal(0, result.ExitCode);
         // Legacy markers add an update recommendation whose version is displayed before selection.
         // Declining that update must still repair using the installed 1.3 requirement, not source 2.3.
-        Assert.Equal(string.IsNullOrEmpty(prefix) ? 0 : 1, source.ProjectFetches);
+        bool dependentUpdate = !historicalSource && !string.IsNullOrEmpty(prefix);
+        Assert.Equal(dependentUpdate ? 1 : 0, source.ProjectFetches);
         var recommendation = Assert.Single(prompts.RecommendedSkillActions, skill => skill.IsCompanion);
-        Assert.Equal(!string.IsNullOrEmpty(prefix) && installed is not null ? "update" : action, recommendation.RecommendationAction);
+        Assert.Equal(dependentUpdate && installed is not null ? "update" : action, recommendation.RecommendationAction);
         Assert.True(recommendation.IsRequiredToolRepair);
         Assert.NotNull(result.Report.Companion);
         Assert.Equal(action, result.Report.Companion.Action);

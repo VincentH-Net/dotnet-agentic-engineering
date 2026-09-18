@@ -346,7 +346,7 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
         Dictionary<string, IReadOnlyList<string>> dependencyKeysByKey = new(StringComparer.Ordinal);
         foreach (var item in items)
         {
-            string[] dependencyKeys = [.. (item.Skill?.Dependencies ?? CompanionDependency.ForDirective(item.Directive?.Name))
+            string[] dependencyKeys = [.. (item.Skill?.Dependencies ?? CompanionDependency.ForDirective(item.Directive?.Name, item.Directive?.Content))
                 .Select(dependency => FormatSkillKey(dependency.SourceRepo, dependency.InstallArg))
                 .Where(selectableKeys.Contains)
                 .Distinct(StringComparer.Ordinal)];

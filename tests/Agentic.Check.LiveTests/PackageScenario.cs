@@ -48,7 +48,7 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
             FixtureFiles.Require(collection.Completed.Contains(fixtureName, StringComparer.Ordinal), $"Baseline {id} has no completed {fixtureName}.");
             baseline = FixtureFiles.ReadJson<FixtureCapture>(Path.Combine(baselineDirectory, fixtureName, "metadata.json"));
             baselineCompanion = collection.Definition.Companion;
-            definition = baseline.Definition;
+            definition = MigrationExpectations.ForBaseline(id, baseline.Definition);
             snapshot = Path.Combine(baselineDirectory, fixtureName, "snapshot.zip");
             VerifyBaselineUnchanged();
             Directory.Delete(workspace.Target, true);
@@ -79,16 +79,6 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
         oracle = new(workspace.Process, workspace.Root);
         if (scenario == "candidate-preview-stable")
         {
-            var stableSource = await oracle.SelectedAsync(SourceOracle.OwnRepository, false).ConfigureAwait(false);
-            SourceIdentity identity = new(stableSource.Repository, stableSource.Reference, stableSource.Commit);
-            string? skipReason = StableTransitionSkipReason(scenario, identity);
-            if (skipReason is not null)
-            {
-                log(skipReason);
-                FixtureFiles.WriteJson(Path.Combine(FixtureFiles.Reports, runId + "-skipped.json"),
-                    new { fixture = fixtureName, scenario, reason = skipReason, stableSource = identity });
-                Skip.If(true, skipReason);
-            }
             preview = true;
             await ResolveSourcesAsync().ConfigureAwait(false);
             await InvokeAsync(false, false, "candidate-preview-setup").ConfigureAwait(false);
@@ -116,14 +106,6 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
         log(SourceDescription);
         FixtureFiles.WriteJson(Path.Combine(FixtureFiles.Reports, runId + "-sources.json"), sources.Values.Select(source => new { source.Repository, source.Reference, source.Commit }));
     }
-
-    internal static string? StableTransitionSkipReason(string scenario, SourceIdentity source)
-        // This immutable release predates the companion. Do not generalize this to missing projects or HTTP errors.
-        => scenario == "candidate-preview-stable" && source.Repository == SourceOracle.OwnRepository
-            && source.Reference == "v2.2.0" && source.Commit == "ebc711fb6db0912cae2b0c2bc4991d57d5afa007"
-                ? $"PRE-COMPANION STABLE SOURCE: {scenario} cannot switch candidate content to {source.Repository}@{source.Reference} ({source.Commit}): "
-                    + "this release has no companion project. This variation is skipped until another stable source is selected; no stable transition was verified."
-                : null;
 
     async Task ResolveSourcesAsync()
     {
@@ -318,12 +300,7 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
             var expected = expectedSkills.Select(skill => agent + "/" + skill.LocalFolder).Order(StringComparer.Ordinal);
             var actual = origins.Where(origin => origin.LocalPath.StartsWith(agent + "/", StringComparison.Ordinal)).Select(origin => origin.LocalPath).Order(StringComparer.Ordinal);
             FixtureFiles.Require(expected.SequenceEqual(actual), $"Installed manifest/dependency inventory mismatch in {agent}");
-            var retained = baseline?.Sources.Where(origin => origin.LocalPath.StartsWith(agent + "/", StringComparison.Ordinal)).Select(origin => origin.LocalPath) ?? [];
-            var allExpected = expected.Concat(retained).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal);
-            string skillsDirectory = Path.Combine(workspace.Target, agent);
-            string[] directories = Directory.Exists(skillsDirectory) ? Directory.GetDirectories(skillsDirectory) : [];
-            var allActual = directories.Select(path => agent + "/" + Path.GetFileName(path)).Order(StringComparer.Ordinal);
-            FixtureFiles.Require(allExpected.SequenceEqual(allActual), $"Unexpected skill directories in {agent}");
+            VerifySkillDirectoryInventory(workspace.Target, agent, expected, filesBeforeOperation);
         }
         foreach (var origin in origins)
         {
@@ -366,6 +343,15 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
             }
             if (baseline?.Companion is null && scenario is "migration" or "preview-preview")
                 FixtureFiles.Require(report.GetProperty("companion").GetProperty("action").GetString() == "install", "Pre-companion migration must be first installation.");
+        }
+        if (requiresCompanion || scenario == "candidate-preview-stable")
+        {
+            if (!preview && scenario == "candidate-preview-stable")
+            {
+                var previous = System.Text.Json.Nodes.JsonNode.Parse(manifestBefore)!["tools"]!["innowvate.agentic"];
+                var current = System.Text.Json.Nodes.JsonNode.Parse(await File.ReadAllTextAsync(CompanionInstaller.ManifestPath(workspace.Target)).ConfigureAwait(false))!["tools"]!["innowvate.agentic"];
+                FixtureFiles.Require(previous is not null && System.Text.Json.Nodes.JsonNode.DeepEquals(previous, current), "Switching to stable changed the candidate companion manifest entry.");
+            }
             await CompanionRoundTripAsync(workspace, candidate.Companion).ConfigureAwait(false);
             var dna = report.GetProperty("dna");
             FixtureFiles.Require(dna.GetProperty("success").GetBoolean() && !dna.GetProperty("skipped").GetBoolean(), "Default shorthand installation/update did not succeed.");
@@ -383,6 +369,19 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
 
     IEnumerable<(string Name, string Block)> ExpectedDirectives()
         => DirectiveOracle.Expected(sources[SourceOracle.OwnRepository].Directory, definition.Technologies, prefixFreeMarkers: true);
+
+    internal static void VerifySkillDirectoryInventory(string target, string agent, IEnumerable<string> expected, IReadOnlyDictionary<string, string>? previousFiles)
+    {
+        // Setup may have added preview-only skills beyond the frozen baseline. Keep the
+        // inventory from immediately before this phase, whose setup was already verified.
+        var retained = previousFiles?.Keys.Where(path => path.StartsWith(agent + "/", StringComparison.Ordinal)
+            && path.Split('/').Length == 4 && path.EndsWith("/SKILL.md", StringComparison.Ordinal)).Select(path => path[..^"/SKILL.md".Length]) ?? [];
+        var allExpected = expected.Concat(retained).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal);
+        string skillsDirectory = Path.Combine(target, agent);
+        string[] directories = Directory.Exists(skillsDirectory) ? Directory.GetDirectories(skillsDirectory) : [];
+        var allActual = directories.Select(path => agent + "/" + Path.GetFileName(path)).Order(StringComparer.Ordinal);
+        FixtureFiles.Require(allExpected.SequenceEqual(allActual), $"Unexpected or missing skill directory in {agent}");
+    }
 
     bool DetermineContentDifference()
     {

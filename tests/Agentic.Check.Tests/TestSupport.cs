@@ -267,6 +267,8 @@ sealed class FakeDirectiveSource : IDirectiveSource
 
     public string ProjectContent { get; init; } = "<Project><Version>2.3.0</Version></Project>";
 
+    public DirectiveException? ProjectFailure { get; init; }
+
     readonly IReadOnlyList<DirectiveSourceFile> files;
     readonly Dictionary<string, string> contents;
 
@@ -290,6 +292,8 @@ sealed class FakeDirectiveSource : IDirectiveSource
         if (sourceFile.FileName == CompanionSourceVersionReader.ProjectPath)
         {
             ProjectFetches++;
+            if (ProjectFailure is not null)
+                throw ProjectFailure;
             return Task.FromResult(ProjectContent);
         }
 
@@ -301,7 +305,8 @@ sealed class FakeDirectiveSource : IDirectiveSource
     public static Dictionary<string, string> DefaultDirectiveContents()
         => new(StringComparer.Ordinal)
         {
-            ["foundation-prompt-log.md"] = DirectiveFile("foundation-prompt-log"),
+            ["foundation-prompt-log.md"] = DirectiveFile("foundation-prompt-log").Replace("Body for foundation-prompt-log.",
+                "Body for foundation-prompt-log.\ndotnet agentic prompt-log show -m 2.3", StringComparison.Ordinal),
             ["dotnet-cli-run.md"] = DirectiveFile("dotnet-cli-run"),
             ["uno-build-and-run.md"] = DirectiveFile("uno-build-and-run")
         };

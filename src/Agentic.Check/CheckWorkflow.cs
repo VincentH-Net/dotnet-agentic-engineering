@@ -314,12 +314,12 @@ sealed class CheckWorkflow(
         {
             installedCompanion = CompanionInstaller.InstalledVersion(targetDirectory);
             List<string> installedConsumers = [];
-            foreach (var directive in directivePlan.Directives.Where(d => CompanionDependency.ForDirective(d.Name).Count > 0))
+            foreach (var directive in directivePlan.Directives)
             {
                 if (DirectiveMarkers.FindBlock(directivePlan.AgentsContent, directive.Name) is { } range)
                 {
                     string installed = directivePlan.AgentsContent[range];
-                    if (CompanionDependency.Invocations(installed).Count > 0)
+                    if (CompanionDependency.ForDirective(directive.Name, installed).Count > 0)
                     {
                         installedConsumers.Add(installed);
                     }
@@ -358,7 +358,7 @@ sealed class CheckWorkflow(
             repairError = exception.Message;
         }
 
-        bool hasDependentRecommendations = recommendedDirectives.Any(d => CompanionDependency.ForDirective(d.Name).Count > 0)
+        bool hasDependentRecommendations = recommendedDirectives.Any(d => CompanionDependency.ForDirective(d.Name, d.Content).Count > 0)
             || recommendedSkillActions.Any(skill => skill.Dependencies.Contains(CompanionDependency.Identity));
         if (hasDependentRecommendations || repairRequirement is not null || repairError is not null)
         {
@@ -366,7 +366,7 @@ sealed class CheckWorkflow(
             try
             {
                 var plannedRequirement = hasDependentRecommendations
-                    ? await companionVersions.ReadAsync(recommendedDirectives.FirstOrDefault(d => CompanionDependency.ForDirective(d.Name).Count > 0)?.SourceRef
+                    ? await companionVersions.ReadAsync(recommendedDirectives.FirstOrDefault(d => CompanionDependency.ForDirective(d.Name, d.Content).Count > 0)?.SourceRef
                         ?? recommendedSkillActions.First(skill => skill.Dependencies.Contains(CompanionDependency.Identity)).ResolvedSourceRef, cancellationToken).ConfigureAwait(false)
                     : repairRequirement;
                 status = $"required {plannedRequirement?.Minimum ?? "unknown"}";
@@ -433,9 +433,9 @@ sealed class CheckWorkflow(
 
         if (selectedSkills.Any(skill => skill.IsCompanion))
         {
-            bool selectedConsumer = selectedDirectives.Any(d => CompanionDependency.ForDirective(d.Name).Count > 0)
+            bool selectedConsumer = selectedDirectives.Any(d => CompanionDependency.ForDirective(d.Name, d.Content).Count > 0)
                 || selectedSkills.Any(skill => !skill.IsDna && skill.Dependencies.Contains(CompanionDependency.Identity));
-            string selectedRef = selectedDirectives.FirstOrDefault(d => CompanionDependency.ForDirective(d.Name).Count > 0)?.SourceRef
+            string selectedRef = selectedDirectives.FirstOrDefault(d => CompanionDependency.ForDirective(d.Name, d.Content).Count > 0)?.SourceRef
                 ?? selectedSkills.FirstOrDefault(skill => !skill.IsDna && skill.Dependencies.Contains(CompanionDependency.Identity))?.ResolvedSourceRef
                 ?? sourceVersion?.ResolvedSourceRef ?? string.Empty;
             if (repairError is not null && !selectedConsumer)

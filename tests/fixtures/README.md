@@ -16,6 +16,14 @@ The immutable 2.2.0 snapshot still records that installer's exclusion. Migration
 exercise the candidate's newly applicable ASP.NET skills against that original snapshot;
 fresh tests use the unchanged Web SDK trigger and the updated detection expectation.
 
+`migration-expectations/<baseline-id>.json` records intentional candidate detection changes
+for that baseline's frozen triggers. Listed fixtures override only technologies and gates;
+other fixtures retain their captured expectations. These reviewed values are independent of
+the production detector and fresh definitions. Historical reports are still checked against
+historical expectations, and every extracted snapshot is checked against candidate expectations.
+Add an explicit entry when a detector change intentionally affects a historical fixture;
+never edit the baseline metadata or derive expected results from the detector under test.
+
 `baselines/<installer-version-and-UTC-date-id>/<fixture>/snapshot.zip` holds the complete
 installed tree, including instruction files, skill assets, and original gh tracking metadata.
 ZIP storage prevents tools from generating `obj` files in persistent snapshots. Each
@@ -233,15 +241,12 @@ PowerShell users set the same names with `$env:NAME = 'value'` before running do
 | `candidate-preview-stable` | Another copy, first installed from candidate SHA, then stable. Exposes any SHA-pin switching defect. |
 | `preview-declined` | Another preview-web-cli copy; interactive deselection and exact skill/metadata preservation. |
 
-The `candidate-preview-stable` variation has one temporary, test-only compatibility skip:
-when this repository's selected stable source is exactly `v2.2.0` at
-`ebc711fb6db0912cae2b0c2bc4991d57d5afa007`. That release predates the companion, so switching
-candidate preview content back to it makes the candidate request a nonexistent companion project.
-The runner reports `PRE-COMPANION STABLE SOURCE` with the repository, tag and commit, and saves
-`<run>-skipped.json` before invoking the candidate. This is an explicit coverage gap, not a passed
-transition or an unchanged-source skip. The variation automatically runs for any other stable
-source. Historical `preview-stable`, all baseline-to-candidate migrations, and companion checks
-remain enabled. Other missing sources, HTTP failures and prerequisite errors are not exempted.
+The `candidate-preview-stable` variation also runs against the pre-companion `v2.2.0` source.
+Its Git-only prompt-log directive requires no companion source-project lookup. The tools
+installed during candidate preview setup must remain usable after switching and on the next
+stable check; normal shorthand update behavior remains enabled. Historical `preview-stable`
+starts with the published 2.2.0 snapshot and has no such candidate tool setup. Missing sources,
+HTTP failures and genuine prerequisite errors remain failures.
 
 Migration and preview-reinstall cases have separate content-transition rows. Before those
 rows run an update, they independently compare intended source content with the baseline.

@@ -257,7 +257,6 @@ static string FirstLine(string value) => value.Split('\n', 2)[0].Trim();
 static string SkipReason(string message)
     => message.StartsWith("UNCHANGED SOURCE:", StringComparison.Ordinal) ? "Unchanged source; reinstall/preservation covered by separate tests."
         : message.StartsWith("No published skill update to decline:", StringComparison.Ordinal) ? "No published skill update available to decline."
-        : message.StartsWith("PRE-COMPANION STABLE SOURCE:", StringComparison.Ordinal) ? "Stable source predates companion support; transition unverified."
         : FirstLine(message);
 
 static string Checkout([CallerFilePath] string source = "") => Path.GetDirectoryName(Path.GetDirectoryName(source))!;

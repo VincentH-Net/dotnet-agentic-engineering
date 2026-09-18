@@ -662,6 +662,7 @@ public sealed class WorkflowTests
             <!-- foundation-prompt-log:start -->
             ## foundation-prompt-log
             Body for foundation-prompt-log.
+            dotnet agentic prompt-log show -m 2.3
             <!-- foundation-prompt-log:end -->
             """);
         tempDirectory.Write(".agents/skills/dotnet-livecharts2/SKILL.md", "# Present");

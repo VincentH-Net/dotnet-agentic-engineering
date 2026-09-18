@@ -9,8 +9,8 @@ static partial class CompanionDependency
     internal const string SourceRepo = "VincentH-Net/dotnet-agentic-engineering";
     internal static SkillDependency Identity { get; } = new(string.Empty, PackageId);
 
-    internal static IReadOnlyList<SkillDependency> ForDirective(string? name)
-        => name == "foundation-prompt-log" ? [Identity] : [];
+    internal static IReadOnlyList<SkillDependency> ForDirective(string? name, string? content)
+        => name == "foundation-prompt-log" && content is not null && Invocations(content).Count > 0 ? [Identity] : [];
 
     internal static SkillManifestEntry Action(string description = "install")
         => new(string.Empty, PackageId, PackageId, string.Empty, [], recommendationAction: description);

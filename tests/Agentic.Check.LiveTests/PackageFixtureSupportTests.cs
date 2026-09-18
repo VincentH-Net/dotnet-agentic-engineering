@@ -20,14 +20,19 @@ public sealed class PackageFixtureSupportTests
         FixtureFiles.MaterializeTrigger(directory, trigger);
         var inventory = FixtureFiles.Inventory(trigger);
         Assert.DoesNotContain(inventory.Keys, path => path is "AGENTS.md" or "CLAUDE.md" || path.Contains("skills/", StringComparison.Ordinal) || path.Contains("dotnet-tools", StringComparison.Ordinal));
-        var detected = StackDetector.Detect(trigger);
+        AssertDetection(definition, trigger);
+    }
+
+    static void AssertDetection(FixtureDefinition definition, string target)
+    {
+        var detected = StackDetector.Detect(target);
         Assert.Equal(definition.Technologies.Order(StringComparer.Ordinal), detected.Technologies.Order(StringComparer.Ordinal));
         var actual = detected.InstallGates.SelectMany(report => report.Values).GroupBy(pair => pair.Key, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => group.SelectMany(pair => pair.Value).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray(), StringComparer.Ordinal);
         Assert.Equal(definition.Gates.Keys.Order(StringComparer.Ordinal), actual.Keys.Order(StringComparer.Ordinal));
         foreach (var (key, values) in definition.Gates)
             Assert.Equal(values.Order(StringComparer.Ordinal), actual[key]);
-        if (name == "uno-conflicting-gates")
+        if (definition.Name == "uno-conflicting-gates")
             Assert.Equal(3, detected.Warnings.Count);
     }
 
@@ -42,34 +47,24 @@ public sealed class PackageFixtureSupportTests
     }
 
     [Fact]
-    public void CandidatePreviewStableSkipIdentifiesOnlyTheKnownPreCompanionRelease()
+    public void MigrationExpectationsDoNotRewriteHistoricalDetectionOrFreshTriggers()
     {
-        const string commit = "ebc711fb6db0912cae2b0c2bc4991d57d5afa007";
-        SourceIdentity source = new(SourceOracle.OwnRepository, "v2.2.0", commit);
-        string? reason = PackageScenario.StableTransitionSkipReason("candidate-preview-stable", source);
-        Assert.NotNull(reason);
-        Assert.Contains($"{source.Repository}@v2.2.0 ({commit})", reason, StringComparison.Ordinal);
-        Assert.Contains("no stable transition was verified", reason, StringComparison.Ordinal);
+        const string id = "agentic-check-2.2.0-2026-09-14-capture02";
+        string path = Path.Combine(FixtureFiles.Checkout, "tests/fixtures/baselines", id, "aspnetcore-test-exclusion/metadata.json");
+        var historical = FixtureFiles.ReadJson<FixtureCapture>(path).Definition;
+        var expected = MigrationExpectations.ForBaseline(id, historical);
 
-        foreach (string scenario in PackageFixtureTests.BuildScenarios(null).Select(row => (string)row[1]).Distinct(StringComparer.Ordinal))
-        {
-            if (scenario != "candidate-preview-stable")
-                Assert.Null(PackageScenario.StableTransitionSkipReason(scenario, source));
-        }
+        Assert.Equal(["foundation", "dotnet"], historical.Technologies);
+        Assert.Equal(["foundation", "dotnet", "aspnetcore"], expected.Technologies);
+        Assert.Equal(historical.Agents, expected.Agents);
+        Assert.Equal(historical.BaselinePreview, expected.BaselinePreview);
+        Assert.Same(historical, MigrationExpectations.ForBaseline("another-baseline", historical));
+        var unaffected = historical with { Name = "dotnet-library" };
+        Assert.Same(unaffected, MigrationExpectations.ForBaseline(id, unaffected));
     }
 
-    [Theory]
-    [InlineData(SourceOracle.OwnRepository, "v2.3.0", "ebc711fb6db0912cae2b0c2bc4991d57d5afa007")]
-    [InlineData(SourceOracle.OwnRepository, "v2.2.1", "ebc711fb6db0912cae2b0c2bc4991d57d5afa007")]
-    [InlineData(SourceOracle.OwnRepository, "v2.2.0-preview.1", "ebc711fb6db0912cae2b0c2bc4991d57d5afa007")]
-    [InlineData(SourceOracle.OwnRepository, "main", "ebc711fb6db0912cae2b0c2bc4991d57d5afa007")]
-    [InlineData(SourceOracle.OwnRepository, "v2.2.0", "1111111111111111111111111111111111111111")]
-    [InlineData("dotnet/skills", "v2.2.0", "ebc711fb6db0912cae2b0c2bc4991d57d5afa007")]
-    public void OtherStableSourcesDoNotSkipCandidatePreviewStable(string repository, string reference, string commit)
-        => Assert.Null(PackageScenario.StableTransitionSkipReason("candidate-preview-stable", new(repository, reference, commit)));
-
     [Fact]
-    public void InstalledSnapshotsMatchFrozenInventoriesAndTriggerHashes()
+    public void InstalledSnapshotsMatchFrozenInventoriesAndCandidateDetection()
     {
         string root = Path.Combine(FixtureFiles.Checkout, "tests/fixtures/baselines");
         Assert.True(Directory.Exists(root), "Prepare at least one baseline collection.");
@@ -91,6 +86,8 @@ public sealed class PackageFixtureSupportTests
                 Assert.True(FixtureFiles.EqualInventory(metadata.Files, FixtureFiles.Inventory(snapshot)));
                 foreach (var (path, hash) in metadata.TriggerHashes)
                     Assert.Equal(hash, FixtureFiles.Hash(Path.Combine(snapshot, path)));
+                BaselinePreparation.VerifyReport(metadata.Report, metadata.Definition);
+                AssertDetection(MigrationExpectations.ForBaseline(collection.Id, metadata.Definition), snapshot);
                 Assert.DoesNotContain(metadata.Files.Keys, path => path.Split('/').Any(part => part is ".git" or "bin" or "obj") || path.EndsWith(".nupkg", StringComparison.Ordinal));
                 if (!collection.Definition.CompanionExpected)
                     Assert.Null(metadata.Companion);
@@ -111,6 +108,30 @@ public sealed class PackageFixtureSupportTests
         Assert.True(left.Equals(right));
         Assert.Equal(body, installedBody);
         Assert.NotEqual(body, SourceOracle.ParseSkill(injected.Replace("Keep  ", "Keep ", StringComparison.Ordinal)).Body);
+    }
+
+    [Fact]
+    public void StableSwitchRetainsVerifiedPreviewSkillsButRejectsMissingOrUnexpectedDirectories()
+    {
+        using FixtureWorkspace workspace = new();
+        const string agent = ".agents/skills";
+        string preview = Path.Combine(workspace.Target, agent, "preview-only");
+        _ = Directory.CreateDirectory(preview);
+        File.WriteAllText(Path.Combine(preview, "SKILL.md"), "Verified preview installation");
+        var previous = FixtureFiles.Inventory(workspace.Target);
+        string stable = Path.Combine(workspace.Target, agent, "stable");
+        _ = Directory.CreateDirectory(stable);
+        File.WriteAllText(Path.Combine(stable, "SKILL.md"), "Stable installation");
+        string[] expected = [agent + "/stable"];
+
+        PackageScenario.VerifySkillDirectoryInventory(workspace.Target, agent, expected, previous);
+        _ = Assert.Throws<InvalidDataException>(() => PackageScenario.VerifySkillDirectoryInventory(workspace.Target, agent, expected, null));
+        Directory.Delete(preview, true);
+        _ = Assert.Throws<InvalidDataException>(() => PackageScenario.VerifySkillDirectoryInventory(workspace.Target, agent, expected, previous));
+        _ = Directory.CreateDirectory(preview);
+        File.WriteAllText(Path.Combine(preview, "SKILL.md"), "Verified preview installation");
+        _ = Directory.CreateDirectory(Path.Combine(workspace.Target, agent, "unexpected"));
+        _ = Assert.Throws<InvalidDataException>(() => PackageScenario.VerifySkillDirectoryInventory(workspace.Target, agent, expected, previous));
     }
 
     [Theory]

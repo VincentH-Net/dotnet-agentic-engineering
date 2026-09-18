@@ -137,7 +137,7 @@ public sealed class ToolSelectionTests
         var skills = includeConsumer ? new[] { CompanionTests.Consumer(), companion, DnaInstaller.Action(new(null)) }
             : [companion, DnaInstaller.Action(new(null))];
         RecommendationSelectionState state = new(RecommendationSelectionPrompt.BuildItems(
-            [new("foundation-prompt-log", DirectiveStatuses.Missing, "content")], skills));
+            [new("foundation-prompt-log", DirectiveStatuses.Missing, "dotnet agentic prompt-log show -m 2.3")], skills));
         if (clearSelection)
             state.Apply(new(SkillSelectionCommand.SelectNone));
         return state;

@@ -1,0 +1,10 @@
+{
+  "aspnetcore-test-exclusion": {
+    "technologies": [
+      "foundation",
+      "dotnet",
+      "aspnetcore"
+    ],
+    "gates": {}
+  }
+}
