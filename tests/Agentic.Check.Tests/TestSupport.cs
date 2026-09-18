@@ -354,6 +354,8 @@ static class CompanionTestCommands
 {
     internal static CommandResult Succeed(IReadOnlyList<string> arguments, string target)
     {
+        if (arguments.Contains("--global"))
+            return new(0, arguments[1] == "list" ? "{\"version\":1,\"data\":[{\"packageId\":\"InnoWvate.Dna\",\"version\":\"1.0.0\",\"commands\":[\"dna\"]}]}" : string.Empty, string.Empty);
         if (arguments[1] is "install" or "update")
         {
             string manifest = CompanionInstaller.ManifestPath(target);

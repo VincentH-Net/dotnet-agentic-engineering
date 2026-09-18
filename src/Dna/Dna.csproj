@@ -4,29 +4,23 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <PackAsTool>true</PackAsTool>
-    <ToolCommandName>agentic-check</ToolCommandName>
-    <PackageId>Agentic.Check</PackageId>
-    <Title>Agentic Check</Title>
-    <Version>2.3.0</Version>
+    <ToolCommandName>dna</ToolCommandName>
+    <PackageId>InnoWvate.Dna</PackageId>
+    <Title>dna</Title>
+    <Version>1.0.0</Version>
     <Authors>Vincent Hoogendoorn</Authors>
     <Company>InnoWvate.NET</Company>
     <Copyright>Copyright © 2026 Vincent Hoogendoorn / InnoWvate.NET</Copyright>
-    <Description>Optimizes your repo for agentic engineering with .NET - based technologies.</Description>
+    <Description>Global shorthand command for the repo-local dotnet agentic tool and the latest Agentic.Check.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/VincentH-Net/dotnet-agentic-engineering</PackageProjectUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageTags>agentic-check;agentic;dotnet-tool;dotnet;cli;skills;directives;github;repo;doctor;check;codex;claude-code;gh skills</PackageTags>
+    <PackageTags>dna;agentic;dotnet-tool;dotnet;cli</PackageTags>
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/VincentH-Net/dotnet-agentic-engineering</RepositoryUrl>
-    <PackageReleaseNotes>https://github.com/VincentH-Net/dotnet-agentic-engineering/releases/tag/v$(Version)</PackageReleaseNotes>
-    <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="/" />
+    <Compile Include="../Shared/ToolLauncher.cs" Link="ToolLauncher.cs" />
   </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="Spectre.Console" Version="0.57.1" />
-    <PackageReference Include="System.CommandLine" Version="2.0.9" />
-  </ItemGroup>
-  <ItemGroup><Compile Include="../Shared/ToolVersion.cs" Link="ToolVersion.cs" /></ItemGroup>
 </Project>

@@ -1,17 +1,27 @@
 # InnoWvate.Agentic 2.3.0
 
-A .NET 10 local tool for deterministic prompt logging. Agentic.Check installs and updates it
+A .NET 10 local tool for deterministic prompt logging and launching Agentic.Check. Agentic.Check installs and updates it
 before applying dependent directives or skills. After cloning, run `dotnet tool restore` in the
 target directory to restore the exact version recorded in `.config/dotnet-tools.json`.
 Run from that target or a child folder:
 
 ```bash
 dotnet agentic --help
+dotnet agentic check
 dotnet agentic prompt-log wrap --input - -m 2.3
 dotnet agentic prompt-log wrap --input prompt-log-input.txt --prompt-log prompt-log-block.txt -m 2.3
 dotnet agentic prompt-log show --since 2026-01-01 -m 2.3
 dotnet agentic prompt-log check --commit HEAD -m 2.3
 ```
+
+`dotnet agentic check <args>` delegates to `dotnet tool exec Agentic.Check -- <args>`,
+using the latest stable package through normal .NET resolution and caching, as with
+`dnx Agentic.Check`. All Check arguments, including `--help`, pass through unchanged.
+The selected SDK must be .NET 10 or later; check `global.json` if an older SDK is selected.
+Standard streams, working directory, and the child exit code are preserved.
+
+The optional global [dna shorthand](../Dna/README.md) makes `dna <args>` equivalent to
+the repo-local `dotnet agentic <args>`. `dna check` also works before a local companion exists.
 
 `wrap` reads one complete, already-sanitized raw log. Use the harness's process-input API for
 stdin; no JSON encoding, per-entry files, shell variables, pipes, or shell redirection are
@@ -36,7 +46,7 @@ the commit message and never writes Git history or configuration.
 committer datetime (including offset), and validation/legacy label, followed by its unescaped
 text and a display separator. It omits ordinary commit content and trailers. Historical JSON
 logs are decoded and numbered standalone logs retain their raw text. Malformed logs are reported
-on stderr; other logs are still displayed and the command returns failure. `check` validates
+on stderr; other logs are still displayed and the command returns failure. `prompt-log check` validates
 framing and escaping only; no log is a successful notice. Historical content is not a current
 instruction, and storage escaping is for format integrity, not prompt-injection prevention.
 
@@ -95,4 +105,4 @@ Agentic.Check stable mode resolves `2.*`; preview resolves `2.*-*`. These allow 
 minors. The SDK chooses the highest matching version across configured feeds: a stable release
 can outrank an earlier preview. Use uniquely versioned fixture packages and isolated caches in
 tests. Updates may downgrade a manual wrong-major or preview installation; restores use the exact
-recorded version. This release implements prompt logging only.
+recorded version. The shorthand package is independently versioned and always uses stable resolution.

@@ -58,6 +58,7 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
         await workspace.InitializeAsync().ConfigureAwait(false);
         workspace.Environment["AGENTIC_CHECK_CACHE_SECONDS"] = "3600";
         workspace.AddPackage(candidate.Companion);
+        workspace.AddPackage(candidate.Dna);
         executable = await workspace.InstallCheckAsync(candidate.Check).ConfigureAwait(false);
         if (baseline?.Companion is { } previous)
         {
@@ -188,7 +189,8 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
             || dryReport.GetProperty("directiveSummary").GetProperty("outdatedCount").GetInt32() > 0
             || dryReport.GetProperty("missingSkills").GetArrayLength() > 0 || preview
             || dryReport.GetProperty("actions").EnumerateArray().Any(action => action.GetString()!.StartsWith("Would install ", StringComparison.Ordinal))
-            || (dryReport.TryGetProperty("companion", out var companion) && companion.ValueKind == JsonValueKind.Object);
+            || (dryReport.TryGetProperty("companion", out var companion) && companion.ValueKind == JsonValueKind.Object)
+            || (dryReport.TryGetProperty("dna", out var dna) && dna.ValueKind == JsonValueKind.Object);
         if (hasActions)
         {
             await auto.WaitUntilTextAsync("select which to apply:").ConfigureAwait(false);
@@ -361,6 +363,16 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
             if (baseline?.Companion is null && scenario is "migration" or "preview-preview")
                 FixtureFiles.Require(report.GetProperty("companion").GetProperty("action").GetString() == "install", "Pre-companion migration must be first installation.");
             await CompanionRoundTripAsync(workspace, candidate.Companion).ConfigureAwait(false);
+            var dna = report.GetProperty("dna");
+            FixtureFiles.Require(dna.GetProperty("success").GetBoolean() && !dna.GetProperty("skipped").GetBoolean(), "Default shorthand installation/update did not succeed.");
+            FixtureFiles.Require(dna.GetProperty("resolvedVersion").GetString() == candidate.Dna.Version, "Wrong shorthand package version.");
+            string globalTools = Path.Combine(workspace.Environment["DOTNET_CLI_HOME"], ".dotnet", "tools");
+            string installedDna = Directory.GetFiles(globalTools, "*.nupkg", SearchOption.AllDirectories)
+                .Single(path => Path.GetFileName(path).Equals($"{candidate.Dna.Id}.{candidate.Dna.Version}.nupkg", StringComparison.OrdinalIgnoreCase));
+            FixtureFiles.Require(FixtureFiles.Hash(installedDna) == candidate.Dna.Sha256, "SDK installed different shorthand package bytes.");
+            string launcher = Path.Combine(globalTools, OperatingSystem.IsWindows() ? "dna.exe" : "dna");
+            string version = await workspace.Process.SuccessAsync(launcher, ["--version"], workspace.Target).ConfigureAwait(false);
+            FixtureFiles.Require(version.Split('+')[0] == candidate.Companion.Version.Split('+')[0], "Shorthand did not run the repo-local companion.");
         }
         FixtureFiles.WriteJson(Path.Combine(FixtureFiles.Reports, runId + "-installed-sources.json"), origins);
     }

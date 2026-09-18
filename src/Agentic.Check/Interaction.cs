@@ -5,6 +5,8 @@ namespace Agentic.Check;
 
 interface IUserPrompts
 {
+    bool IsInteractive => true;
+
     Task<bool> ConfirmAsync(string prompt, bool defaultValue, CancellationToken cancellationToken);
 
     Task<RecommendationSelectionResult> SelectRecommendationsAsync(
@@ -23,6 +25,8 @@ sealed record RecommendationSelectionResult(
 
 sealed class SpectreUserPrompts(IAnsiConsole console) : IUserPrompts
 {
+    public bool IsInteractive => console.Profile.Capabilities.Interactive && !Console.IsInputRedirected;
+
     public Task<bool> ConfirmAsync(string prompt, bool defaultValue, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();

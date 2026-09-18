@@ -75,7 +75,7 @@ public sealed class PackageFixtureTests(ITestOutputHelper output)
         var budget = await FixtureAuthentication.Shared.RequireAsync().ConfigureAwait(true);
         output.WriteLine($"Preflight authenticated GitHub core budget: {budget.Remaining}/{budget.Limit}, reset {DateTimeOffset.FromUnixTimeSeconds(budget.Reset):O}");
         var candidate = await CandidateInputs.LoadAsync().ConfigureAwait(true);
-        output.WriteLine($"{candidate.Configuration}: origin/{candidate.Branch}@{candidate.Commit}\nCheck: {candidate.Check.Path} SHA256 {candidate.Check.Sha256}\nCompanion: {candidate.Companion.Path} SHA256 {candidate.Companion.Sha256}");
+        output.WriteLine($"{candidate.Configuration}: origin/{candidate.Branch}@{candidate.Commit}\nCheck: {candidate.Check.Path} SHA256 {candidate.Check.Sha256}\nCompanion: {candidate.Companion.Path} SHA256 {candidate.Companion.Sha256}\nDna: {candidate.Dna.Path} SHA256 {candidate.Dna.Sha256}");
         using PackageScenario run = new(candidate, fixture, scenario, output.WriteLine, TestRun);
         try
         {
@@ -93,6 +93,7 @@ public sealed class PackageFixtureTests(ITestOutputHelper output)
         {
             candidate.Check.Verify();
             candidate.Companion.Verify();
+            candidate.Dna.Verify();
             run.VerifyBaselineUnchanged();
         }
     }

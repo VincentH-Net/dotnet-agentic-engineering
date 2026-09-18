@@ -116,3 +116,9 @@ MIT
 framing and returns a block via stdout or a file. Agentic.Check 2.3.0 installs its local prerequisite before applying prompt-log
 content and validates compatibility against that content's source version. Restore cloned local
 tools with `dotnet tool restore`. The companion prepares log blocks; agents retain control of Git.
+
+`dotnet agentic check` runs the latest stable Agentic.Check, equivalent to `dnx Agentic.Check`.
+The optional [dna shorthand command](src/Dna/README.md), packaged as `InnoWvate.Dna` 1.0.0,
+forwards normal commands to the repo-local companion. `dna check` can bootstrap a repo before
+the companion is installed. Agentic.Check selects the shorthand action with the companion;
+deselect it to opt out. Both check shortcuts require a .NET 10 or later selected SDK.

@@ -87,6 +87,27 @@ installed consumer's literal `-m`/`--minver` requirement. Confirmed stable skill
 same prerequisites even when no recommendations were selected. Declining updates does not install
 their prerequisites. No global launcher, PATH edits, or activation scripts are needed.
 
+## Optional dna shorthand command
+
+The `dna` shorthand for `dotnet agentic` action is selected by default with the companion.
+You can deselect it while keeping the companion; deselecting the companion also deselects
+its shorthand. Repos with an existing companion can opt into the shorthand without
+reinstalling the companion. It is a separate global launcher, `InnoWvate.Dna`, independently
+versioned from 1.0.0. Its selected action installs the latest stable package, or updates
+an existing verified installation to the latest stable version, including during preview.
+
+Before installation, Agentic.Check inspects PATH (and Windows PATHEXT) without executing
+any discovered `dna`. A conflicting command's path is shown with an “Install anyway?” choice
+and a warning that it may hide the shorthand. Declining deselects only the shorthand.
+`--yes` and noninteractive runs skip a conflicting shorthand action with a warning.
+Shell profiles and PATH ordering are never changed. JSON reports include `dna` status,
+conflicts, installed/resolved version, and skip/error information.
+
+`dna <args>` uses the repo-local companion. Both `dna check <args>` and
+`dotnet agentic check <args>` invoke the latest stable Agentic.Check through
+`dotnet tool exec`, preserving arguments and standard streams. `dna check` works without
+a local companion. A .NET 10 or later SDK must be selected in the current directory.
+
 For development, add the locally packed companion folder to the target's `nuget.config`; see the
 [companion README](../Agentic/README.md). Highest-version resolution spans all configured feeds, so
 use unique test versions and isolated caches. Publish the matching package before exposing new

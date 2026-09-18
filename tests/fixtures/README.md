@@ -131,7 +131,7 @@ dotnet run --no-build --project tests/Agentic.FixturePreparation -- pack-candida
 
 The last command validates the actual remote branch against HEAD (not a cached tracking ref),
 checks the expected HTTPS/SSH origin and non-default branch, rejects dirty production/content
-inputs, and packs both projects exactly once. Unrelated untracked documents are outside these
+inputs, and packs all three tool projects exactly once. Unrelated untracked documents are outside these
 inputs and remain untouched. It passes RepositoryCommit into NuGet metadata and writes
 `candidate-build.json` with configuration, branch, SHA, package IDs/versions and hashes.
 It checks source identity again after packing and refuses an existing output directory.
@@ -145,6 +145,7 @@ push, package directory and affected verification; no candidate is rewritten or 
 | --- | --- |
 | `AGENTIC_E2E_CHECK_PACKAGE` | Absolute exact Agentic.Check nupkg path. |
 | `AGENTIC_E2E_COMPANION_PACKAGE` | Absolute exact InnoWvate.Agentic nupkg path. |
+| `AGENTIC_E2E_DNA_PACKAGE` | Absolute exact InnoWvate.Dna nupkg path. |
 | `AGENTIC_E2E_BUILD_MANIFEST` | Optional manifest path; defaults beside Check to candidate-build.json. |
 | `AGENTIC_E2E_BASELINE` | Explicit collection ID for migration; not needed by fresh scenarios. |
 | `AGENTIC_E2E_SOURCE_CHECKOUT` | Optional explicit checkout; otherwise discovered from test binaries. |
@@ -187,6 +188,7 @@ this repository's CLI skill, external test skills, directives, and the companion
 export AGENTIC_E2E_NETWORK=1
 export AGENTIC_E2E_CHECK_PACKAGE=/absolute/candidates/Agentic.Check.<version>.nupkg
 export AGENTIC_E2E_COMPANION_PACKAGE=/absolute/candidates/InnoWvate.Agentic.<version>.nupkg
+export AGENTIC_E2E_DNA_PACKAGE=/absolute/candidates/InnoWvate.Dna.1.0.0.nupkg
 export AGENTIC_E2E_BASELINE=agentic-check-2.2.0-<UTC-date>-<capture>
 AGENTIC_E2E_FIXTURE=dotnet-cli AGENTIC_E2E_SCENARIO=fresh \
   dotnet test tests/Agentic.Check.LiveTests --filter 'Category=PackageNetwork' \

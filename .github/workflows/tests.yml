@@ -21,6 +21,7 @@ jobs:
       - run: dotnet test tests/Agentic.Check.LiveTests/Agentic.Check.LiveTests.csproj
       - run: dotnet pack src/Agentic/Agentic.csproj --configuration Release
       - run: dotnet pack src/Agentic.Check/Agentic.Check.csproj --configuration Release
+      - run: dotnet pack src/Dna/Dna.csproj --configuration Release
       - uses: actions/upload-artifact@v4
         if: always()
         with:

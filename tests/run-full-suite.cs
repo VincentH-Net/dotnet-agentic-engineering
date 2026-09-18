@@ -30,7 +30,7 @@ _ = Directory.CreateDirectory(reports);
 File.WriteAllText(summary, $"Full suite (C#)\nBaseline: {baseline}\n");
 
 string[] projects = ["Agentic.Tests", "Agentic.Check.Tests", "Agentic.LiveTests", "Agentic.Check.LiveTests"];
-string[] packageKinds = ["check", "companion"];
+string[] packageKinds = ["check", "companion", "dna"];
 List<string> failedCommands = [];
 Dictionary<string, string?> settings = new(StringComparer.Ordinal)
 {
@@ -63,7 +63,7 @@ try
         return result;
     }
 
-    foreach (var (id, variable) in new[] { ("Agentic.Check", "AGENTIC_E2E_CHECK_PACKAGE"), ("InnoWvate.Agentic", "AGENTIC_E2E_COMPANION_PACKAGE") })
+    foreach (var (id, variable) in new[] { ("Agentic.Check", "AGENTIC_E2E_CHECK_PACKAGE"), ("InnoWvate.Agentic", "AGENTIC_E2E_COMPANION_PACKAGE"), ("InnoWvate.Dna", "AGENTIC_E2E_DNA_PACKAGE") })
     {
         string[] packages = Directory.GetFiles(candidates, id + ".*.nupkg");
         if (packages.Length != 1)

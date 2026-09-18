@@ -25,7 +25,8 @@ sealed class CheckWorkflow(
     IReporter reporter,
     IDirectiveSource? directiveSource = null,
     ISourceVersionResolver? sourceVersionResolver = null,
-    IReadOnlyList<SkillManifestEntry>? skillManifest = null)
+    IReadOnlyList<SkillManifestEntry>? skillManifest = null,
+    DnaInstaller? dnaInstaller = null)
 {
     static readonly JsonSerializerOptions ReportSerializerOptions = new(JsonSerializerDefaults.Web)
     {
@@ -169,6 +170,7 @@ sealed class CheckWorkflow(
         DirectiveInstaller directiveInstaller = new(contentSource, reporter);
         CompanionSourceVersionReader companionVersions = new(contentSource);
         CompanionInstaller companionInstaller = new(authenticatedRunner);
+        var shorthandInstaller = dnaInstaller ?? new DnaInstaller(authenticatedRunner);
         Dictionary<string, bool> prerequisiteResults = new(StringComparer.Ordinal);
 
         async Task<bool> EnsureCompanionAsync(string sourceRef, ToolVersion? localRequirement, bool restoreOnly)
@@ -285,10 +287,12 @@ sealed class CheckWorkflow(
             ? [.. recommended.Select(skill => skill with { RecommendationAction = missing.Contains(skill) ? "install" : "re-install" })]
             : BuildStableSkillActions(recommended, missing, stableSwitchSkills);
         ToolVersion? repairRequirement = null;
+        string? installedCompanion = null;
         bool restoreOnly = false;
         string? repairError = null;
         try
         {
+            installedCompanion = CompanionInstaller.InstalledVersion(targetDirectory);
             List<string> installedConsumers = [];
             foreach (var directive in directivePlan.Directives.Where(d => CompanionDependency.ForDirective(d.Name).Count > 0))
             {
@@ -321,7 +325,7 @@ sealed class CheckWorkflow(
             if (installedConsumers.Count > 0)
             {
                 repairRequirement = CompanionDependency.ReadLocalRequirement(installedConsumers);
-                string? installed = CompanionInstaller.InstalledVersion(targetDirectory);
+                string? installed = installedCompanion;
                 restoreOnly = installed is not null && ToolVersion.Parse(installed).Satisfies(repairRequirement);
                 if (restoreOnly)
                 {
@@ -358,6 +362,15 @@ sealed class CheckWorkflow(
             }
 
             recommendedSkillActions = [.. recommendedSkillActions, CompanionDependency.Action(hasDependentRecommendations ? "install/update" : restoreOnly ? "restore" : "repair") with { Version = status }];
+        }
+
+        DnaInstallation? dnaInstallation = null;
+        if (recommendedSkillActions.Any(skill => skill.IsCompanion) || installedCompanion is not null)
+        {
+            // An already installed companion satisfies this dependency even when there is
+            // no companion action. Existing repos can still opt into or update the shorthand.
+            dnaInstallation = await shorthandInstaller.InspectAsync(targetDirectory, cancellationToken).ConfigureAwait(false);
+            recommendedSkillActions = [.. recommendedSkillActions, DnaInstaller.Action(dnaInstallation)];
         }
 
         IReadOnlyList<DirectivePlanItem> selectedDirectives = [];
@@ -402,9 +415,9 @@ sealed class CheckWorkflow(
         if (selectedSkills.Any(skill => skill.IsCompanion))
         {
             bool selectedConsumer = selectedDirectives.Any(d => CompanionDependency.ForDirective(d.Name).Count > 0)
-                || selectedSkills.Any(skill => skill.Dependencies.Contains(CompanionDependency.Identity));
+                || selectedSkills.Any(skill => !skill.IsDna && skill.Dependencies.Contains(CompanionDependency.Identity));
             string selectedRef = selectedDirectives.FirstOrDefault(d => CompanionDependency.ForDirective(d.Name).Count > 0)?.SourceRef
-                ?? selectedSkills.FirstOrDefault(skill => skill.Dependencies.Contains(CompanionDependency.Identity))?.ResolvedSourceRef
+                ?? selectedSkills.FirstOrDefault(skill => !skill.IsDna && skill.Dependencies.Contains(CompanionDependency.Identity))?.ResolvedSourceRef
                 ?? sourceVersion?.ResolvedSourceRef ?? string.Empty;
             if (repairError is not null && !selectedConsumer)
             {
@@ -422,7 +435,40 @@ sealed class CheckWorkflow(
             }
         }
 
-        selectedSkills = [.. selectedSkills.Where(skill => !skill.IsCompanion)];
+        if (report.Companion?.Success == false)
+            selectedSkills = [.. selectedSkills.Where(skill => !skill.IsDna)];
+
+        if (selectedSkills.Any(skill => skill.IsDna))
+        {
+            var dna = await shorthandInstaller.EnsureAsync(dnaInstallation!, targetDirectory, options.DryRun, options.Yes, prompts, cancellationToken).ConfigureAwait(false);
+            report.Dna = dna;
+            string description = $"{(options.DryRun ? "Would " : string.Empty)}{dna.Action} {DnaInstaller.PackageId} globally (`dna` shorthand for `dotnet agentic`)";
+            if (dna.Skipped)
+                description = dna.Error!;
+            report.Actions.Add(description);
+            foreach (string conflict in dna.Conflicts)
+            {
+                string warning = $"The dna command at {conflict} may hide the shorthand.";
+                report.Warnings.Add(warning);
+                reporter.Warning(warning);
+            }
+            if (dna.Skipped)
+            {
+                reporter.Warning(description);
+            }
+            else if (!dna.Success)
+            {
+                reporter.Error(dna.Error!);
+            }
+            else
+            {
+                reporter.Success(description);
+                if (!options.DryRun)
+                    reporter.Info($"Global launcher: {shorthandInstaller.CommandPath}. Its directory must be on PATH to use dna.");
+            }
+        }
+
+        selectedSkills = [.. selectedSkills.Where(skill => !skill.IsCompanion && !skill.IsDna)];
 
         var directiveResult = await directiveInstaller
             .ApplyAsync(directivePlan, selectedDirectives.Select(directive => directive.Name), options.DryRun, cancellationToken)
@@ -458,7 +504,7 @@ sealed class CheckWorkflow(
             }
 
             await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
-            return new CheckRunResult(report.Companion?.Success == false ? 1 : 0, report);
+            return new CheckRunResult(report.Companion?.Success == false || report.Dna?.Success == false ? 1 : 0, report);
         }
 
         if (selectedSkills.Count > 0)
@@ -532,7 +578,7 @@ sealed class CheckWorkflow(
             }, cancellationToken).ConfigureAwait(false);
         }
 
-        int exitCode = report.Companion?.Success == false || report.SkillUpdates.Any(result => !result.Success) || report.InstallResults.Any(result => !result.Success) || report.SkillCopyResults.Any(result => !result.Success) ? 1 : 0;
+        int exitCode = report.Companion?.Success == false || report.Dna?.Success == false || report.SkillUpdates.Any(result => !result.Success) || report.InstallResults.Any(result => !result.Success) || report.SkillCopyResults.Any(result => !result.Success) ? 1 : 0;
         await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
         return new CheckRunResult(exitCode, report);
     }

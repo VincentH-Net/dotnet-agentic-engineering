@@ -64,6 +64,10 @@ Initial review dates were inferred from manifest history and do not prove that e
 
 ## Deterministic terminal regression tests
 
+The recorded installer scenarios also cover default shorthand selection, opting out while
+retaining the companion, and a PATH collision with explicit acceptance, rejection, or `--yes`.
+The unknown command writes a marker if executed; every collision test asserts that it was never run.
+
 Run `dotnet test tests/Agentic.Check.LiveTests/Agentic.Check.LiveTests.csproj` for the offline tests
 and Hex1b terminal suite. GitHub responses are seeded in a per-test cache from working-tree source;
 `gh` and companion SDK operations use isolated executable fixtures. Agentic.Check runs through its

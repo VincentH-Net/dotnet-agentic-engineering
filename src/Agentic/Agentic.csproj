@@ -11,9 +11,10 @@
          Keep it explicit here (no imports/expressions); update consumer -m values when major/minor changes.
          If this file moves, update Agentic.Check's source path; contract tests verify both. -->
     <Version>2.3.0</Version>
-    <Authors>VincentH-Net</Authors>
-    <Copyright>Copyright © VincentH.NET</Copyright>
-    <Description>Deterministic prompt-log wrapping, history display, and validation for coding agents.</Description>
+    <Authors>Vincent Hoogendoorn</Authors>
+    <Company>InnoWvate.NET</Company>
+    <Copyright>Copyright © 2026 Vincent Hoogendoorn / InnoWvate.NET</Copyright>
+    <Description>Repo-local agentic tooling: prompt-log wrapping, history display, validation, and delegation to Agentic.Check.</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/VincentH-Net/dotnet-agentic-engineering</PackageProjectUrl>
     <PackageReadmeFile>README.md</PackageReadmeFile>
@@ -30,4 +31,5 @@
     <PackageReference Include="System.CommandLine" Version="2.0.9" />
   </ItemGroup>
   <ItemGroup><Compile Include="../Shared/ToolVersion.cs" Link="ToolVersion.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="../Shared/ToolLauncher.cs" Link="ToolLauncher.cs" /></ItemGroup>
 </Project>

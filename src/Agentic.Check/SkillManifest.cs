@@ -54,6 +54,8 @@ sealed record SkillManifestEntry
 
     public bool IsCompanion => Key == CompanionDependency.Identity.Key;
 
+    public bool IsDna => Key == DnaInstaller.Identity.Key;
+
     public string RecommendationAction { get; init; }
 
     public bool ForceInstall { get; init; }

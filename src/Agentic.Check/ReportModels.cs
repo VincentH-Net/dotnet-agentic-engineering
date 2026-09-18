@@ -8,6 +8,8 @@ sealed class AgenticCheckReport
 
     public CompanionReport? Companion { get; set; }
 
+    public DnaReport? Dna { get; set; }
+
     public string? RepoRoot { get; set; }
 
     public string? SkillsDirectory { get; set; }

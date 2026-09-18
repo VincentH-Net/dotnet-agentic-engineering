@@ -19,6 +19,8 @@ static class AgenticCli
         output ??= Console.Out;
         error ??= Console.Error;
         input ??= Console.In;
+        if (args is ["check", .. var checkArguments])
+            return await ToolLauncher.CheckAsync(checkArguments, directory ?? Environment.CurrentDirectory, error, cancellationToken).ConfigureAwait(false);
         runningVersion ??= typeof(AgenticCli).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion;
         var running = ToolVersion.Parse(runningVersion);
         Option<string?> minimum = new("--minver", "-m") { Recursive = true, Description = "Required major.minor; same major, this minor or later. Defaults to the running tool's major.minor." };
@@ -36,9 +38,10 @@ static class AgenticCli
                 result.AddError(exception.Message);
             }
         });
-        RootCommand root = new("Deterministic prompt logging. Git operations are read-only.");
+        RootCommand root = new("Repo-local agentic tooling. Prompt-log Git operations are read-only.");
         root.Options.OfType<VersionOption>().Single().Validators.Clear();
         root.Options.Add(minimum);
+        root.Subcommands.Add(new Command("check", "Run the latest stable Agentic.Check; all following arguments are forwarded."));
         Command prompt = new("prompt-log", "Wrap, display, and validate prompt logs.");
         root.Subcommands.Add(prompt);
         Option<string> inputFile = new("--input") { Required = true, Description = "Complete sanitized raw log file, or - for stdin. No per-entry encoding." };

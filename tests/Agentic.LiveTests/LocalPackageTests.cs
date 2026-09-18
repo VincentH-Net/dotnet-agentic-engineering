@@ -7,6 +7,7 @@ using System.Xml.Linq;
 using Agentic.Check;
 using Hex1b;
 using Hex1b.Automation;
+using Hex1b.Input;
 using Xunit.Abstractions;
 
 namespace Agentic.LiveTests;
@@ -150,26 +151,32 @@ public sealed class LocalPackageTests(ITestOutputHelper output)
         Assert.Empty(await File.ReadAllBytesAsync(destination).ConfigureAwait(true));
     }
 
-    [Fact]
-    public async Task PackagedCompanionRunsInRecordedTerminalFromLocalManifestAndChildFolder()
+    [SkippableTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task PackagedCompanionRunsInRecordedTerminalFromLocalManifestAndChildFolder(bool shorthand)
     {
-        if (OperatingSystem.IsWindows())
-        {
-            return;
-        }
+        Skip.If(OperatingSystem.IsWindows(), "Terminal interaction requires Bash on macOS/Linux.");
 
         using PackageWorkspace workspace = new();
         await workspace.PrepareAsync().ConfigureAwait(true);
         workspace.AddPackage("2.3.0");
+        string command = "dotnet agentic";
+        if (shorthand)
+        {
+            await workspace.AddToolAsync("Dna").ConfigureAwait(true);
+            await workspace.RunAsync("dotnet", ["tool", "install", DnaInstaller.PackageId, "--global"]).ConfigureAwait(true);
+            command = Quote(Path.Combine(workspace.CliHome, ".dotnet", "tools", "dna"));
+        }
         var installed = await new CompanionInstaller(workspace.Runner).EnsureAsync(workspace.Target, ToolVersion.ParseMinimum("2.3"), false, false, false, CancellationToken.None).ConfigureAwait(true);
         Assert.True(installed.Success, installed.Error);
         await workspace.RunAsync("git", ["init"]).ConfigureAwait(true);
         const string raw = "[red]literal[/] quotes \" \\ 漢字\n\nQ: Keep raw text?\nA: Yes.\n\nprompt-log-end:\n\\prompt-log-end:\nlast\n";
         await File.WriteAllTextAsync(Path.Combine(workspace.Target, "log.txt"), raw.Replace("\n", "\r\n", StringComparison.Ordinal)).ConfigureAwait(true);
-        string recording = Path.Combine(workspace.Checkout, "tests/Agentic.LiveTests/TestResults/recordings", $"companion-{Guid.NewGuid():N}.cast");
+        string recording = Path.Combine(workspace.Checkout, "tests/Agentic.LiveTests/TestResults/recordings", $"{(shorthand ? "dna" : "companion")}-{Guid.NewGuid():N}.cast");
         _ = Directory.CreateDirectory(Path.GetDirectoryName(recording)!);
         output.WriteLine($"Hex1b recording: {recording}");
-        await using (var terminal = Hex1bTerminal.CreateBuilder().WithHeadless().WithDimensions(180, 70)
+        var terminal = Hex1bTerminal.CreateBuilder().WithHeadless().WithDimensions(180, 70)
             .WithPtyProcess(options =>
             {
                 options.FileName = "/bin/bash";
@@ -177,7 +184,8 @@ public sealed class LocalPackageTests(ITestOutputHelper output)
                 options.WorkingDirectory = workspace.Target;
                 options.Environment = workspace.Environment;
             })
-            .WithAsciinemaRecording(recording, new AsciinemaRecorderOptions { Title = "Packaged dotnet agentic", Command = "dotnet agentic", IdleTimeLimit = 1 }).Build())
+            .WithAsciinemaRecording(recording, new AsciinemaRecorderOptions { Title = "Packaged agentic launcher", Command = command, IdleTimeLimit = 1 }).Build();
+        await using (terminal.ConfigureAwait(true))
         {
             using CancellationTokenSource cancellation = new(TimeSpan.FromSeconds(90));
             var run = terminal.RunAsync(cancellation.Token);
@@ -186,32 +194,43 @@ public sealed class LocalPackageTests(ITestOutputHelper output)
             {
                 string exports = string.Join(" ", workspace.Environment.Select(pair => pair.Key + "=" + Quote(pair.Value)));
                 _ = await CommandAsync("export " + exports, 0).ConfigureAwait(true);
-                string help = await CommandAsync("dotnet agentic --help", 0).ConfigureAwait(true);
+                string help = await CommandAsync(command + " --help", 0).ConfigureAwait(true);
                 Assert.Contains("--minver", help, StringComparison.Ordinal);
-                _ = await CommandAsync("dotnet agentic prompt-log wrap --input log.txt --prompt-log block.txt -m 2.3", 0).ConfigureAwait(true);
-                string wrapped = await CommandAsync("dotnet agentic prompt-log wrap --input - --minver 2.3 < log.txt", 0).ConfigureAwait(true);
+                _ = await CommandAsync(command + " prompt-log wrap --input log.txt --prompt-log block.txt -m 2.3", 0).ConfigureAwait(true);
+                string wrapped = await CommandAsync(command + " prompt-log wrap --input - --minver 2.3 < log.txt", 0).ConfigureAwait(true);
                 Assert.Contains("prompt-log-format: raw-v1", wrapped, StringComparison.Ordinal);
                 Assert.Contains("\\prompt-log-end:", wrapped, StringComparison.Ordinal);
                 string block = await File.ReadAllTextAsync(Path.Combine(workspace.Target, "block.txt")).ConfigureAwait(true);
                 Assert.Equal("prompt-log:\nprompt-log-format: raw-v1\n[red]literal[/] quotes \" \\ 漢字\n\nQ: Keep raw text?\nA: Yes.\n\n\\prompt-log-end:\n\\\\prompt-log-end:\nlast\n\nprompt-log-end:\n", block);
                 await File.WriteAllTextAsync(Path.Combine(workspace.Target, "message.txt"), "Fixture commit\n\n" + block + "\nReviewed-by: Fixture\n").ConfigureAwait(true);
                 _ = await CommandAsync("git -c user.name=Fixture -c user.email=fixture@example.invalid -c commit.cleanup=default commit --allow-empty -F message.txt", 0).ConfigureAwait(true);
-                string shown = await CommandAsync("dotnet agentic prompt-log show -m 2.3", 0).ConfigureAwait(true);
+                string shown = await CommandAsync(command + " prompt-log show -m 2.3", 0).ConfigureAwait(true);
                 Assert.Contains("[red]literal[/]", shown, StringComparison.Ordinal);
                 Assert.Contains("A: Yes.", shown, StringComparison.Ordinal);
                 Assert.Contains("valid prompt log", shown, StringComparison.Ordinal);
-                _ = await CommandAsync("dotnet agentic prompt-log check -m 2.3", 0).ConfigureAwait(true);
+                _ = await CommandAsync(command + " prompt-log check -m 2.3", 0).ConfigureAwait(true);
                 await File.WriteAllTextAsync(Path.Combine(workspace.Target, "old-message.txt"), "Historical JSON\n\nprompt-log:\n\"old first line\"\n\"\"\n\"old last line\"\n\nprompt-log-end:\n").ConfigureAwait(true);
                 _ = await CommandAsync("git -c user.name=Fixture -c user.email=fixture@example.invalid commit --allow-empty --cleanup=verbatim -F old-message.txt", 0).ConfigureAwait(true);
-                string historical = await CommandAsync("dotnet agentic prompt-log show -m 2.3", 0).ConfigureAwait(true);
+                string historical = await CommandAsync(command + " prompt-log show -m 2.3", 0).ConfigureAwait(true);
                 Assert.Contains("legacy prompt log (JSON)", historical, StringComparison.Ordinal);
                 Assert.Contains("old last line", historical, StringComparison.Ordinal);
-                _ = await CommandAsync("mkdir child && cd child && dotnet agentic --minver 2.3 prompt-log check", 0).ConfigureAwait(true);
-                _ = await CommandAsync("dotnet agentic prompt-log wrap --unknown", 2).ConfigureAwait(true);
-                string incompatible = await CommandAsync("dotnet agentic prompt-log wrap --input ../log.txt --prompt-log forbidden.txt -m 3.0", 1).ConfigureAwait(true);
+                _ = await CommandAsync("mkdir child && cd child && " + command + " --minver 2.3 prompt-log check", 0).ConfigureAwait(true);
+                _ = await CommandAsync(command + " prompt-log wrap --unknown", 2).ConfigureAwait(true);
+                string incompatible = await CommandAsync(command + " prompt-log wrap --input ../log.txt --prompt-log forbidden.txt -m 3.0", 1).ConfigureAwait(true);
                 Assert.Contains("incompatible", incompatible, StringComparison.Ordinal);
                 Assert.False(File.Exists(Path.Combine(workspace.Target, "child/forbidden.txt")));
-                _ = await CommandAsync("dotnet agentic prompt-log check --commit absent -m 2.3", 1).ConfigureAwait(true);
+                _ = await CommandAsync(command + " prompt-log check --commit absent -m 2.3", 1).ConfigureAwait(true);
+                if (shorthand)
+                {
+                    string interrupted = "INTERRUPTED_" + Guid.NewGuid().ToString("N");
+                    await auto.TypeAsync($"{command} prompt-log wrap --input - -m 2.3; printf '\\n{interrupted}:%s\\n' \"$?\"").ConfigureAwait(true);
+                    await auto.EnterAsync().ConfigureAwait(true);
+                    await auto.TypeAsync("interactive input awaiting cancellation").ConfigureAwait(true);
+                    await auto.WaitUntilTextAsync("interactive input awaiting cancellation").ConfigureAwait(true);
+                    await auto.Ctrl().KeyAsync(Hex1bKey.C).ConfigureAwait(true);
+                    await auto.WaitUntilTextAsync(interrupted + ":130").ConfigureAwait(true);
+                    _ = await CommandAsync(command + " --help", 0).ConfigureAwait(true);
+                }
             }
             finally
             {
@@ -271,6 +290,16 @@ sealed class PackageWorkspace : IDisposable
 
         XDocument config = new(new XElement("configuration", new XElement("packageSources", new XElement("clear"), new XElement("add", new XAttribute("key", "fixture"), new XAttribute("value", Feed)))));
         await File.WriteAllTextAsync(Path.Combine(Target, "nuget.config"), config.ToString()).ConfigureAwait(false);
+        await File.WriteAllTextAsync(Path.Combine(root, "nuget.config"), config.ToString()).ConfigureAwait(false);
+    }
+
+    internal async Task AddToolAsync(string project)
+    {
+        string output = Path.Combine(root, "packed", project);
+        var packed = await new ProcessCommandRunner().RunAsync("dotnet", ["pack", $"src/{project}/{project}.csproj", "-c", "Release", "-o", output], Checkout, CancellationToken.None).ConfigureAwait(false);
+        Assert.True(packed.Success, packed.StandardError + packed.StandardOutput);
+        string package = Directory.GetFiles(output, "*.nupkg").Single();
+        File.Copy(package, Path.Combine(Feed, Path.GetFileName(package)));
     }
 
     internal void AddPackage(string version, string packageId = CompanionDependency.PackageId, string command = "agentic")

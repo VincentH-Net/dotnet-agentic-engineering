@@ -182,7 +182,16 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
         }
         else
         {
+            bool companionSelected = SelectedSkills.Any(skill => skill.IsCompanion);
             SelectWithDependencies(key);
+            // Default the optional shorthand on when the companion becomes selected. This is
+            // a UI default, not a reverse dependency; later dependency closure preserves opt-out.
+            if (!companionSelected && SelectedSkills.Any(skill => skill.IsCompanion))
+            {
+                var dna = items.FirstOrDefault(item => item.Skill?.IsDna == true);
+                if (dna is not null)
+                    SelectWithDependencies(dna.Key);
+            }
         }
     }
 
@@ -216,7 +225,7 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
         => IsSpecialized = false;
 
     static bool IsTargetLocalRepair(RecommendationSelectionItem item)
-        => item.Skill?.IsCompanion == true
+        => item.Skill is { IsCompanion: true } or { IsDna: true }
             || item.Directive?.Status == DirectiveStatuses.Outdated
             || item.Skill?.ForceInstall == true;
 
@@ -442,7 +451,7 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
         items.AddRange(missingSkills.Select(skill => new RecommendationSelectionItem(
             RecommendationSelectionState.FormatSkillKey(skill.SourceRepo, skill.InstallArg),
             FormatSkillListItem(skill),
-            skill.IsCompanion ? RecommendationSelectionKind.Tool : RecommendationSelectionKind.Skill,
+            skill.IsCompanion || skill.IsDna ? RecommendationSelectionKind.Tool : RecommendationSelectionKind.Skill,
             null,
             skill,
             skill.Version)));
@@ -578,7 +587,7 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
                 lastSkillPlugin = null;
             }
 
-            if (item.Skill is { IsCompanion: false })
+            if (item.Skill is { IsCompanion: false, IsDna: false })
             {
                 string skillSourceRepo = item.Skill.SourceRepo;
                 bool showPluginHeaders = !visibleSkillSourceReposWithoutPluginHeaders.Contains(skillSourceRepo, StringComparer.OrdinalIgnoreCase);

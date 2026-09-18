@@ -83,7 +83,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
             await auto.WaitUntilTextAsync("[ ] foundation-prompt-log").ConfigureAwait(true);
             await auto.EnterAsync().ConfigureAwait(true);
         }).ConfigureAwait(true);
-        Assert.False(File.Exists(Path.Combine(workspace.RootPath, "tool.log")));
+        Assert.DoesNotContain(await File.ReadAllLinesAsync(Path.Combine(workspace.RootPath, "tool.log")).ConfigureAwait(true), line => !line.StartsWith("tool list ", StringComparison.Ordinal));
         Assert.False(File.Exists(CompanionInstaller.ManifestPath(workspace.RepoPath)));
         Assert.DoesNotContain("foundation-prompt-log:start", await workspace.ReadRepoFileAsync("AGENTS.md").ConfigureAwait(true), StringComparison.Ordinal);
         AssertRecordingWasWritten(workspace);
@@ -102,7 +102,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
         var dry = await RunCommandAsync(workspace, $"--dry-run --agents codex {Quote(workspace.RepoPath)}").ConfigureAwait(true);
         Assert.Contains("required 2.3, pattern 2.*", dry.Screen, StringComparison.Ordinal);
         Assert.False(File.Exists(CompanionInstaller.ManifestPath(workspace.RepoPath)));
-        Assert.False(File.Exists(Path.Combine(workspace.RootPath, "tool.log")));
+        Assert.DoesNotContain(await File.ReadAllLinesAsync(Path.Combine(workspace.RootPath, "tool.log")).ConfigureAwait(true), line => !line.StartsWith("tool list ", StringComparison.Ordinal));
         _ = await RunInteractiveCommandAsync(workspace, $"--agents codex {Quote(workspace.RepoPath)}", async auto =>
         {
             await auto.WaitUntilTextAsync("InnoWvate.Agentic (install/update)").ConfigureAwait(true);
@@ -117,7 +117,71 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
         }).ConfigureAwait(true);
         Assert.Contains("foundation-prompt-log:start", await workspace.ReadRepoFileAsync("AGENTS.md").ConfigureAwait(true), StringComparison.Ordinal);
         Assert.Equal("2.3.0", CompanionInstaller.InstalledVersion(workspace.RepoPath));
-        _ = Assert.Single(await File.ReadAllLinesAsync(Path.Combine(workspace.RootPath, "tool.log")).ConfigureAwait(true));
+        _ = Assert.Single(await File.ReadAllLinesAsync(Path.Combine(workspace.RootPath, "tool.log")).ConfigureAwait(true), line => line.Contains("InnoWvate.Agentic", StringComparison.Ordinal));
+        Assert.True(File.Exists(Path.Combine(workspace.RootPath, "dna-installed")));
+        AssertRecordingWasWritten(workspace);
+    }
+
+    [SkippableFact]
+    [Trait("Category", "EndToEnd")]
+    public async Task ShorthandCanBeDeselectedWithoutRemovingCompanion()
+    {
+        Skip.If(IsUnsupportedPlatform(), "Terminal interaction requires Bash on macOS/Linux.");
+        using var workspace = await TestWorkspace.CreateAsync(nameof(ShorthandCanBeDeselectedWithoutRemovingCompanion), writeDotnetProject: false).ConfigureAwait(true);
+        _ = await RunInteractiveCommandAsync(workspace, $"--agents codex {Quote(workspace.RepoPath)}", async auto =>
+        {
+            await auto.WaitUntilTextAsync("shorthand for").ConfigureAwait(true);
+            await auto.TypeAsync("shorthand").ConfigureAwait(true);
+            await auto.WaitUntilTextAsync("Filter: shorthand").ConfigureAwait(true);
+            await auto.SpaceAsync().ConfigureAwait(true);
+            await auto.WaitUntilTextAsync("[ ] `dna`").ConfigureAwait(true);
+            await auto.EscapeAsync().ConfigureAwait(true);
+            await auto.WaitUntilTextAsync("[x] InnoWvate.Agentic").ConfigureAwait(true);
+            await auto.EnterAsync().ConfigureAwait(true);
+        }).ConfigureAwait(true);
+        Assert.Equal("2.3.0", CompanionInstaller.InstalledVersion(workspace.RepoPath));
+        Assert.False(File.Exists(Path.Combine(workspace.RootPath, "dna-installed")));
+        Assert.Contains("foundation-prompt-log:start", await workspace.ReadRepoFileAsync("AGENTS.md").ConfigureAwait(true), StringComparison.Ordinal);
+        AssertRecordingWasWritten(workspace);
+    }
+
+    [SkippableTheory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [Trait("Category", "EndToEnd")]
+    public async Task ShorthandCollisionRequiresExplicitConsent(bool consent, bool unattended)
+    {
+        Skip.If(IsUnsupportedPlatform(), "Terminal interaction requires Bash on macOS/Linux.");
+        using var workspace = await TestWorkspace.CreateAsync(nameof(ShorthandCollisionRequiresExplicitConsent), writeDotnetProject: false).ConfigureAwait(true);
+        string unknown = Path.Combine(workspace.BinPath, "dna");
+        await File.WriteAllTextAsync(unknown, "#!/bin/sh\ntouch " + Quote(Path.Combine(workspace.RootPath, "unknown-executed")) + "\n").ConfigureAwait(true);
+        if (!OperatingSystem.IsWindows())
+            File.SetUnixFileMode(unknown, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        string reportPath = Path.Combine(workspace.RootPath, "dna-report.json");
+        string arguments = $"--agents codex --report {Quote(reportPath)} {Quote(workspace.RepoPath)}";
+        if (unattended)
+        {
+            _ = await RunCommandAsync(workspace, "--yes " + arguments).ConfigureAwait(true);
+        }
+        else
+        {
+            _ = await RunInteractiveCommandAsync(workspace, arguments, async auto =>
+            {
+                await auto.WaitUntilTextAsync("shorthand for").ConfigureAwait(true);
+                await auto.EnterAsync().ConfigureAwait(true);
+                await auto.WaitUntilTextAsync("Install anyway?").ConfigureAwait(true);
+                await auto.TypeAsync(consent ? "y" : "n").ConfigureAwait(true);
+                await auto.EnterAsync().ConfigureAwait(true);
+            }).ConfigureAwait(true);
+        }
+        using var report = JsonDocument.Parse(await File.ReadAllTextAsync(reportPath).ConfigureAwait(true));
+        var dna = report.RootElement.GetProperty("dna");
+        Assert.Equal(!consent, dna.GetProperty("skipped").GetBoolean());
+        Assert.Equal(unknown, dna.GetProperty("conflicts")[0].GetString());
+        Assert.Equal(consent, File.Exists(Path.Combine(workspace.RootPath, "dna-installed")));
+        Assert.Equal("2.3.0", CompanionInstaller.InstalledVersion(workspace.RepoPath));
+        Assert.False(File.Exists(Path.Combine(workspace.RootPath, "unknown-executed")));
         AssertRecordingWasWritten(workspace);
     }
 
@@ -1135,11 +1199,19 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
                     os.execv(REAL_DOTNET, [REAL_DOTNET] + args)
                 with (root / 'tool.log').open('a') as log:
                     log.write(' '.join(args) + '\n')
+                if args[1] == 'list' and '--global' in args:
+                    installed = (root / 'dna-installed').exists()
+                    print(json.dumps({'version': 1, 'data': [{'packageId': 'InnoWvate.Dna', 'version': '1.0.0', 'commands': ['dna']}] if installed else []}))
+                    sys.exit(0)
                 if (root / 'tool-failure').exists():
                     print('fixture SDK installation failure', file=sys.stderr)
                     sys.exit(1)
                 if args[1] == 'run':
                     print('2.3.0')
+                    sys.exit(0)
+                if '--global' in args:
+                    assert 'InnoWvate.Dna' in args
+                    (root / 'dna-installed').write_text('1.0.0')
                     sys.exit(0)
                 manifest = pathlib.Path(args[args.index('--tool-manifest') + 1])
                 data = json.loads(manifest.read_text())
