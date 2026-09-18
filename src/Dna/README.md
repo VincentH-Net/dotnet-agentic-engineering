@@ -10,10 +10,17 @@ The local tool manifest determines the InnoWvate.Agentic version. For example:
 ```sh
 dna
 dna -h
+dna prompt-log
+dna prompt-log --limit 50
+dna prompt-log --all
 dna prompt-log show -m 2.3
 dna prompt-log show --since 2026-01-26 --until 2026-02-07 -m 2.3
 dna prompt-log check --commit HEAD -m 2.3
 ```
+
+With the updated local companion, `dna prompt-log` defaults to `show`: the latest 20 prompt
+logs, displayed chronologically. `--limit N` changes the count and `--all` removes the limit;
+date filters remain available. `dna prompt-log --help` shows the available commands and options.
 
 `dna check <args>` runs `dotnet tool exec Agentic.Check -- <args>` directly, using
 normal .NET stable-package resolution, NuGet settings, and caching. It works without

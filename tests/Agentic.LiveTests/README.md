@@ -14,7 +14,8 @@ user's global tools are untouched. No publishing or GitHub calls are required.
 The Hex1b test invokes both `dotnet agentic` and the globally installed `dna` from a local
 manifest and a child folder. It records help,
 complete raw-log framing from files and stdin, stdout output, raw and historical Git history,
-validation, argument errors, and incompatible invocation output.
+default history display, limits and truncation notices, unlimited history, validation,
+argument errors, and incompatible invocation output.
 It also asserts file contents, command exit codes, and absence of forbidden mutations.
 
 Recordings are preserved in `TestResults/recordings/` and their paths appear in test output:

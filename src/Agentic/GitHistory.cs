@@ -47,9 +47,14 @@ sealed class GitCommandRunner(string executable = "git") : IGitCommandRunner
 
 sealed class GitHistory(IGitCommandRunner runner, string directory, TextWriter output, TextWriter error)
 {
-    internal async Task<int> ShowAsync(string? since, string? until, CancellationToken cancellationToken)
+    internal async Task<int> ShowAsync(string? since, string? until, int? limit, CancellationToken cancellationToken)
     {
-        List<string> args = ["log", "--reverse", "--format=%H"];
+        // Filter before limiting so ordinary commits never consume the prompt-log budget.
+        // Match either delimiter, including CR line endings, to retain malformed-log errors.
+        List<string> args = ["log", "-z", "--format=%H%n%cI%n%B", "--no-notes", "--no-show-signature",
+            "--extended-regexp", "--grep=(^|\r)prompt-log(-end)?:(\r|$)"];
+        if (limit is not null)
+            args.Add("--max-count=" + Math.Min((long)limit + 1, int.MaxValue).ToString(System.Globalization.CultureInfo.InvariantCulture));
         if (since is not null)
         {
             args.Add("--since=" + since);
@@ -61,12 +66,24 @@ sealed class GitHistory(IGitCommandRunner runner, string directory, TextWriter o
         }
 
         args.Add("--");
-        string hashes = await runner.RunAsync(args, directory, cancellationToken).ConfigureAwait(false);
+        string history = await runner.RunAsync(args, directory, cancellationToken).ConfigureAwait(false);
+        string[] records = history.Split('\0', StringSplitOptions.RemoveEmptyEntries);
+        int count = Math.Min(limit ?? records.Length, records.Length);
         int result = 0;
-        foreach (string hash in hashes.Split('\n', StringSplitOptions.RemoveEmptyEntries))
+        for (int index = count - 1; index >= 0; index--)
         {
-            result |= await ReadAsync(hash, show: true, cancellationToken).ConfigureAwait(false);
+            cancellationToken.ThrowIfCancellationRequested();
+            string record = records[index];
+            int newline = record.IndexOf('\n', StringComparison.Ordinal);
+            if (newline < 0)
+                throw new FormatException("Git returned an invalid history record.");
+            string hash = record[..newline];
+            ValidateHash(hash);
+            result |= await DisplayAsync(hash, record[(newline + 1)..], show: true).ConfigureAwait(false);
         }
+
+        if (records.Length > count)
+            await error.WriteLineAsync($"Showing the latest {count} prompt logs; older entries omitted. Use --limit N or --all to show more.").ConfigureAwait(false);
 
         return result;
     }
@@ -78,19 +95,26 @@ sealed class GitHistory(IGitCommandRunner runner, string directory, TextWriter o
             throw new FormatException("Invalid commit revision.");
         }
 
-        string hash = await runner.RunAsync(["rev-parse", "--verify", "--end-of-options", revision + "^{commit}"], directory, cancellationToken).ConfigureAwait(false);
-        return await ReadAsync(hash.Trim(), show: false, cancellationToken).ConfigureAwait(false);
+        string resolved = await runner.RunAsync(["rev-parse", "--verify", "--end-of-options", revision + "^{commit}"], directory, cancellationToken).ConfigureAwait(false);
+        string hash = resolved.Trim();
+        ValidateHash(hash);
+        string message = await runner.RunAsync(["show", "-s", "--format=%cI%n%B", hash, "--"], directory, cancellationToken).ConfigureAwait(false);
+        return await DisplayAsync(hash, message, show: false).ConfigureAwait(false);
     }
 
-    async Task<int> ReadAsync(string hash, bool show, CancellationToken cancellationToken)
+    static void ValidateHash(string hash)
     {
         if (hash.Length is not (40 or 64) || !hash.All(char.IsAsciiHexDigit))
         {
             throw new FormatException("Git returned an invalid object identifier.");
         }
+    }
 
-        string message = await runner.RunAsync(["show", "-s", "--format=%cI%n%B", hash, "--"], directory, cancellationToken).ConfigureAwait(false);
+    async Task<int> DisplayAsync(string hash, string message, bool show)
+    {
         int newline = message.IndexOf('\n', StringComparison.Ordinal);
+        if (newline < 0)
+            throw new FormatException("Git returned an invalid history record.");
         try
         {
             var log = PromptLogReader.Parse(message[(newline + 1)..]);

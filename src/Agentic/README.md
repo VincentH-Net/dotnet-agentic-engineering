@@ -8,6 +8,9 @@ Run from that target or a child folder:
 ```bash
 dotnet agentic --help
 dotnet agentic check
+dotnet agentic prompt-log
+dotnet agentic prompt-log --limit 50
+dotnet agentic prompt-log --all
 dotnet agentic prompt-log wrap --input - -m 2.3
 dotnet agentic prompt-log wrap --input prompt-log-input.txt --prompt-log prompt-log-block.txt -m 2.3
 dotnet agentic prompt-log show --since 2026-01-01 -m 2.3
@@ -42,7 +45,18 @@ whitespace cleanup is acceptable and may trim trailing spaces or collapse blank 
 stored log and the rest of the commit message. This tool does not assemble the rest of
 the commit message and never writes Git history or configuration.
 
-`show` displays reachable history chronologically. Each log has its full commit hash, ISO 8601
+`prompt-log` defaults to `show`. Both display the newest 20 prompt-log entries reachable from
+`HEAD`, in chronological order. Use `--limit N` (a positive integer) to change the limit, or
+`--all` to remove it; the two options cannot be combined. `--since` and `--until` narrow the
+history before the limit is applied. `--all` still follows `HEAD`, not every branch. A notice
+on stderr says when older entries were omitted. `prompt-log --help` shows help without reading history.
+
+History is read with one `git log` invocation, filtering commits by their full-line prompt-log
+markers before limiting. Ordinary commits do not count; malformed prompt-log entries do count
+and report errors. One extra entry is retrieved to detect truncation. Only the selected entries
+are validated; use `--all` to include older logs. Individual log bodies are not truncated.
+
+Each log has its full commit hash, ISO 8601
 committer datetime (including offset), and validation/legacy label, followed by its unescaped
 text and a display separator. It omits ordinary commit content and trailers. Historical JSON
 logs are decoded and numbered standalone logs retain their raw text. Malformed logs are reported
