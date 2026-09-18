@@ -306,10 +306,14 @@ public sealed class CompanionTests
         }
 
         ToolRunner runner = new() { Resolved = "1.4.0", NotRestored = notRestored };
-        CheckWorkflow workflow = new(runner, new FakePrompts(), new RecordingReporter(), source, new FakeSourceVersionResolver());
-        var result = await workflow.RunAsync(new(temp.Path, false, true, null, null, "codex", false), CancellationToken.None);
+        FakePrompts prompts = new();
+        CheckWorkflow workflow = new(runner, prompts, new RecordingReporter(), source, new FakeSourceVersionResolver());
+        var result = await workflow.RunAsync(new(temp.Path, false, false, null, null, "codex", false), CancellationToken.None);
         Assert.Equal(0, result.ExitCode);
         Assert.Equal(0, source.ProjectFetches);
+        var recommendation = Assert.Single(prompts.RecommendedSkillActions, skill => skill.IsCompanion);
+        Assert.Equal(action, recommendation.RecommendationAction);
+        Assert.True(recommendation.IsRequiredToolRepair);
         Assert.NotNull(result.Report.Companion);
         Assert.Equal(action, result.Report.Companion.Action);
         Assert.Equal("1.3", result.Report.Companion.RequiredMinimum);
@@ -357,18 +361,42 @@ public sealed class CompanionTests
         _ = Assert.Throws<FormatException>(() => CompanionDependency.ReadLocalRequirement(["dotnet agentic prompt-log show -m 1.3", "dotnet agentic --minver 2.3 prompt-log check"]));
     }
 
-    [Fact]
-    public async Task DeselectedConsumersNeverAutomaticallyUpdateTool()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task IndependentToolChoiceIsHonoredWithoutSelectedConsumers(bool selectTool)
     {
         using TempDirectory temp = new();
         _ = temp.CreateDirectory("target");
         ToolRunner runner = new();
-        FakePrompts prompts = new() { SelectedDirectiveNames = [], SelectedSkillInstallArgs = [CompanionDependency.PackageId] };
+        FakePrompts prompts = new() { SelectedDirectiveNames = [], SelectedSkillInstallArgs = selectTool ? [CompanionDependency.PackageId] : [] };
         var result = await new CheckWorkflow(runner, prompts, new RecordingReporter(), new FakeDirectiveSource(), new FakeSourceVersionResolver())
             .RunAsync(new(temp.Path, false, false, null, null, "codex", false), CancellationToken.None);
         Assert.Equal(0, result.ExitCode);
-        Assert.DoesNotContain(runner.Calls, call => call.FileName == "dotnet" && call.Arguments[1] != "list");
-        Assert.False(File.Exists(CompanionInstaller.ManifestPath(temp.Path)));
+        Assert.Equal(selectTool ? 1 : 0, runner.Calls.Count(call => call.FileName == "dotnet" && call.Arguments[1] == "install"));
+        Assert.Equal(selectTool, File.Exists(CompanionInstaller.ManifestPath(temp.Path)));
+        Assert.DoesNotContain("foundation-prompt-log:start", await File.ReadAllTextAsync(result.Report.AgentsFile), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(null, "install", "required 2.3")]
+    [InlineData("2.2.0", "update", "currently 2.2.0; required 2.3")]
+    [InlineData("2.3.0", "update", "currently 2.3.0; required 2.3")]
+    public async Task ToolRecommendationDescribesPlannedActionAndCurrentVersion(string? installed, string action, string detail)
+    {
+        using TempDirectory temp = new();
+        _ = temp.CreateDirectory("target");
+        if (installed is not null)
+            WriteManifest(temp.Path, installed);
+        FakePrompts prompts = new() { SelectedDirectiveNames = [], SelectedSkillInstallArgs = [] };
+        var result = await new CheckWorkflow(new ToolRunner(), prompts, new RecordingReporter(), new FakeDirectiveSource(), new FakeSourceVersionResolver())
+            .RunAsync(new(temp.Path, false, false, null, null, "codex", false), CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        var recommendation = Assert.Single(prompts.RecommendedSkillActions, skill => skill.IsCompanion);
+        Assert.Equal($"InnoWvate.Agentic ({action})", RecommendationSelectionPrompt.FormatSkillListItem(recommendation));
+        Assert.Equal(detail, recommendation.Version);
+        Assert.False(recommendation.IsRequiredToolRepair);
     }
 
     internal static void WriteManifest(string target, string? version)

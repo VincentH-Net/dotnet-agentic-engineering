@@ -373,7 +373,9 @@ sealed class CheckWorkflow(
                     ? await companionVersions.ReadAsync(recommendedDirectives.FirstOrDefault(d => CompanionDependency.ForDirective(d.Name).Count > 0)?.SourceRef
                         ?? recommendedSkillActions.First(skill => skill.Dependencies.Contains(CompanionDependency.Identity)).ResolvedSourceRef, cancellationToken).ConfigureAwait(false)
                     : repairRequirement;
-                status = $"installed {CompanionInstaller.InstalledVersion(targetDirectory) ?? "absent"}; required {plannedRequirement?.Minimum ?? "unknown"}";
+                status = $"required {plannedRequirement?.Minimum ?? "unknown"}";
+                if (installedCompanion is not null)
+                    status = $"currently {installedCompanion}; {status}";
             }
             catch (Exception exception) when (exception is DirectiveException or FormatException or System.Xml.XmlException or IOException or UnauthorizedAccessException or JsonException or KeyNotFoundException)
             {
@@ -381,7 +383,14 @@ sealed class CheckWorkflow(
                 status = "version unavailable: " + exception.Message;
             }
 
-            recommendedSkillActions = [.. recommendedSkillActions, CompanionDependency.Action(hasDependentRecommendations ? "install/update" : restoreOnly ? "restore" : "repair") with { Version = status }];
+            string action = !hasDependentRecommendations && repairError is not null ? "repair"
+                : !hasDependentRecommendations && restoreOnly ? "restore"
+                : installedCompanion is null ? "install" : "update";
+            recommendedSkillActions = [.. recommendedSkillActions, CompanionDependency.Action(action) with
+            {
+                Version = status,
+                IsRequiredToolRepair = repairRequirement is not null || repairError is not null
+            }];
         }
 
         DnaInstallation? dnaInstallation = null;
@@ -420,12 +429,6 @@ sealed class CheckWorkflow(
         // The same selection graph closes dependencies for interactive, --yes, dry-run, and updates.
         var closedSelection = CloseDependencies(selectedDirectives, selectedSkills, recommendedSkillActions);
         selectedSkills = closedSelection.SelectedSkills;
-        if (repairRequirement is null && repairError is null
-            && !selectedDirectives.Any(d => CompanionDependency.ForDirective(d.Name).Count > 0)
-            && !selectedSkills.Any(skill => skill.Dependencies.Contains(CompanionDependency.Identity)))
-        {
-            selectedSkills = [.. selectedSkills.Where(skill => !skill.IsCompanion)];
-        }
 
         if (!options.DryRun && (recommendedDirectives.Count > 0 || recommendedSkillActions.Count > 0))
         {

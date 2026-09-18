@@ -12,7 +12,7 @@ static partial class CompanionDependency
     internal static IReadOnlyList<SkillDependency> ForDirective(string? name)
         => name == "foundation-prompt-log" ? [Identity] : [];
 
-    internal static SkillManifestEntry Action(string description = "install/update")
+    internal static SkillManifestEntry Action(string description = "install")
         => new(string.Empty, PackageId, PackageId, string.Empty, [], recommendationAction: description);
 
     // Authored invocations occupy a shell command line; backslash-newline continuation is allowed.

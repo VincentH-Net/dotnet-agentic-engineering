@@ -40,7 +40,9 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
     readonly Dictionary<string, IReadOnlyList<string>> dependencyKeysByKey = BuildDependencyKeysByKey(items);
     readonly Dictionary<string, IReadOnlyList<string>> dependentKeysByKey = BuildDependentKeysByKey(items);
     readonly HashSet<string> selectedKeys = items.Select(item => item.Key).ToHashSet(StringComparer.Ordinal);
+    readonly HashSet<string> automaticallySelectedToolKeys = new(StringComparer.Ordinal);
     HashSet<string>? specializedDefaultSelectedKeys;
+    HashSet<string> specializedDefaultAutomaticToolKeys = new(StringComparer.Ordinal);
 
     public IReadOnlyList<RecommendationSelectionItem> FilteredItems { get; private set; } = items;
 
@@ -182,6 +184,7 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
         }
         else
         {
+            var previouslySelectedKeys = selectedKeys.ToHashSet(StringComparer.Ordinal);
             bool companionSelected = SelectedSkills.Any(skill => skill.IsCompanion);
             SelectWithDependencies(key);
             // Default the optional shorthand on when the companion becomes selected. This is
@@ -192,11 +195,17 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
                 if (dna is not null)
                     SelectWithDependencies(dna.Key);
             }
+
+            automaticallySelectedToolKeys.UnionWith(items
+                .Where(item => item.Kind == RecommendationSelectionKind.Tool && item.Skill?.IsRequiredToolRepair != true
+                    && item.Key != key && selectedKeys.Contains(item.Key) && !previouslySelectedKeys.Contains(item.Key))
+                .Select(item => item.Key));
         }
     }
 
     void SetAllSelection(bool selected)
     {
+        automaticallySelectedToolKeys.Clear();
         if (!selected)
         {
             selectedKeys.Clear();
@@ -218,6 +227,9 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
             _ = selectedKeys.Add(key);
         }
 
+        automaticallySelectedToolKeys.Clear();
+        automaticallySelectedToolKeys.UnionWith(specializedDefaultAutomaticToolKeys);
+
         IsSpecialized = true;
     }
 
@@ -236,6 +248,9 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
         {
             RemoveWithDependents(specializedSelection, item.Key);
         }
+
+        PruneAutomaticTools(specializedSelection);
+        specializedDefaultAutomaticToolKeys = automaticallySelectedToolKeys.Intersect(specializedSelection).ToHashSet(StringComparer.Ordinal);
 
         return specializedSelection;
     }
@@ -268,15 +283,30 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
 
     internal void DeselectWithDependents(string key)
     {
-        if (!selectedKeys.Remove(key))
+        RemoveWithDependents(selectedKeys, key);
+        PruneAutomaticTools(selectedKeys);
+        automaticallySelectedToolKeys.IntersectWith(selectedKeys);
+    }
+
+    void PruneAutomaticTools(HashSet<string> selection)
+    {
+        var retained = selection.Except(automaticallySelectedToolKeys).ToHashSet(StringComparer.Ordinal);
+        Queue<string> pending = new(retained);
+        while (pending.TryDequeue(out string? key))
         {
-            return;
+            foreach (string dependencyKey in dependencyKeysByKey.GetValueOrDefault(key, []))
+            {
+                if (selection.Contains(dependencyKey) && retained.Add(dependencyKey))
+                    pending.Enqueue(dependencyKey);
+            }
         }
 
-        foreach (string dependentKey in dependentKeysByKey.GetValueOrDefault(key, []))
-        {
-            DeselectWithDependents(dependentKey);
-        }
+        // The optional shorthand follows a retained companion, but must not keep an
+        // otherwise unused, automatically selected companion alive through its dependency.
+        if (items.Any(item => item.Skill?.IsCompanion == true && retained.Contains(item.Key)))
+            retained.UnionWith(items.Where(item => item.Skill?.IsDna == true && selection.Contains(item.Key)).Select(item => item.Key));
+
+        selection.ExceptWith(automaticallySelectedToolKeys.Except(retained));
     }
 
     void AddFilterCharacter(char character)

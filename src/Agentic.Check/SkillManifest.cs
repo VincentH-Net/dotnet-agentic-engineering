@@ -56,6 +56,8 @@ sealed record SkillManifestEntry
 
     public bool IsDna => Key == DnaInstaller.Identity.Key;
 
+    public bool IsRequiredToolRepair { get; init; }
+
     public string RecommendationAction { get; init; }
 
     public bool ForceInstall { get; init; }

@@ -132,6 +132,8 @@ sealed class FakePrompts : IUserPrompts
 
     public IReadOnlyList<string>? SelectedSkillInstallArgs { get; init; }
 
+    public IReadOnlyList<SkillManifestEntry> RecommendedSkillActions { get; private set; } = [];
+
     public Task<bool> ConfirmAsync(string prompt, bool defaultValue, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -147,6 +149,7 @@ sealed class FakePrompts : IUserPrompts
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        RecommendedSkillActions = missingSkills;
         var selectedDirectives = SelectedDirectiveNames is null
             ? recommendedDirectives
             : [.. recommendedDirectives.Where(directive => SelectedDirectiveNames.Contains(directive.Name, StringComparer.Ordinal))];

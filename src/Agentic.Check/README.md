@@ -71,6 +71,10 @@ agentic-check -h
 ## Local companion prerequisites (2.3.0)
 
 Selecting `foundation-prompt-log` also selects `InnoWvate.Agentic` in the same dependency list.
+Deselecting the directive also deselects tools added automatically for it, unless another
+selected action needs them or the companion needs repair for existing content. Tools already
+selected beforehand or selected independently remain selected. Tool labels describe the planned
+action (`install`, `update`, or `restore`), with current and required versions shown separately.
 Deselecting the prerequisite deselects its consumers. Agentic.Check prepares it once per target,
 before changing dependent content, using the target's explicit `.config/dotnet-tools.json` and
 normal `nuget.config` sources. New nested manifests preserve discovery of unrelated parent tools.

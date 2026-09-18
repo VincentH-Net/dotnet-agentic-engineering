@@ -18,7 +18,7 @@ sealed class DnaInstaller(ICommandRunner runner, string? searchPath = null, stri
     internal static SkillManifestEntry Action(DnaInstallation installation)
         => new(string.Empty, PackageId, "`dna` shorthand for `dotnet agentic`", string.Empty, [],
             dependencies: [CompanionDependency.Identity], recommendationAction: installation.Action,
-            version: installation.Error ?? $"global launcher; installed {installation.Version ?? "absent"}");
+            version: installation.Error ?? (installation.Version is null ? "global launcher" : $"global launcher; currently {installation.Version}"));
 
     internal string CommandPath => Path.Combine(globalDirectory ?? Path.Combine(
         Environment.GetEnvironmentVariable("DOTNET_CLI_HOME") ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),

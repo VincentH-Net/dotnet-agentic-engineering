@@ -76,7 +76,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
         using var workspace = await TestWorkspace.CreateAsync(nameof(DeselectingCompanionDeselectsPromptDirectiveWithoutInstallation), writeDotnetProject: false).ConfigureAwait(true);
         _ = await RunInteractiveCommandAsync(workspace, $"--agents codex {Quote(workspace.RepoPath)}", async auto =>
         {
-            await auto.WaitUntilTextAsync("InnoWvate.Agentic (install/update)").ConfigureAwait(true);
+            await auto.WaitUntilTextAsync("InnoWvate.Agentic (install)").ConfigureAwait(true);
             await auto.TypeAsync("InnoWvate.Agentic").ConfigureAwait(true);
             await auto.WaitUntilTextAsync("Filter: InnoWvate.Agentic").ConfigureAwait(true);
             await auto.SpaceAsync().ConfigureAwait(true);
@@ -107,7 +107,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
         Assert.DoesNotContain(await File.ReadAllLinesAsync(Path.Combine(workspace.RootPath, "tool.log")).ConfigureAwait(true), line => !line.StartsWith("tool list ", StringComparison.Ordinal));
         _ = await RunInteractiveCommandAsync(workspace, $"--agents codex {Quote(workspace.RepoPath)}", async auto =>
         {
-            await auto.WaitUntilTextAsync("InnoWvate.Agentic (install/update)").ConfigureAwait(true);
+            await auto.WaitUntilTextAsync("InnoWvate.Agentic (install)").ConfigureAwait(true);
             await auto.LeftAsync().ConfigureAwait(true);
             await auto.TypeAsync("foundation-prompt-log").ConfigureAwait(true);
             await auto.WaitUntilTextAsync("[ ] foundation-prompt-log").ConfigureAwait(true);
@@ -144,6 +144,57 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
         Assert.Equal("2.3.0", CompanionInstaller.InstalledVersion(workspace.RepoPath));
         Assert.False(File.Exists(Path.Combine(workspace.RootPath, "dna-installed")));
         Assert.Contains("foundation-prompt-log:start", await workspace.ReadRepoFileAsync("AGENTS.md").ConfigureAwait(true), StringComparison.Ordinal);
+        AssertRecordingWasWritten(workspace);
+    }
+
+    [SkippableTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    [Trait("Category", "EndToEnd")]
+    public async Task DeselectingPromptLogPreservesOnlyIndependentToolChoices(bool selectToolFirst)
+    {
+        Skip.If(IsUnsupportedPlatform(), "Terminal interaction requires Bash on macOS/Linux.");
+        using var workspace = await TestWorkspace.CreateAsync(nameof(DeselectingPromptLogPreservesOnlyIndependentToolChoices), writeDotnetProject: false).ConfigureAwait(true);
+        _ = await RunInteractiveCommandAsync(workspace, $"--agents codex {Quote(workspace.RepoPath)}", async auto =>
+        {
+            await auto.WaitUntilTextAsync("InnoWvate.Agentic (install)").ConfigureAwait(true);
+            using (var snapshot = auto.CreateSnapshot())
+                Assert.DoesNotContain("installed absent", snapshot.GetScreenText(), StringComparison.Ordinal);
+            await auto.LeftAsync().ConfigureAwait(true);
+            await auto.WaitUntilTextAsync("[ ] InnoWvate.Agentic").ConfigureAwait(true);
+            if (selectToolFirst)
+            {
+                await auto.TypeAsync("InnoWvate.Agentic").ConfigureAwait(true);
+                await auto.WaitUntilTextAsync("Filter: InnoWvate.Agentic").ConfigureAwait(true);
+                await auto.SpaceAsync().ConfigureAwait(true);
+                await auto.WaitUntilTextAsync("[x] InnoWvate.Agentic").ConfigureAwait(true);
+                await auto.EscapeAsync().ConfigureAwait(true);
+                await auto.WaitUntilTextAsync("[ ] foundation-prompt-log").ConfigureAwait(true);
+            }
+
+            await auto.TypeAsync("foundation-prompt-log").ConfigureAwait(true);
+            await auto.WaitUntilTextAsync("Filter: foundation-prompt-log").ConfigureAwait(true);
+            await auto.SpaceAsync().ConfigureAwait(true);
+            await auto.WaitUntilTextAsync("[x] foundation-prompt-log").ConfigureAwait(true);
+            await auto.EscapeAsync().ConfigureAwait(true);
+            await auto.WaitUntilTextAsync("[x] InnoWvate.Agentic").ConfigureAwait(true);
+            await auto.WaitUntilTextAsync("[x] `dna`").ConfigureAwait(true);
+            await auto.TypeAsync("foundation-prompt-log").ConfigureAwait(true);
+            await auto.WaitUntilTextAsync("Filter: foundation-prompt-log").ConfigureAwait(true);
+            await auto.SpaceAsync().ConfigureAwait(true);
+            await auto.WaitUntilTextAsync("[ ] foundation-prompt-log").ConfigureAwait(true);
+            await auto.EscapeAsync().ConfigureAwait(true);
+            string mark = selectToolFirst ? "[x]" : "[ ]";
+            await auto.WaitUntilTextAsync(mark + " InnoWvate.Agentic").ConfigureAwait(true);
+            await auto.WaitUntilTextAsync(mark + " `dna`").ConfigureAwait(true);
+            await auto.EnterAsync().ConfigureAwait(true);
+        }).ConfigureAwait(true);
+
+        Assert.Equal(selectToolFirst, File.Exists(CompanionInstaller.ManifestPath(workspace.RepoPath)));
+        Assert.Equal(selectToolFirst, File.Exists(Path.Combine(workspace.RootPath, "dna-installed")));
+        Assert.DoesNotContain("foundation-prompt-log:start", await workspace.ReadRepoFileAsync("AGENTS.md").ConfigureAwait(true), StringComparison.Ordinal);
+        string[] toolCalls = await File.ReadAllLinesAsync(Path.Combine(workspace.RootPath, "tool.log")).ConfigureAwait(true);
+        Assert.Equal(selectToolFirst ? 2 : 0, toolCalls.Count(line => line.StartsWith("tool install ", StringComparison.Ordinal)));
         AssertRecordingWasWritten(workspace);
     }
 
