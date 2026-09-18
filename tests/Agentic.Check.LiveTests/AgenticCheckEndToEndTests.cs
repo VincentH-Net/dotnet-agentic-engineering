@@ -649,13 +649,32 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
             async auto =>
             {
                 await auto.WaitUntilTextAsync("Recommend ", timeout: TimeSpan.FromSeconds(45)).ConfigureAwait(true);
-                await auto.WaitUntilTextAsync("Showing 1-24 of", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
+                await auto.WaitUntilTextAsync("Items 1–24 of", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
+                int total;
+                using (var snapshot = auto.CreateSnapshot())
+                {
+                    string range = Assert.Single(snapshot.GetScreenText().Split('\n'), line => line.Trim().StartsWith("Items 1–24 of ", StringComparison.Ordinal));
+                    total = int.Parse(range.Trim().Split(' ')[^1], System.Globalization.CultureInfo.InvariantCulture);
+                }
+
+                await WaitForOverflowAsync(0, total - 24).ConfigureAwait(true);
                 for (int index = 0; index < 30; index++)
                 {
                     await auto.DownAsync().ConfigureAwait(true);
                 }
 
-                await auto.WaitUntilTextAsync("Showing 19-42 of", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
+                await auto.WaitUntilTextAsync($"Items 19–42 of {total}", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
+                await WaitForOverflowAsync(18, total - 42).ConfigureAwait(true);
+
+                for (int index = 30; index < total - 13; index++)
+                    await auto.DownAsync().ConfigureAwait(true);
+                await auto.WaitUntilTextAsync($"Items {total - 24}–{total - 1} of {total}").ConfigureAwait(true);
+                await WaitForOverflowAsync(total - 25, 1).ConfigureAwait(true);
+
+                for (int index = 0; index < 12; index++)
+                    await auto.DownAsync().ConfigureAwait(true);
+                await auto.WaitUntilTextAsync($"Items {total - 12}–{total} of {total}").ConfigureAwait(true);
+                await WaitForOverflowAsync(total - 13, 0).ConfigureAwait(true);
 
                 await auto.TypeAsync("t").ConfigureAwait(true);
                 await auto.WaitUntilTextAsync("Filter: t", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
@@ -668,6 +687,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
                 await auto.WaitUntilTextAsync("uno-test-resize-app-window (install)", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
                 await auto.WaitUntilTextAsync("dotnet-test", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
                 await auto.WaitUntilTextAsync("run-tests (install)", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
+                await WaitForOverflowAsync(0, 0).ConfigureAwait(true);
                 using (var snapshot = auto.CreateSnapshot())
                 {
                     string filteredScreen = snapshot.GetScreenText();
@@ -675,8 +695,27 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
                     Assert.DoesNotContain("uno-navigation-contentcontrol (install)", filteredScreen, StringComparison.Ordinal);
                 }
 
+                await auto.TypeAsync("-no-such-skill").ConfigureAwait(true);
+                await auto.WaitUntilTextAsync("No recommendations match the current filter.").ConfigureAwait(true);
+                await WaitForOverflowAsync(0, 0).ConfigureAwait(true);
+                await auto.EscapeAsync().ConfigureAwait(true);
+                await auto.WaitUntilTextAsync($"Items 1–24 of {total}").ConfigureAwait(true);
+                await WaitForOverflowAsync(0, total - 24).ConfigureAwait(true);
+
                 await auto.LeftAsync().ConfigureAwait(true);
                 await auto.EnterAsync().ConfigureAwait(true);
+
+                Task WaitForOverflowAsync(int above, int below)
+                    => auto.WaitUntilAsync(snapshot =>
+                    {
+                        string screen = snapshot.GetScreenText();
+                        return (above == 0
+                                ? !screen.Contains("more items above", StringComparison.Ordinal) && !screen.Contains("more item above", StringComparison.Ordinal)
+                                : screen.Contains($"↑ {above} more {(above == 1 ? "item" : "items")} above", StringComparison.Ordinal))
+                            && (below == 0
+                                ? !screen.Contains("more items below", StringComparison.Ordinal) && !screen.Contains("more item below", StringComparison.Ordinal)
+                                : screen.Contains($"↓ {below} more {(below == 1 ? "item" : "items")} below", StringComparison.Ordinal));
+                    }, timeout: TimeSpan.FromSeconds(10), description: $"Overflow indicators: {above} above, {below} below");
             }).ConfigureAwait(true);
 
         Assert.Equal(0, result.ExitCode);

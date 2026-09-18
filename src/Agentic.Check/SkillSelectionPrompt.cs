@@ -580,12 +580,12 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
             state.FilteredItems,
             state.CursorIndex,
             item => 1 + (ShouldShowDuplicateDetails(state, item) ? 1 + state.GetDuplicateLocations(item).Count : 0));
+        int visibleEndIndex = visibleStartIndex + visibleItems.Count;
         if (visibleItems.Count < state.FilteredItems.Count)
         {
-            int visibleEndIndex = visibleStartIndex + visibleItems.Count;
             MarkupLine(string.Create(
                 System.Globalization.CultureInfo.InvariantCulture,
-                $"[grey]Showing {visibleStartIndex + 1}-{visibleEndIndex} of {state.FilteredItems.Count} matches[/]"));
+                $"[grey]Items {visibleStartIndex + 1}–{visibleEndIndex} of {state.FilteredItems.Count}[/]"));
         }
 
         RecommendationSelectionKind? lastKind = null;
@@ -597,6 +597,9 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
         {
             MarkupLine(FormatColumnHeader(versionColumnStart));
         }
+
+        if (visibleStartIndex > 0)
+            MarkupLine(FormatOverflowIndicator(visibleStartIndex, above: true));
 
         string[] visibleSkillSourceReposWithoutPluginHeaders = [.. visibleItems
             .Select(item => item.Skill)
@@ -665,8 +668,16 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
             }
         }
 
+        int hiddenBelow = state.FilteredItems.Count - visibleEndIndex;
+        if (hiddenBelow > 0)
+            MarkupLine(FormatOverflowIndicator(hiddenBelow, above: false));
+
         FinishRender(lineCount);
     }
+
+    static string FormatOverflowIndicator(int count, bool above)
+        => string.Create(System.Globalization.CultureInfo.InvariantCulture,
+            $"[bold {ToolHeader.AgenticColor}]{(above ? "↑" : "↓")} {count} more {(count == 1 ? "item" : "items")} {(above ? "above" : "below")}[/]");
 
     static int CalculateVersionColumnStart(IReadOnlyList<RecommendationSelectionItem> visibleItems)
         => visibleItems
