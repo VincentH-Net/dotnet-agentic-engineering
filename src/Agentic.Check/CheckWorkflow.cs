@@ -29,6 +29,9 @@ sealed class CheckWorkflow(
     DnaInstaller? dnaInstaller = null,
     Func<string, string?>? readEnvironment = null)
 {
+    // A manual test shell sets this so every check it starts, including dna check and dnx, reads pinned content.
+    internal const string PreviewSourceRefVariable = "AGENTIC_CHECK_PREVIEW_SOURCE_REF";
+
     static readonly JsonSerializerOptions ReportSerializerOptions = new(JsonSerializerDefaults.Web)
     {
         WriteIndented = true
@@ -59,6 +62,22 @@ sealed class CheckWorkflow(
 
     async Task<CheckRunResult> RunCoreAsync(AgenticCheckOptions options, AgenticCheckReport report, CancellationToken cancellationToken)
     {
+        string? sourcePin = options.PreviewSourceRef is null ? null : "--preview-source-ref";
+        if (options.PreviewSourceRef is null
+            && (readEnvironment ?? Environment.GetEnvironmentVariable)(PreviewSourceRefVariable) is { Length: > 0 } pinnedRef)
+        {
+            if (!GitHubSourceVersionResolver.IsValidPreviewRef(pinnedRef))
+            {
+                reporter.Error($"{PreviewSourceRefVariable} requires a valid branch reference or commit SHA.");
+                return new CheckRunResult(2, report);
+            }
+
+            options = options with { Preview = true, PreviewSourceRef = pinnedRef };
+            sourcePin = PreviewSourceRefVariable;
+        }
+
+        report.PreviewSourceRef = options.PreviewSourceRef;
+        report.PreviewSourceRefOrigin = sourcePin;
 
         if (options.PreviewSourceRef is not null
             && (!options.Preview || !GitHubSourceVersionResolver.IsValidPreviewRef(options.PreviewSourceRef)))
@@ -305,7 +324,8 @@ sealed class CheckWorkflow(
             directivePlan.OutdatedCount);
         report.DirectiveSummary = directiveSummary;
 
-        reporter.Summary(targetDirectory, stack.Technologies, stack.InstallGates, targetAgents, skillsDirectories, directiveSummary, recommended.Count, missing.Count, report.OutdatedSkills, sourceMode);
+        reporter.Summary(targetDirectory, stack.Technologies, stack.InstallGates, targetAgents, skillsDirectories, directiveSummary, recommended.Count, missing.Count, report.OutdatedSkills, sourceMode,
+            sourcePin is null ? null : $"{options.PreviewSourceRef} ({sourcePin})");
         reporter.Info($"GitHub cache duration: {directiveCacheSettings.DurationDescription}");
 
         foreach (string warning in report.Warnings)

@@ -1,4 +1,40 @@
-# Full-suite runner
+# Test runners
+
+## Manual test shell
+
+Test the local builds of all three tools together with this branch's directives and skills, before
+anything is published:
+
+```sh
+dotnet run --file tests/manual-test.cs
+```
+
+It packs `Agentic.Check`, `InnoWvate.Agentic` and `InnoWvate.Dna` from the working tree into an
+isolated feed, unpacks a baseline fixture (default: the newest collection's `broad-stack`) into a
+new Git repository under the temp folder, installs the local `dna` into an isolated .NET CLI home,
+caches the local `Agentic.Check`, and on macOS opens a Terminal window in that repository. Only that
+terminal's environment changes: `DOTNET_CLI_HOME`, `NUGET_PACKAGES`, `AGENTIC_CHECK_CACHE_DIR`,
+PATH, and `AGENTIC_CHECK_PREVIEW_SOURCE_REF`. Your normal global tools, caches, GitHub login and
+shell profiles are untouched. In that shell `dna check`, `dna prompt-log`, `dnx agentic.check` and
+agent-started `dotnet agentic` commands all resolve the local packages, because the repository's
+`NuGet.Config` lists only the local feed.
+
+Directives and skills have no local-file source in Agentic.Check; it reads them from GitHub. The
+script therefore requires HEAD to be pushed and `directives/` and `plugins/` to be clean, and pins
+every check the shell starts to that commit through the hidden `AGENTIC_CHECK_PREVIEW_SOURCE_REF`
+variable, which implies `--preview`. The status table's "Source channel" row shows the pinned commit
+and whether it came from the variable or from `--preview-source-ref`. Tools are packed from the
+working tree, so uncommitted `src` changes are included and noted.
+
+Options: `--list` shows the baseline collections, their fixtures and the fresh definitions;
+`--baseline <id>` and `--fixture <name>` choose what to unpack; `--fresh` materializes only the
+fixture's trigger content for first-install flows; `--target <path>` reuses an existing test
+repository and rewrites only its `NuGet.Config`; `--debug` packs Debug; `--no-terminal` prints
+the activation command instead of opening a window; `--no-gh` keeps gh off PATH to test the
+missing-prerequisite message. Each run writes `tests/TestResults/manual/<run-id>/` with `feed/`,
+`activate.sh`, `README.md` and `manual-build.json`.
+
+## Full-suite runner
 
 Run the complete suite with the C# runner:
 

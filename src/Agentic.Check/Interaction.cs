@@ -113,7 +113,8 @@ interface IReporter
         int recommendedCount,
         int missingCount,
         int outdatedCount,
-        SourceVersionMode sourceMode = SourceVersionMode.Stable);
+        SourceVersionMode sourceMode = SourceVersionMode.Stable,
+        string? sourcePin = null);
 
     Task RunProgressAsync(
         string description,
@@ -197,7 +198,8 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
         int recommendedCount,
         int missingCount,
         int outdatedCount,
-        SourceVersionMode sourceMode = SourceVersionMode.Stable)
+        SourceVersionMode sourceMode = SourceVersionMode.Stable,
+        string? sourcePin = null)
         => console.Write(CreateSummaryTable(
             targetDirectory,
             technologies,
@@ -208,7 +210,8 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
             recommendedCount,
             missingCount,
             outdatedCount,
-            sourceMode));
+            sourceMode,
+            sourcePin));
 
     internal static Table CreateSummaryTable(
         string targetDirectory,
@@ -220,7 +223,8 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
         int recommendedCount,
         int missingCount,
         int outdatedCount,
-        SourceVersionMode sourceMode = SourceVersionMode.Stable)
+        SourceVersionMode sourceMode = SourceVersionMode.Stable,
+        string? sourcePin = null)
     {
         Table table = new()
         {
@@ -237,7 +241,7 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
         _ = table.AddRow("Create AGENTS.md", directiveSummary.CreateAgentsFile ? "yes" : "no");
         _ = table.AddRow("Create CLAUDE.md", directiveSummary.CreateClaudeFile ? "yes" : "no");
         _ = table.AddRow("Source channel", sourceMode == SourceVersionMode.Preview
-            ? "Preview\n* no skills update check - always (re)installs"
+            ? Markup.Escape($"Preview{(sourcePin is null ? string.Empty : $"\n* pinned to {sourcePin}")}\n* no skills update check - always (re)installs")
             : "Stable");
         _ = table.AddRow("Recommended directives", Markup.Escape(FormatDirectiveSummary(directiveSummary)));
         _ = table.AddRow("Recommended skills", Markup.Escape(FormatSkillSummary(recommendedCount, missingCount, outdatedCount, sourceMode)));
@@ -430,7 +434,8 @@ sealed class NullReporter : IReporter
         int recommendedCount,
         int missingCount,
         int outdatedCount,
-        SourceVersionMode sourceMode = SourceVersionMode.Stable)
+        SourceVersionMode sourceMode = SourceVersionMode.Stable,
+        string? sourcePin = null)
     {
     }
 

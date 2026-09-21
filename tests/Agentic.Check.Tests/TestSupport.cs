@@ -194,6 +194,8 @@ sealed class RecordingReporter : IReporter
 
     public int? OutdatedSkillCount { get; private set; }
 
+    public string? SourcePin { get; private set; }
+
     public void Plain(string message)
     {
         PlainMessages.Add(message);
@@ -238,10 +240,12 @@ sealed class RecordingReporter : IReporter
         int recommendedCount,
         int missingCount,
         int outdatedCount,
-        SourceVersionMode sourceMode = SourceVersionMode.Stable)
+        SourceVersionMode sourceMode = SourceVersionMode.Stable,
+        string? sourcePin = null)
     {
         TargetAgents = targetAgents;
         OutdatedSkillCount = outdatedCount;
+        SourcePin = sourcePin;
     }
 
     public async Task RunProgressAsync(
@@ -332,6 +336,8 @@ sealed class FakeSourceVersionResolver : ISourceVersionResolver
 
     public List<string> RequestedSourceRepos { get; } = [];
 
+    public SourceVersionMode? LastMode { get; private set; }
+
     public Task<IReadOnlyDictionary<string, SourceVersionInfo>> ResolveVersionsAsync(
         IEnumerable<string> sourceRepos,
         SourceVersionMode sourceVersionMode,
@@ -339,6 +345,7 @@ sealed class FakeSourceVersionResolver : ISourceVersionResolver
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        LastMode = sourceVersionMode;
         Dictionary<string, SourceVersionInfo> result = new(StringComparer.OrdinalIgnoreCase);
         foreach (string sourceRepo in sourceRepos.Distinct(StringComparer.OrdinalIgnoreCase))
         {

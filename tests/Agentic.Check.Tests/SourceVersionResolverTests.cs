@@ -126,6 +126,54 @@ public sealed class SourceVersionResolverTests
     }
 
     [Fact]
+    public async Task EnvironmentPinsPreviewContentAndShowsItsOrigin()
+    {
+        const string sha = "0123456789abcdef0123456789abcdef01234567";
+        using TempDirectory temp = new();
+        _ = Directory.CreateDirectory(temp.Path);
+        RecordingReporter reporter = new();
+        FakeSourceVersionResolver resolver = new();
+        CheckWorkflow workflow = new(new ToolRunner(), new FakePrompts(), reporter, new FakeDirectiveSource(), resolver,
+            readEnvironment: name => name == CheckWorkflow.PreviewSourceRefVariable ? sha : null);
+        var result = await workflow.RunAsync(new(temp.Path, true, false, null, null, "codex", false), CancellationToken.None);
+        Assert.Equal(0, result.ExitCode);
+        Assert.Equal(SourceVersionMode.Preview, resolver.LastMode);
+        Assert.Equal(sha, result.Report.PreviewSourceRef);
+        Assert.Equal(CheckWorkflow.PreviewSourceRefVariable, result.Report.PreviewSourceRefOrigin);
+        Assert.Equal($"{sha} ({CheckWorkflow.PreviewSourceRefVariable})", reporter.SourcePin);
+    }
+
+    [Fact]
+    public async Task ExplicitOptionOutranksEnvironmentAndIsShownAsSuch()
+    {
+        using TempDirectory temp = new();
+        _ = Directory.CreateDirectory(temp.Path);
+        RecordingReporter reporter = new();
+        CheckWorkflow workflow = new(new ToolRunner(), new FakePrompts(), reporter, new FakeDirectiveSource(), new FakeSourceVersionResolver(),
+            readEnvironment: name => name == CheckWorkflow.PreviewSourceRefVariable ? "other/branch" : null);
+        var result = await workflow.RunAsync(new(temp.Path, true, false, null, null, "codex", false, true, "feature/fixtures"), CancellationToken.None);
+        Assert.Equal(0, result.ExitCode);
+        Assert.Equal("feature/fixtures", result.Report.PreviewSourceRef);
+        Assert.Equal("--preview-source-ref", result.Report.PreviewSourceRefOrigin);
+        Assert.Equal("feature/fixtures (--preview-source-ref)", reporter.SourcePin);
+    }
+
+    [Fact]
+    public async Task InvalidEnvironmentPinFailsBeforeProcessesOrWrites()
+    {
+        using TempDirectory temp = new();
+        FakeCommandRunner runner = new();
+        RecordingReporter reporter = new();
+        CheckWorkflow workflow = new(runner, new FakePrompts(), reporter, readEnvironment: name => name == CheckWorkflow.PreviewSourceRefVariable ? "bad..ref" : null);
+        var result = await workflow.RunAsync(new(temp.Path, false, true, null, null, "codex", false), CancellationToken.None);
+        Assert.Equal(2, result.ExitCode);
+        Assert.Empty(runner.Calls);
+        Assert.False(Directory.Exists(temp.Path));
+        Assert.Contains(CheckWorkflow.PreviewSourceRefVariable, Assert.Single(reporter.Errors), StringComparison.Ordinal);
+        Assert.Null(result.Report.PreviewSourceRef);
+    }
+
+    [Fact]
     public async Task ExplicitShaIsSharedByDirectiveListingContentAndPrerequisiteReader()
     {
         using TempDirectory temp = new();

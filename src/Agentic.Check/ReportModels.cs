@@ -6,6 +6,10 @@ sealed class AgenticCheckReport
 
     public bool DryRun { get; set; }
 
+    public string? PreviewSourceRef { get; set; }
+
+    public string? PreviewSourceRefOrigin { get; set; }
+
     public CompanionReport? Companion { get; set; }
 
     public DnaReport? Dna { get; set; }
