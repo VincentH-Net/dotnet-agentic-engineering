@@ -508,8 +508,8 @@ public sealed class CompanionTests
 
     [Theory]
     [InlineData(null, "install", "required 2.3")]
-    [InlineData("2.2.0", "update", "currently 2.2.0; required 2.3")]
-    [InlineData("2.3.0", "update", "currently 2.3.0; required 2.3")]
+    [InlineData("2.2.0", "update", "currently 2.2.0; required 2.3; refreshes to the latest 2.*")]
+    [InlineData("2.3.0", "update", "currently 2.3.0; required 2.3; refreshes to the latest 2.*")]
     public async Task ToolRecommendationDescribesPlannedActionAndCurrentVersion(string? installed, string action, string detail)
     {
         using TempDirectory temp = new();
@@ -525,6 +525,24 @@ public sealed class CompanionTests
         Assert.Equal($"InnoWvate.Agentic ({action})", RecommendationSelectionPrompt.FormatSkillListItem(recommendation));
         Assert.Equal(detail, recommendation.Version);
         Assert.False(recommendation.IsRequiredToolRepair);
+    }
+
+    [Theory]
+    [InlineData(null, "install InnoWvate.Agentic: installed absent, required 2.3, pattern 2.*, resolved 2.3.0")]
+    [InlineData("2.2.0", "update InnoWvate.Agentic: installed 2.2.0, required 2.3, pattern 2.*, resolved 2.3.0")]
+    [InlineData("2.3.0", "update InnoWvate.Agentic: installed 2.3.0, required 2.3, pattern 2.*, already the latest 2.3.0")]
+    public async Task PreparedToolReportsWhetherTheVersionActuallyChanged(string? installed, string expected)
+    {
+        using TempDirectory temp = new();
+        _ = temp.CreateDirectory("target");
+        if (installed is not null)
+            WriteManifest(temp.Path, installed);
+        FakePrompts prompts = new() { SelectedDirectiveNames = ["foundation-prompt-log"], SelectedSkillInstallArgs = [CompanionDependency.PackageId] };
+        var result = await new CheckWorkflow(new ToolRunner(), prompts, new RecordingReporter(), new FakeDirectiveSource(), new FakeSourceVersionResolver())
+            .RunAsync(new(temp.Path, false, false, null, null, "codex", false), CancellationToken.None);
+        Assert.Equal(0, result.ExitCode);
+        Assert.True(result.Report.Companion?.Success, result.Report.Companion?.Error);
+        Assert.Contains(expected, result.Report.Actions);
     }
 
     internal static void WriteManifest(string target, string? version)

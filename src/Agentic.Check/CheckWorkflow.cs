@@ -252,7 +252,9 @@ sealed class CheckWorkflow(
                 string description = $"{(options.DryRun ? "Would " : "")}{completed.Action} {CompanionDependency.PackageId}: installed {completed.InstalledVersion ?? "absent"}, required {requirement.Minimum}, pattern {completed.Pattern}";
                 if (completed.ResolvedVersion is not null)
                 {
-                    description += $", resolved {completed.ResolvedVersion}";
+                    description += completed.Action == "update" && completed.ResolvedVersion == completed.InstalledVersion
+                        ? $", already the latest {completed.ResolvedVersion}"
+                        : $", resolved {completed.ResolvedVersion}";
                 }
 
                 report.Actions.Add(description);
@@ -410,6 +412,10 @@ sealed class CheckWorkflow(
                 status = $"required {plannedRequirement?.Minimum ?? "unknown"}";
                 if (installedCompanion is not null)
                     status = $"currently {installedCompanion}; {status}";
+                // Selected dependent content always re-resolves the newest package in the major, even when
+                // the installed version already satisfies the minimum; say so instead of implying a version bump.
+                if (installedCompanion is not null && hasDependentRecommendations && plannedRequirement is not null)
+                    status += $"; refreshes to the latest {plannedRequirement.Pattern(options.Preview)}";
             }
             catch (Exception exception) when (exception is DirectiveException or FormatException or System.Xml.XmlException or IOException or UnauthorizedAccessException or JsonException or KeyNotFoundException)
             {
