@@ -6,6 +6,12 @@ static class PromptLogWrapper
 {
     static readonly UTF8Encoding Utf8 = new(false, true);
 
+    // Harnesses prepend these to the first user message; they are never part of what the user typed.
+    static readonly string[] HarnessMarkers =
+    [
+        "<INSTRUCTIONS>", "</INSTRUCTIONS>", "<environment_context>", "</environment_context>", "# AGENTS.md instructions for"
+    ];
+
     internal static async Task WrapAsync(string input, string output, TextReader stdin, CancellationToken cancellationToken, Action? beforeReplace = null, TextWriter? stdout = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -19,6 +25,7 @@ static class PromptLogWrapper
         string text = input == "-"
             ? await stdin.ReadToEndAsync(cancellationToken).ConfigureAwait(false)
             : await ReadInputAsync(input, destination, cancellationToken).ConfigureAwait(false);
+        RejectHarnessContext(text);
         string block = PromptBlock.Format(text);
         cancellationToken.ThrowIfCancellationRequested();
         if (destination is null)
@@ -42,6 +49,18 @@ static class PromptLogWrapper
         finally
         {
             File.Delete(temporary);
+        }
+    }
+
+    internal static void RejectHarnessContext(string text)
+    {
+        string[] lines = text.Split('\n');
+        for (int i = 0; i < lines.Length; i++)
+        {
+            string line = lines[i].TrimStart();
+            string? marker = Array.Find(HarnessMarkers, candidate => line.StartsWith(candidate, StringComparison.Ordinal));
+            if (marker is not null)
+                throw new FormatException($"The log contains harness-injected context ({marker} on line {i + 1}); log only what the user typed, then retry.");
         }
     }
 

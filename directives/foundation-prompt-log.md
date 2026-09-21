@@ -19,6 +19,8 @@ commit or push the current work.
 
 - Redact secrets, tokens, credentials, private URLs, and personal data. Preserve everything
   else verbatim; do not summarize.
+- Log only what the user typed. Omit anything the harness adds to a message, such as AGENTS.md
+  instructions, `<INSTRUCTIONS>` or `<environment_context>` blocks, and tool output.
 - Separate entries with blank lines. Leave standalone user prompts unlabeled, even questions.
 - Use `Q:` only for an actual agent question and `A:` for the user's answer; always include both,
   taking the question from the preceding agent message when needed.

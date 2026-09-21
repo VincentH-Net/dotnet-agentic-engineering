@@ -227,6 +227,30 @@ public sealed class CompanionTests
         Assert.Empty(output.ToString());
     }
 
+    [Theory]
+    [InlineData("# AGENTS.md instructions for /repo\n\n<INSTRUCTIONS>\n## Rules\n</INSTRUCTIONS>\n\nbuild the web api\n", "# AGENTS.md instructions for on line 1")]
+    [InlineData("build it\n\n  <environment_context>\n  <cwd>/repo</cwd>\n</environment_context>\n", "<environment_context> on line 3")]
+    [InlineData("done\n</INSTRUCTIONS>\n", "</INSTRUCTIONS> on line 2")]
+    public async Task HarnessInjectedContextIsRejectedBeforeAnyOutput(string text, string diagnostic)
+    {
+        using Workspace workspace = new();
+        string destination = Path.Combine(workspace.Path, "block.txt");
+        await File.WriteAllTextAsync(destination, "previous block").ConfigureAwait(true);
+        using StringWriter output = new(CultureInfo.InvariantCulture);
+        using StringWriter error = new(CultureInfo.InvariantCulture);
+        using StringReader input = new(text);
+        Assert.Equal(1, await AgenticCli.InvokeAsync(["prompt-log", "wrap", "--input", "-", "--prompt-log", destination, "-m", "2.3"], input, output, error).ConfigureAwait(true));
+        Assert.Empty(output.ToString());
+        Assert.Contains("harness-injected context (" + diagnostic + ")", error.ToString(), StringComparison.Ordinal);
+        Assert.Contains("log only what the user typed", error.ToString(), StringComparison.Ordinal);
+        Assert.Equal("previous block", await File.ReadAllTextAsync(destination).ConfigureAwait(true));
+
+        using StringReader ordinary = new("please update the AGENTS.md instructions for the web project\n\nQ: Which one?\nA: Web\n");
+        using StringWriter block = new(CultureInfo.InvariantCulture);
+        Assert.Equal(0, await AgenticCli.InvokeAsync(["prompt-log", "wrap", "--input", "-", "-m", "2.3"], ordinary, block, error).ConfigureAwait(true));
+        Assert.Contains("please update the AGENTS.md instructions for the web project", block.ToString(), StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task FailedInputAndIncompatibilityDoNotEmitPartialStdout()
     {
