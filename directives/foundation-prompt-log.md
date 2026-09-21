@@ -19,9 +19,10 @@ commit or push the current work.
 
 - Redact secrets, tokens, credentials, private URLs, and personal data. Preserve everything
   else verbatim; do not summarize.
-- Verify that answers include their corresponding agent questions. When needed, inspect the preceding agent message for the question.
-- Use blank lines and labels `Q:` and `A:` for readability. Review the complete log
-  for omissions and sensitive content before wrapping it.
+- Separate entries with blank lines. Leave standalone user prompts unlabeled, even questions.
+- Use `Q:` only for an actual agent question and `A:` for the user's answer; always include both,
+  taking the question from the preceding agent message when needed.
+- Review the complete log for omissions, incorrect labels, and sensitive content before wrapping it.
 
 ### Writing the Log
 
