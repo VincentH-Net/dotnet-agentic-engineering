@@ -2,9 +2,9 @@
 
 If you use coding agents on real .NET repos, the hard part is not finding one more skill. It is composing the right set of directives and skills for your tech stack and patterns, keeping that set current, and not burying the agent in instructions that contradict each other. That is the work I kept redoing on my own repos, so I moved it into a tool.
 
-`agentic.check` scans a folder, detects the technologies in use, and installs directives and skills for them, tested and selected from best-in-class GitHub skills repos. Since 2.3 it also installs the tooling those directives and skills need, and gives you `dna` for daily use. Follow the steps below - or just watch me do that in this video:
+`agentic.check` scans a folder, detects the technologies in use, and installs directives and skills for them, tested and selected from best-in-class GitHub skills repos. Since 2.3 it also installs the tooling those directives and skills need, and you run everything through `dna`, a global shorthand you install once per machine. Follow the steps below - or just watch me do that in this video:
 
-[Insert video: create the Api repo, run dnx agentic.check, prompt the agent, show dna prompt-log.]
+[Insert video: install dna, create the Api repo, run dna check, prompt the agent, show dna prompt-log.]
 
 Repo: [github.com/VincentH-Net/dotnet-agentic-engineering](https://github.com/VincentH-Net/dotnet-agentic-engineering)
 
@@ -14,16 +14,17 @@ NuGet: [nuget.org/packages/Agentic.Check](https://www.nuget.org/packages/Agentic
 
 First make sure you have the .NET 10 SDK or later and the GitHub CLI. Skills are installed with `gh skill`, which uses GitHub's API quota. Anonymous access is enough for a handful of skills; `gh auth login` gives you a much higher quota, and the tool tells you when you need it.
 
-Let's create a repo with a .NET project and run the check:
+Install the `dna` shorthand once per machine, then create a repo with a .NET project and run the check:
 
 ```bash
+dotnet tool install --global InnoWvate.Dna
 mkdir Api && cd Api && git init && dotnet new gitignore
 dotnet new webapi --use-minimal-apis
 git add . && git commit -m "create new api from template"
-dnx agentic.check
+dna check
 ```
 
-`agentic.check` detects a .NET web API and lists what fits it:
+`dna check` runs the latest `agentic.check`, which detects a .NET web API and lists what fits it:
 
 - **Directives**: short, tested instructions in `AGENTS.md` / `CLAUDE.md`, such as how to run `dotnet` without agent timeouts, how to fix build warnings, which documentation source to consult first, and the prompt log.
 - **Skills**, installed with `gh skill` from tested sources: [dotnet/skills](https://github.com/dotnet/skills), [unoplatform/studio](https://github.com/unoplatform/studio), [mtmattei/UnoPlatformSkills](https://github.com/mtmattei/UnoPlatformSkills) and [VincentH-Net/dotnet-agentic-engineering](https://github.com/VincentH-Net/dotnet-agentic-engineering).
@@ -33,9 +34,7 @@ Directives and skills compose like your stack: Orleans adds to .NET, which adds 
 
 [Insert screenshot: recommendation list for the Api repo with directives, skills, and the InnoWvate.Agentic and dna tool actions.]
 
-Selecting the Prompt Log directive also selects two tools: `InnoWvate.Agentic`, the `dotnet agentic` tool that the directive calls, pinned in the target folder just like the directive so specialized folders can have their own version, and the `dna` shorthand for `dotnet agentic`, a global launcher so you type less. Deselect `dna` if you prefer the long form.
-
-That makes `dnx agentic.check` a one-time step per machine. From then on, `dna check` does the same in any folder.
+Selecting the Prompt Log directive also selects the tool it uses: `InnoWvate.Agentic`, the `dotnet agentic` tool that the directive calls, pinned in the target folder just like the directive, so specialized folders can have their own version. `dna` is the shorthand for it: `dna <args>` runs that folder's `dotnet agentic <args>`, and `dna check` works before it exists. If you cannot install a global tool, or another `dna` is on your PATH, `dnx agentic.check` does the same as `dna check`.
 
 Now start your agent. If it was already running, start it again so the new instructions are active.
 

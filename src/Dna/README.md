@@ -20,16 +20,16 @@ replaces `dnx agentic.check` there.
 
 ## Install
 
-Agentic.Check selects the `dna` shorthand by default when it installs the local tool; deselect it
-to opt out. Or install it yourself:
+Once per machine:
 
 ```bash
 dotnet tool install --global InnoWvate.Dna
 ```
 
-Requires a .NET 10 or later SDK selected for the current folder. If another `dna` command is
-already on your PATH, Agentic.Check shows where it is and asks before installing, because that
-command may hide this one.
+Agentic.Check also offers it when started with `dnx agentic.check` or `dotnet agentic check`;
+deselect it to opt out. Requires a .NET 10 or later SDK selected for the current folder. If
+another `dna` command is already on your PATH, that command may hide this one; Agentic.Check
+shows where it is and asks before installing.
 
 ## Update
 

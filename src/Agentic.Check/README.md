@@ -1,6 +1,6 @@
 # Agentic.Check
 
-`dnx agentic.check` optimizes your repo for agentic engineering with .NET - based technologies.
+`agentic.check` optimizes your repo for agentic engineering with .NET - based technologies. You run it as `dna check`.
 
 - Detects which .NET based technologies and features you use
 - Recommends an optimal set of agentic directives, skills and tools for those
@@ -41,20 +41,21 @@ you to run `gh auth login` and rerun; completed changes are kept. When you are l
 
 ## Usage
 
-First time on a machine, from the folder you want to set up:
+Install the `dna` shorthand once per machine, then run the check from the folder you want to set up:
 
 ```bash
-dnx agentic.check
+dotnet tool install --global InnoWvate.Dna
+dna check
 ```
 
-This also installs the `dna` shorthand. From then on, run `dna check` in any folder instead; it
-runs the latest `agentic.check` the same way.
+`dna check` runs the latest stable `agentic.check`; so does `dotnet agentic check` once the local
+tool exists. Without `dna`, run `dnx agentic.check` with the same options after `--`.
 
 ```bash
 dna check --dry-run   # report recommended actions without applying them
 dna check --preview   # latest directives and skills from each source's default branch
 dna check --yes       # apply all recommended actions without prompting
-dna check -h          # all options; with dnx: dnx agentic.check -- -h
+dna check -h          # all options
 ```
 
 ### Tools
@@ -66,20 +67,19 @@ Currently the **Prompt Log** directive (`foundation-prompt-log`) does; selecting
   It is installed in the target's `.config/dotnet-tools.json` at the newest version compatible
   with the selected directives and skills (`major.*`, or `major.*-*` with `--preview`). If that
   fails, the dependent directives and skills are skipped and reported.
-- **`dna` shorthand for `dotnet agentic`**: the optional global `InnoWvate.Dna` launcher, so
-  you type less. Deselect it to opt out. If another `dna` command is already on
-  your PATH, `agentic.check` shows where it is and asks before installing. A run started
-  with `dna check` never replaces the running `dna`; it stops with an update command when
-  `dna` is too old.
+- **`dna` shorthand for `dotnet agentic`**: the global `InnoWvate.Dna` launcher, offered when
+  `agentic.check` is started with `dnx agentic.check` or `dotnet agentic check`. Deselect it to
+  opt out. If another `dna` command is already on your PATH, `agentic.check` shows where it is
+  and asks before installing. A run started with `dna check` never replaces the running `dna`;
+  it stops with an update command when `dna` is too old.
 
 Deselecting a directive or skill deselects the tools it pulled in, unless something else needs them.
 
 ### Updating
 
-Run `dna check` regularly, and after adding a technology to your repo. It runs the latest stable
-`agentic.check`, same as `dotnet agentic check` and `dnx agentic.check`, and updates directives,
-skills and tools together so they stay compatible. In a fresh clone, `dotnet tool restore` restores
-the recorded tool version; `dna check` offers this too.
+Run `dna check` regularly, and after adding a technology to your repo. Directives, skills and
+tools are updated together so they stay compatible. In a fresh clone, `dotnet tool restore`
+restores the recorded tool version; `dna check` offers this too.
 
 ### Folder specializing
 

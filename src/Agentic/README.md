@@ -65,8 +65,7 @@ Exit codes: **0** success, **1** failure, **2** invalid arguments. Diagnostics g
 dotnet tool restore
 ```
 
-restores the exact recorded version. Or run `dna check`, or `dnx agentic.check` on a machine
-without `dna`, which offers the restore and the `dna` shorthand. A .NET 10 or later SDK must be selected for the folder.
+restores the exact recorded version. Or run `dna check`, which offers the restore. A .NET 10 or later SDK must be selected for the folder.
 
 ## Local development feeds
 
