@@ -1,51 +1,54 @@
-# dna shorthand command
+# dna
 
-Install the optional global launcher with `dotnet tool install --global InnoWvate.Dna`,
-or select the `dna` shorthand action in Agentic.Check. It is versioned independently,
-starting at 1.0.0.
+`dna` is the shorthand for `dotnet agentic`: a global launcher for that folder-local tool, so you type less:
 
-`dna <args>` forwards to `dotnet tool run agentic -- <args>` in the current directory.
-The local tool manifest determines the InnoWvate.Agentic version. For example:
-
-```sh
-dna
-dna -h
-dna prompt-log
+```bash
+dna check                     # run the latest Agentic.Check to set up or update this repo
+dna prompt-log                # show the latest 20 prompt logs
 dna prompt-log --limit 50
 dna prompt-log --all
-dna prompt-log show -m 2.3
-dna prompt-log show --since 2026-01-26 --until 2026-02-07 -m 2.3
-dna prompt-log check --commit HEAD -m 2.3
+dna prompt-log --since 2026-01-26 --until 2026-02-07
+dna prompt-log check --commit HEAD
+dna -h
 ```
 
-With the updated local companion, `dna prompt-log` defaults to `show`: the latest 20 prompt
-logs, displayed chronologically. `--limit N` changes the count and `--all` removes the limit;
-date filters remain available. `dna prompt-log --help` shows the available commands and options.
+`dna <args>` runs `dotnet agentic <args>` in the current folder, so that folder's pinned
+[InnoWvate.Agentic](https://www.nuget.org/packages/InnoWvate.Agentic) version is used.
+`dna check` runs the latest stable [Agentic.Check](https://www.nuget.org/packages/Agentic.Check)
+directly and works before the local tool is installed. Once `dna` is on a machine, `dna check`
+replaces `dnx agentic.check` there.
 
-`dna check <args>` runs `dotnet tool exec Agentic.Check -- <args>` directly, using
-normal .NET stable-package resolution, NuGet settings, and caching. It works without
-a local companion installation and is equivalent to `dotnet agentic check <args>`
-when the companion is installed. Both require a .NET 10 or later SDK selected for
-the current directory, including any `global.json` selection.
+## Install
 
-The launcher preserves arguments, working directory, standard input/output/error,
-and the child exit code. All other commands require a restored local agentic tool.
-Before a normal invocation, a local `dotnet tool list --local --format json` query checks
-the current folder's tool scope. If InnoWvate.Agentic is absent, dna exits with code 1
-and writes this message to stderr:
+Agentic.Check selects the `dna` shorthand by default when it installs the local tool; deselect it
+to opt out. Or install it yourself:
+
+```bash
+dotnet tool install --global InnoWvate.Dna
+```
+
+Requires a .NET 10 or later SDK selected for the current folder. If another `dna` command is
+already on your PATH, Agentic.Check shows where it is and asks before installing, because that
+command may hide this one.
+
+## Update
+
+```bash
+dotnet tool update --global InnoWvate.Dna
+```
+
+Agentic.Check also offers this update when you start it with `dnx agentic.check` or
+`dotnet agentic check`. Started with `dna check`, it cannot replace the running `dna`, so it only
+verifies that `dna` is recent enough and stops with this update command when it is not.
+
+## When the local tool is missing
+
+In a folder without InnoWvate.Agentic, `dna` exits with code 1 and prints:
 
 ```text
 `dotnet agentic` is not installed in the scope of the current working folder.
 Please run `dna check` to install it.
 ```
 
-Tools declared in a manifest but needing restoration retain .NET's restore diagnostics.
-SDK and manifest errors retain their original diagnostics too. `dna check` bypasses this
-availability query and can install the companion. The query uses local metadata only.
-It does not install the companion automatically or modify PATH or shell profiles.
-
-Agentic.Check offers a global update when this package is already installed. An
-unrelated `dna` found on PATH is reported without executing it. You may install
-anyway, but the other command may hide this shorthand. In unattended mode a
-conflicting shorthand action is skipped. Update manually with
-`dotnet tool update --global InnoWvate.Dna`.
+The launcher is deliberately tiny and versioned independently. Functionality lives in the
+folder-pinned InnoWvate.Agentic and the latest Agentic.Check.

@@ -29,4 +29,5 @@
     <PackageReference Include="System.CommandLine" Version="2.0.9" />
   </ItemGroup>
   <ItemGroup><Compile Include="../Shared/ToolVersion.cs" Link="ToolVersion.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="../Shared/DnaLauncherContract.cs" Link="DnaLauncherContract.cs" /></ItemGroup>
 </Project>

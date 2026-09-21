@@ -156,6 +156,64 @@ public sealed class DnaTests
         Assert.Null(optedOut.Report.Dna);
         Assert.Empty(runner.Writes);
     }
+
+    [Theory]
+    [InlineData("1.0.0")]
+    [InlineData("1.0.0+abc123")]
+    [InlineData("1.2.0-preview.1")]
+    [InlineData("not a version")]
+    public async Task RunStartedByDnaNeverReplacesTheRunningShorthand(string version)
+    {
+        using TempDirectory temp = new();
+        CompanionTests.WriteManifest(temp.Path, "2.3.0");
+        DnaRunner runner = new() { Version = "1.0.0" };
+        var installer = new DnaInstaller(runner, temp.CreateDirectory("bin"));
+        CheckWorkflow workflow = new(runner, new FakePrompts(), new RecordingReporter(),
+            new FakeDirectiveSource(new Dictionary<string, string>()), new FakeSourceVersionResolver(), [], installer,
+            name => name == DnaLauncherContract.VersionVariable ? version : null);
+        var result = await workflow.RunAsync(new(temp.Path, false, true, null, null, "codex", false), CancellationToken.None);
+        Assert.Equal(0, result.ExitCode);
+        Assert.Null(result.Report.Dna);
+        Assert.Empty(runner.Writes);
+        var launcher = Assert.Single(result.Report.Prerequisites, check => check.Name == "dna");
+        Assert.True(launcher.Success);
+        Assert.Equal(version, launcher.Version);
+        Assert.Equal(DnaInstaller.MinimumLauncherVersion, launcher.MinimumVersion);
+    }
+
+    [Theory]
+    [InlineData("0.9.9")]
+    [InlineData("0.9.9-preview.1+abc123")]
+    public async Task RunStartedByOutdatedDnaStopsBeforeAnyWork(string version)
+    {
+        using TempDirectory temp = new();
+        _ = Directory.CreateDirectory(temp.Path);
+        ToolRunner runner = new();
+        RecordingReporter reporter = new();
+        CheckWorkflow workflow = new(runner, new FakePrompts(), reporter, new FakeDirectiveSource(), new FakeSourceVersionResolver(),
+            readEnvironment: name => name == DnaLauncherContract.VersionVariable ? version : null);
+        var result = await workflow.RunAsync(new(temp.Path, false, true, null, null, "codex", false), CancellationToken.None);
+        Assert.Equal(2, result.ExitCode);
+        Assert.Empty(runner.Calls);
+        string error = Assert.Single(reporter.Errors);
+        Assert.Equal($"The dna shorthand {version} is older than the required 1.0.0. Run `dotnet tool update --global InnoWvate.Dna`, then run `dna check` again.", error);
+        var launcher = Assert.Single(result.Report.Prerequisites);
+        Assert.Equal("dna", launcher.Name);
+        Assert.False(launcher.Success);
+        Assert.Equal(version, launcher.Version);
+        Assert.Equal("1.0.0", launcher.MinimumVersion);
+        Assert.Equal(error, launcher.StandardError);
+    }
+
+    [Fact]
+    public void LauncherVersionIsReadFromTheSharedVariableOnly()
+    {
+        Assert.Null(DnaInstaller.Launcher(_ => null));
+        Assert.Null(DnaInstaller.Launcher(name => name == DnaLauncherContract.VersionVariable ? "  " : "1.0.0"));
+        var launcher = DnaInstaller.Launcher(name => name == DnaLauncherContract.VersionVariable ? " 1.0.0 " : null);
+        Assert.Equal("1.0.0", Assert.IsType<DnaLauncher>(launcher).Version);
+        Assert.Null(launcher.Error);
+    }
 }
 
 sealed class DnaRunner(ToolRunner? companion = null) : ICommandRunner

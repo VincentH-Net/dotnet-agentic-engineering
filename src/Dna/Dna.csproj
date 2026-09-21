@@ -22,5 +22,6 @@
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="/" />
     <Compile Include="../Shared/ToolLauncher.cs" Link="ToolLauncher.cs" />
+    <Compile Include="../Shared/DnaLauncherContract.cs" Link="DnaLauncherContract.cs" />
   </ItemGroup>
 </Project>

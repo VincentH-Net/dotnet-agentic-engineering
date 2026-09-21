@@ -10,10 +10,36 @@ sealed record DnaInstallation(string? Version, string? Error = null)
 sealed record DnaReport(string Action, string? InstalledVersion, string? ResolvedVersion, bool Success, bool Skipped,
     IReadOnlyList<string> Conflicts, string? Error);
 
+// The dna that started this run, when it did. Its files cannot be replaced while it runs.
+sealed record DnaLauncher(string Version, string? Error);
+
 sealed class DnaInstaller(ICommandRunner runner, string? searchPath = null, string? globalDirectory = null)
 {
     internal const string PackageId = "InnoWvate.Dna";
+    // Raise only when Agentic.Check depends on a newer launch protocol.
+    internal const string MinimumLauncherVersion = "1.0.0";
     internal static SkillDependency Identity { get; } = new(string.Empty, PackageId);
+
+    internal static DnaLauncher? Launcher(Func<string, string?> readEnvironment)
+    {
+        string? version = readEnvironment(DnaLauncherContract.VersionVariable)?.Trim();
+        if (string.IsNullOrEmpty(version))
+            return null;
+        try
+        {
+            var running = ToolVersion.Parse(version);
+            var minimum = ToolVersion.Parse(MinimumLauncherVersion);
+            // Prerelease and build metadata do not change the launch protocol.
+            bool sufficient = (running.Major, running.Minor, running.Patch).CompareTo((minimum.Major, minimum.Minor, minimum.Patch)) >= 0;
+            return new(version, sufficient ? null
+                : $"The dna shorthand {version} is older than the required {MinimumLauncherVersion}. Run `dotnet tool update --global {PackageId}`, then run `dna check` again.");
+        }
+        catch (FormatException)
+        {
+            // An unrecognized version cannot be judged, but the running launcher must still not be replaced.
+            return new(version, null);
+        }
+    }
 
     internal static SkillManifestEntry Action(DnaInstallation installation)
         => new(string.Empty, PackageId, "`dna` shorthand for `dotnet agentic`", string.Empty, [],

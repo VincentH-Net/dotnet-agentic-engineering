@@ -1,8 +1,14 @@
+using System.Reflection;
 using Agentic;
 using Dna;
 
 if (args is ["check", .. var arguments])
+{
+    // Agentic.Check verifies this launcher version and must not replace the running dna.
+    Environment.SetEnvironmentVariable(DnaLauncherContract.VersionVariable,
+        typeof(Program).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion);
     return await ToolLauncher.CheckAsync(arguments, Environment.CurrentDirectory, Console.Error).ConfigureAwait(false);
+}
 
 if (await LocalCompanion.IsMissingAsync(Environment.CurrentDirectory).ConfigureAwait(false))
 {

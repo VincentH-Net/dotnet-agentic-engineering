@@ -100,6 +100,18 @@ sealed class CheckWorkflow(
             return new CheckRunResult(2, report);
         }
 
+        var launcher = DnaInstaller.Launcher(readEnvironment ?? Environment.GetEnvironmentVariable);
+        if (launcher is not null)
+        {
+            report.Prerequisites.Add(new("dna", launcher.Error is null, launcher.Version, DnaInstaller.MinimumLauncherVersion, string.Empty, launcher.Error ?? string.Empty));
+            if (launcher.Error is not null)
+            {
+                reporter.Error(launcher.Error);
+                await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
+                return new CheckRunResult(2, report);
+            }
+        }
+
         var prerequisites = await new PrerequisiteChecker(commandRunner)
             .CheckAsync(report.TargetDirectory, cancellationToken)
             .ConfigureAwait(false);
@@ -390,10 +402,11 @@ sealed class CheckWorkflow(
         }
 
         DnaInstallation? dnaInstallation = null;
-        if (recommendedSkillActions.Any(skill => skill.IsCompanion) || installedCompanion is not null)
+        if (launcher is null && (recommendedSkillActions.Any(skill => skill.IsCompanion) || installedCompanion is not null))
         {
             // An already installed companion satisfies this dependency even when there is
             // no companion action. Existing repos can still opt into or update the shorthand.
+            // A run started by dna never offers it: the running launcher's files are locked on Windows.
             dnaInstallation = await shorthandInstaller.InspectAsync(targetDirectory, cancellationToken).ConfigureAwait(false);
             recommendedSkillActions = [.. recommendedSkillActions, DnaInstaller.Action(dnaInstallation)];
         }
