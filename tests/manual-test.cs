@@ -1,5 +1,6 @@
 // Prepare an isolated shell for manually testing the local Agentic.Check, InnoWvate.Agentic and
-// InnoWvate.Dna builds together with this branch's directives and skills, before anything is published.
+// InnoWvate.Dna builds together with this branch's directives and skills, before anything is published,
+// or (--published) the packages and release content on nuget.org after publishing.
 // Run from any directory: dotnet run --file /path/to/tests/manual-test.cs [options]
 using System.ComponentModel;
 using System.Diagnostics;
@@ -19,6 +20,7 @@ bool release = true;
 bool openTerminal = true;
 bool withGh = true;
 bool list = false;
+bool published = false;
 for (int i = 0; i < args.Length; i++)
 {
     switch (args[i])
@@ -50,10 +52,19 @@ for (int i = 0; i < args.Length; i++)
         case "--no-gh":
             withGh = false;
             break;
+        case "--published":
+            published = true;
+            break;
         default:
             Console.Error.WriteLine($"Unknown or incomplete option: {args[i]}. Use --help for usage.");
             return 2;
     }
+}
+
+if (published && !release)
+{
+    Console.Error.WriteLine("--debug has no effect with --published: nothing is built locally.");
+    return 2;
 }
 
 string checkout = Checkout();
@@ -76,44 +87,54 @@ if (list)
 
 try
 {
-    string sha = Git("rev-parse", "HEAD");
-    string branch = Git("symbolic-ref", "--quiet", "--short", "HEAD");
-    var (remoteCode, remoteOutput) = Capture("git", ["ls-remote", "--exit-code", "origin", "refs/heads/" + branch], checkout);
-    string pushed = remoteCode == 0 ? remoteOutput.Split('\t')[0].Trim() : "(none)";
-    if (pushed != sha)
+    string sha = string.Empty;
+    string branch = string.Empty;
+    string sources = string.Empty;
+    if (!published)
     {
-        throw Failure($"SOURCE NOT READY: origin/{branch} is at {pushed}, HEAD is {sha}.\n"
-            + "Agentic.Check reads directives and skills from GitHub, so push HEAD first and rerun.");
+        sha = Git("rev-parse", "HEAD");
+        branch = Git("symbolic-ref", "--quiet", "--short", "HEAD");
+        var (remoteCode, remoteOutput) = Capture("git", ["ls-remote", "--exit-code", "origin", "refs/heads/" + branch], checkout);
+        string pushed = remoteCode == 0 ? remoteOutput.Split('\t')[0].Trim() : "(none)";
+        if (pushed != sha)
+        {
+            throw Failure($"SOURCE NOT READY: origin/{branch} is at {pushed}, HEAD is {sha}.\n"
+                + "Agentic.Check reads directives and skills from GitHub, so push HEAD first and rerun.");
+        }
+        string content = Git("status", "--porcelain", "--untracked-files=all", "--", "directives", "plugins");
+        if (content.Length > 0)
+            throw Failure("Directives and skills must be committed and pushed to be tested:\n" + content);
+        sources = Git("status", "--porcelain", "--", "src");
     }
-    string content = Git("status", "--porcelain", "--untracked-files=all", "--", "directives", "plugins");
-    if (content.Length > 0)
-        throw Failure("Directives and skills must be committed and pushed to be tested:\n" + content);
-    string sources = Git("status", "--porcelain", "--", "src");
 
     string configuration = release ? "Release" : "Debug";
     string runId = DateTime.UtcNow.ToString("yyyyMMdd'T'HHmmss'Z'", CultureInfo.InvariantCulture);
     string run = Path.Combine(checkout, "tests", "TestResults", "manual", runId);
     string feed = Path.Combine(run, "feed");
     string cliHome = Path.Combine(run, "cli-home");
-    _ = Directory.CreateDirectory(feed);
     _ = Directory.CreateDirectory(cliHome);
-    Say($"Manual test run {runId}: {branch}@{sha[..12]} ({configuration})");
+    Say(published ? $"Manual test run {runId}: published packages and release content" : $"Manual test run {runId}: {branch}@{sha[..12]} ({configuration})");
     if (sources.Length > 0)
         Say("Note: src has uncommitted changes; the packed tools include them, the pushed content does not.");
 
-    Say("\nPacking the three tools into an isolated feed...");
-    string[] projects = ["src/Agentic.Check/Agentic.Check.csproj", "src/Agentic/Agentic.csproj", "src/Dna/Dna.csproj"];
-    foreach (string project in projects)
+    var packages = Array.Empty<(string id, string version, string path, string sha256)>();
+    if (!published)
     {
-        if (Run("dotnet", ["pack", project, "-c", configuration, "-o", feed, "-p:RepositoryCommit=" + sha], checkout) != 0)
-            throw Failure($"Packing {project} failed.");
+        _ = Directory.CreateDirectory(feed);
+        Say("\nPacking the three tools into an isolated feed...");
+        string[] projects = ["src/Agentic.Check/Agentic.Check.csproj", "src/Agentic/Agentic.csproj", "src/Dna/Dna.csproj"];
+        foreach (string project in projects)
+        {
+            if (Run("dotnet", ["pack", project, "-c", configuration, "-o", feed, "-p:RepositoryCommit=" + sha], checkout) != 0)
+                throw Failure($"Packing {project} failed.");
+        }
+        string[] packageIds = ["Agentic.Check", "InnoWvate.Agentic", "InnoWvate.Dna"];
+        packages = [.. packageIds.Select(id =>
+        {
+            string path = Directory.GetFiles(feed, id + ".*.nupkg").Single();
+            return (id, version: Path.GetFileNameWithoutExtension(path)[(id.Length + 1)..], path, sha256: Sha256(path));
+        })];
     }
-    string[] packageIds = ["Agentic.Check", "InnoWvate.Agentic", "InnoWvate.Dna"];
-    var packages = packageIds.Select(id =>
-    {
-        string path = Directory.GetFiles(feed, id + ".*.nupkg").Single();
-        return (id, version: Path.GetFileNameWithoutExtension(path)[(id.Length + 1)..], path, sha256: Sha256(path));
-    }).ToArray();
 
     bool existing = target is not null;
     string? source = null;
@@ -168,10 +189,11 @@ try
     }
 
     string nugetConfig = Path.Combine(target!, "NuGet.Config");
+    string packageSource = published ? "https://api.nuget.org/v3/index.json" : feed;
     if (existing)
-        Say($"\nRefreshing {nugetConfig} to the new feed; the repository's files and history are untouched.");
+        Say($"\nRefreshing {nugetConfig} to {(published ? "nuget.org" : "the new feed")}; the repository's files and history are untouched.");
     new XDocument(new XElement("configuration",
-        new XElement("packageSources", new XElement("clear"), new XElement("add", new XAttribute("key", "local-builds"), new XAttribute("value", feed))),
+        new XElement("packageSources", new XElement("clear"), new XElement("add", new XAttribute("key", published ? "nuget.org" : "local-builds"), new XAttribute("value", packageSource))),
         new XElement("fallbackPackageFolders", new XElement("clear")))).Save(nugetConfig);
 
     string toolsDirectory = Path.Combine(cliHome, ".dotnet", "tools");
@@ -181,33 +203,43 @@ try
         ["NUGET_PACKAGES"] = Path.Combine(run, "packages"),
         ["NUGET_HTTP_CACHE_PATH"] = Path.Combine(run, "http-cache"),
         ["AGENTIC_CHECK_CACHE_DIR"] = Path.Combine(run, "source-cache"),
-        ["AGENTIC_CHECK_PREVIEW_SOURCE_REF"] = sha,
         ["DOTNET_ADD_GLOBAL_TOOLS_TO_PATH"] = "0",
         ["DOTNET_SKIP_FIRST_TIME_EXPERIENCE"] = "1",
         ["DOTNET_NOLOGO"] = "1",
         ["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1"
     };
 
-    Say("\nInstalling the local dna into the isolated CLI home...");
-    if (Run("dotnet", ["tool", "install", "--global", "InnoWvate.Dna", "--configfile", nugetConfig], target!, environment) != 0)
-        throw Failure("Installing InnoWvate.Dna from the local feed failed.");
+    if (!published)
+        environment["AGENTIC_CHECK_PREVIEW_SOURCE_REF"] = sha;
+
+    Say(published ? "\nInstalling dna from nuget.org into the isolated CLI home..." : "\nInstalling the local dna into the isolated CLI home...");
+    var (installCode, installOutput) = Capture("dotnet", ["tool", "install", "--global", "InnoWvate.Dna", "--configfile", nugetConfig], target!, environment);
+    Say(installOutput);
+    if (installCode != 0)
+        throw Failure($"Installing InnoWvate.Dna from {(published ? "nuget.org" : "the local feed")} failed.");
+    string dnaVersion = VersionIn(installOutput);
     if (File.Exists(Path.Combine(target!, ".config", "dotnet-tools.json"))
         && Run("dotnet", ["tool", "restore", "--configfile", nugetConfig], target!, environment) != 0)
     {
         Say("Note: dotnet tool restore failed; dna check will offer to repair the local tool.");
     }
-    Say("\nCaching the local Agentic.Check for dna check...");
+    Say(published ? "\nCaching Agentic.Check from nuget.org for dna check..." : "\nCaching the local Agentic.Check for dna check...");
     var (cacheCode, cacheOutput) = Capture("dotnet", ["tool", "exec", "Agentic.Check", "--configfile", nugetConfig, "--", "--version"], target!, environment, "y\n");
+    string checkVersion = cacheCode == 0 ? cacheOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries).LastOrDefault()?.Trim() ?? "unknown" : "unknown";
     if (cacheCode != 0)
-        Say($"Note: caching failed; the first dna check downloads it from the local feed instead.\n{cacheOutput}");
+        Say($"Note: caching failed; the first dna check downloads it from {(published ? "nuget.org" : "the local feed")} instead.\n{cacheOutput}");
 
     string activate = Path.Combine(run, "activate.sh");
     string dotnetDirectory = Path.GetDirectoryName(Environment.ProcessPath!)!;
     string path = withGh
         ? $"{Quote(toolsDirectory)}:$PATH"
         : $"{Quote(toolsDirectory)}:{Quote(dotnetDirectory)}:/usr/bin:/bin:/usr/sbin:/sbin";
-    string summary = $"Manual test shell {runId}: local Agentic.Check {packages[0].version}, InnoWvate.Agentic {packages[1].version}, InnoWvate.Dna {packages[2].version} ({configuration}).";
-    string pinned = $"Directives and skills come from {branch}@{sha[..12]} through AGENTIC_CHECK_PREVIEW_SOURCE_REF.";
+    string summary = published
+        ? $"Published-package test shell {runId}: Agentic.Check {checkVersion} and InnoWvate.Dna {dnaVersion} from nuget.org; dna check resolves InnoWvate.Agentic there too."
+        : $"Manual test shell {runId}: local Agentic.Check {packages[0].version}, InnoWvate.Agentic {packages[1].version}, InnoWvate.Dna {packages[2].version} ({configuration}).";
+    string pinned = published
+        ? "Directives and skills come from the latest published release (stable channel)."
+        : $"Directives and skills come from {branch}@{sha[..12]} through AGENTIC_CHECK_PREVIEW_SOURCE_REF.";
     File.WriteAllText(activate, string.Join('\n',
     [
         "# Source this file in a terminal to test the local builds. Only that terminal and its child processes change.",
@@ -221,12 +253,12 @@ try
 
     JsonObject provenance = new()
     {
-        ["branch"] = branch,
-        ["commit"] = sha,
-        ["configuration"] = configuration,
+        ["branch"] = published ? null : branch,
+        ["commit"] = published ? null : sha,
+        ["configuration"] = published ? null : configuration,
         ["target"] = target,
         ["source"] = source ?? "existing target",
-        ["feed"] = feed,
+        ["packageSource"] = packageSource,
         ["activate"] = activate,
         ["packages"] = new JsonArray([.. packages.Select(package => (JsonNode)new JsonObject
         {
@@ -252,12 +284,18 @@ try
         $"source {Quote(activate)}",
         "```",
         string.Empty,
-        "Then `dna check`, `dna prompt-log`, `dnx agentic.check -- -h` and agent-started `dotnet agentic` commands all",
-        "use the local builds from `feed/` and the pinned content. Your normal global tools, caches, GitHub login and",
-        "shell profiles are unchanged. `NuGet.Config` in the test repository lists only the local feed; add nuget.org",
-        "there if you need to restore other packages in that repository.",
+        published
+            ? "Then `dna check`, `dna prompt-log`, `dnx agentic.check -- -h` and agent-started `dotnet agentic` commands all"
+            : "Then `dna check`, `dna prompt-log`, `dnx agentic.check -- -h` and agent-started `dotnet agentic` commands all",
+        published
+            ? "use the published packages from nuget.org and the latest release content, in caches isolated from your machine."
+            : "use the local builds from `feed/` and the pinned content. Your normal global tools, caches, GitHub login and",
+        published
+            ? "Your normal global tools, caches, GitHub login and shell profiles are unchanged."
+            : "shell profiles are unchanged. `NuGet.Config` in the test repository lists only the local feed; add nuget.org",
+        published ? string.Empty : "there if you need to restore other packages in that repository.",
         string.Empty,
-        "Reuse this repository with a newer build: `dotnet run --file tests/manual-test.cs --target " + Quote(target!) + "`.",
+        $"Reuse this repository: `dotnet run --file tests/manual-test.cs{(published ? " --published" : string.Empty)} --target " + Quote(target!) + "`.",
         string.Empty
     ]));
 
@@ -288,6 +326,8 @@ static void PrintUsage()
         prepares a test repository, installs the local dna into an isolated .NET CLI home, and opens a
         Terminal window (macOS) whose environment uses only those local builds. Directives and skills are read
         from the pushed HEAD commit, so HEAD must be pushed and directives/plugins must be clean.
+        With --published nothing is built: the same isolated shell uses the packages on nuget.org and the
+        latest release content, to verify a release after publishing.
 
         Options:
           --list               List baseline collections, their fixtures, and fresh definitions, then exit.
@@ -298,6 +338,7 @@ static void PrintUsage()
           --debug              Pack Debug instead of Release.
           --no-terminal        Do not open a Terminal window; print the activation command instead.
           --no-gh              Leave gh off PATH in the shell, to test the missing prerequisite message.
+          --published          Use nuget.org and the latest release instead of local builds and pinned content.
           -h, --help           Show this help.
 
         Each run writes tests/TestResults/manual/<run-id>/ with feed/, activate.sh, README.md and manual-build.json.
@@ -383,6 +424,18 @@ static string Sha256(string path)
 }
 
 static string Quote(string value) => "'" + value.Replace("'", "'\\''", StringComparison.Ordinal) + "'";
+
+// dotnet tool install reports: Tool 'innowvate.dna' (version '1.0.0') was successfully installed.
+static string VersionIn(string toolOutput)
+{
+    const string marker = "version '";
+    int start = toolOutput.IndexOf(marker, StringComparison.Ordinal);
+    if (start < 0)
+        return "unknown";
+    start += marker.Length;
+    int end = toolOutput.IndexOf('\'', start);
+    return end > start ? toolOutput[start..end] : "unknown";
+}
 
 static InvalidOperationException Failure(string message) => new(message);
 

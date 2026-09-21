@@ -1,5 +1,7 @@
 # Test runners
 
+Release steps, which use both runners below, are in [docs/releasing.md](../docs/releasing.md).
+
 ## Manual test shell
 
 Test the local builds of all three tools together with this branch's directives and skills, before
@@ -33,6 +35,11 @@ repository and rewrites only its `NuGet.Config`; `--debug` packs Debug; `--no-te
 the activation command instead of opening a window; `--no-gh` keeps gh off PATH to test the
 missing-prerequisite message. Each run writes `tests/TestResults/manual/<run-id>/` with `feed/`,
 `activate.sh`, `README.md` and `manual-build.json`.
+
+After publishing a release, `--published` verifies it the same way from a clean slate: nothing is
+built, the test repository's `NuGet.Config` lists only nuget.org, `dna` and `Agentic.Check` are
+installed from there into the isolated CLI home, and no content pin is set, so `dna check` reads
+the latest published release. It works with `--target` to refresh an existing test repository.
 
 ## Full-suite runner
 
