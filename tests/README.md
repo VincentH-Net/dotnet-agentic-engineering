@@ -51,7 +51,9 @@ It follows this fixed sequence:
 1. Build the existing fixture-preparation helper in Release. Invoke its `pack-candidates`
    command, which validates the expected origin, non-default development branch, pushed HEAD,
    and clean production/content inputs before packing all three Release candidates
-   (`Agentic.Check`, `InnoWvate.Agentic`, and `InnoWvate.Dna`). It records
+   (`Agentic.Check`, `InnoWvate.Agentic`, and `InnoWvate.Dna`). Release builds of the tool projects
+   map source paths to repository-relative paths, and packing fails if a Release PDB still contains
+   the local checkout path. It records
    package hashes and source provenance and checks source readiness again after packing.
 2. Build all four test projects in Release, then run all four without rebuilding, in this order:
    `Agentic.Tests`, `Agentic.Check.Tests`, `Agentic.LiveTests`, `Agentic.Check.LiveTests`.

@@ -26,6 +26,36 @@ public sealed class PackageArtifactTests
         _ = Assert.Throws<InvalidDataException>(package.Verify);
     }
 
+    [Theory]
+    [InlineData("/_/src/Agentic/Program.cs", null)]
+    [InlineData("<checkout>/src/Agentic/Program.cs", "contains the local checkout path")]
+    [InlineData("C:/elsewhere/Program.cs", "no repository-relative source paths")]
+    public void CandidateSymbolsMustUseRepositoryRelativePaths(string documentPath, string? failure)
+    {
+        ArgumentNullException.ThrowIfNull(documentPath);
+        using FixtureWorkspace workspace = new();
+        string checkout = Path.Combine(workspace.Root, "checkout");
+        string path = Path.Combine(workspace.Root, "symbols-only.nupkg");
+        using (var archive = ZipFile.Open(path, ZipArchiveMode.Create))
+        {
+            using StreamWriter symbols = new(archive.CreateEntry("tools/net10.0/any/Agentic.pdb").Open(), Encoding.UTF8);
+            symbols.Write("fixture portable pdb bytes " + documentPath.Replace("<checkout>", checkout, StringComparison.Ordinal));
+        }
+        if (failure is null)
+        {
+            CandidateInputs.RequireRepositoryRelativeSymbols(path, checkout);
+        }
+        else
+        {
+            var exception = Assert.Throws<InvalidDataException>(() => CandidateInputs.RequireRepositoryRelativeSymbols(path, checkout));
+            Assert.Contains(failure, exception.Message, StringComparison.Ordinal);
+        }
+        string empty = Path.Combine(workspace.Root, "no-symbols.nupkg");
+        using (var archive = ZipFile.Open(empty, ZipArchiveMode.Create))
+            _ = archive.CreateEntry("fixture.nuspec");
+        _ = Assert.Throws<InvalidDataException>(() => CandidateInputs.RequireRepositoryRelativeSymbols(empty, checkout));
+    }
+
     [Fact]
     public void ArchiveCopiesPreserveExecutableAssetsAndRemainIndependent()
     {

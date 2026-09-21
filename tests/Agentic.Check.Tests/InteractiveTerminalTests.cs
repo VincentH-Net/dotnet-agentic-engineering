@@ -12,6 +12,38 @@ public sealed class InteractiveTerminalTests
     ];
 
     [Fact]
+    public async Task HandOffHappensAfterArgumentValidationAndOnlyForInteractiveRuns()
+    {
+        using TempDirectory temp = new();
+        _ = Directory.CreateDirectory(temp.Path);
+        int handOffs = 0;
+        Task<int> HandOff(CancellationToken _)
+        {
+            handOffs++;
+            return Task.FromResult(InteractiveTerminal.HandedOffExitCode);
+        }
+        ToolRunner runner = new();
+        RecordingReporter reporter = new();
+        FakePrompts prompts = new() { Interactive = false };
+        CheckWorkflow workflow = new(runner, prompts, reporter, new FakeDirectiveSource(), new FakeSourceVersionResolver(), interactiveHandOff: HandOff);
+
+        var invalid = await workflow.RunAsync(new(temp.Path, false, false, null, null, "codex", false, PreviewSourceRef: "feature/x"), CancellationToken.None);
+        Assert.Equal(2, invalid.ExitCode);
+        Assert.Equal(0, handOffs);
+        Assert.Contains("--preview-source-ref", Assert.Single(reporter.Errors), StringComparison.Ordinal);
+
+        var handedOff = await workflow.RunAsync(new(temp.Path, false, false, null, null, "codex", false), CancellationToken.None);
+        Assert.Equal(InteractiveTerminal.HandedOffExitCode, handedOff.ExitCode);
+        Assert.Equal(1, handOffs);
+        Assert.Empty(runner.Calls);
+
+        var dryRun = await workflow.RunAsync(new(temp.Path, true, false, null, null, "codex", false), CancellationToken.None);
+        Assert.Equal(0, dryRun.ExitCode);
+        Assert.Equal(1, handOffs);
+        Assert.NotEmpty(runner.Calls);
+    }
+
+    [Fact]
     public void ShellScriptChangesDirectoryExportsEnvironmentAndRunsTheCommand()
     {
         string script = InteractiveTerminal.ShellScript("/repo/it's", ["/usr/local/share/dotnet/dotnet", "/store/agentic.check.dll", "--report", "r's.json"], Environment);

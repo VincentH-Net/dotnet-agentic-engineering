@@ -18,6 +18,8 @@
     <PackageTags>dna;agentic;dotnet-tool;dotnet;cli</PackageTags>
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/VincentH-Net/dotnet-agentic-engineering</RepositoryUrl>
+    <!-- Release builds map source paths to /_/ so published symbols never carry a local checkout path. -->
+    <ContinuousIntegrationBuild Condition="'$(Configuration)' == 'Release'">true</ContinuousIntegrationBuild>
   </PropertyGroup>
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="/" />

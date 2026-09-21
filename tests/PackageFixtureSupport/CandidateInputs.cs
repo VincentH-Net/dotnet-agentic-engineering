@@ -1,3 +1,5 @@
+using System.IO.Compression;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace Agentic.PackageFixtures;
@@ -58,9 +60,31 @@ static partial class CandidateInputs
         var check = PackageArtifact.Read(Directory.GetFiles(output, "Agentic.Check.*.nupkg").Single(), "Agentic.Check");
         var companion = PackageArtifact.Read(Directory.GetFiles(output, "InnoWvate.Agentic.*.nupkg").Single(), "InnoWvate.Agentic");
         var dna = PackageArtifact.Read(Directory.GetFiles(output, "InnoWvate.Dna.*.nupkg").Single(), "InnoWvate.Dna");
+        // The tool projects map Release source paths to /_/; this guards that setting for anything that could be published.
+        if (configuration == "Release")
+        {
+            foreach (var artifact in new[] { check, companion, dna })
+                RequireRepositoryRelativeSymbols(artifact.Path, FixtureFiles.Checkout);
+        }
         var after = await VerifySourceAsync(FixtureFiles.Checkout).ConfigureAwait(false);
         FixtureFiles.Require(after == (branch, sha), "Source changed while packing.");
         FixtureFiles.WriteJson(Path.Combine(output, "candidate-build.json"), new CandidateBuild(branch, sha, configuration, DateTimeOffset.UtcNow, check, companion, dna));
+    }
+
+    internal static void RequireRepositoryRelativeSymbols(string packagePath, string checkout)
+    {
+        using var archive = ZipFile.OpenRead(packagePath);
+        var symbols = archive.Entries.Where(entry => entry.FullName.EndsWith(".pdb", StringComparison.OrdinalIgnoreCase)).ToList();
+        FixtureFiles.Require(symbols.Count > 0, $"No symbols found in {packagePath}.");
+        foreach (var entry in symbols)
+        {
+            using var stream = entry.Open();
+            using MemoryStream buffer = new();
+            stream.CopyTo(buffer);
+            string text = Encoding.UTF8.GetString(buffer.ToArray());
+            FixtureFiles.Require(!text.Contains(checkout, StringComparison.Ordinal), $"{entry.FullName} in {packagePath} contains the local checkout path; Release builds must keep ContinuousIntegrationBuild enabled.");
+            FixtureFiles.Require(text.Contains("/_/", StringComparison.Ordinal), $"{entry.FullName} in {packagePath} has no repository-relative source paths.");
+        }
     }
 
     [GeneratedRegex(@"^(?:https://github\.com/|git@github\.com:|ssh://git@github\.com(?::22)?/)VincentH-Net/dotnet-agentic-engineering(?:\.git)?/?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]

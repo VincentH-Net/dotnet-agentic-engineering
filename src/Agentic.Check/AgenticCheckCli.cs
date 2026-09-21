@@ -166,18 +166,15 @@ static class AgenticCheckCli
             {
                 SpectreReporter reporter = new(AnsiConsole.Console);
                 SpectreUserPrompts userPrompts = new(AnsiConsole.Console);
-                bool dryRun = parseResult.GetValue(dryRunOption);
-                bool yes = parseResult.GetValue(yesOption);
-                // Everything but --yes and --dry-run is interactive: without an interactive terminal, hand off to a new one.
-                if (!dryRun && !yes && !userPrompts.IsInteractive)
-                    return await InteractiveTerminal.HandOffAsync(args, Console.Out, Console.Error, cancellationToken).ConfigureAwait(false);
                 try
                 {
                     reporter.Header();
 
                     var targetDirectory = parseResult.GetValue(targetDirectoryArgument)
                         ?? new DirectoryInfo(Environment.CurrentDirectory);
+                    bool dryRun = parseResult.GetValue(dryRunOption);
                     bool preview = parseResult.GetValue(previewOption);
+                    bool yes = parseResult.GetValue(yesOption);
                     var report = parseResult.GetValue(reportOption);
                     string? skillsDirectory = parseResult.GetValue(skillsDirectoryOption);
                     string? agents = parseResult.GetValue(agentsOption);
@@ -207,7 +204,8 @@ static class AgenticCheckCli
                     var workflow = new CheckWorkflow(
                         new ProcessCommandRunner(),
                         userPrompts,
-                        reporter);
+                        reporter,
+                        interactiveHandOff: token => InteractiveTerminal.HandOffAsync(args, Console.Out, Console.Error, token));
 
                     var result = await workflow.RunAsync(options, CancellationToken.None).ConfigureAwait(false);
                     return result.ExitCode;

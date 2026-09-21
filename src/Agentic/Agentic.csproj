@@ -23,6 +23,8 @@
     <RepositoryUrl>https://github.com/VincentH-Net/dotnet-agentic-engineering</RepositoryUrl>
     <PackageReleaseNotes>https://github.com/VincentH-Net/dotnet-agentic-engineering/releases/tag/v$(Version)</PackageReleaseNotes>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <!-- Release builds map source paths to /_/ so published symbols never carry a local checkout path. -->
+    <ContinuousIntegrationBuild Condition="'$(Configuration)' == 'Release'">true</ContinuousIntegrationBuild>
   </PropertyGroup>
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="/" />
