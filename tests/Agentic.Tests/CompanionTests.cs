@@ -66,6 +66,24 @@ public sealed class CompanionTests
         Assert.Equal("2.3", context.Required.Minimum);
     }
 
+    [Theory]
+    [InlineData(null, "dotnet agentic")]
+    [InlineData("1.0.0", "dna")]
+    public async Task HelpShowsTheCommandTheUserTyped(string? launcherVersion, string usage)
+    {
+        using StringWriter root = new(CultureInfo.InvariantCulture);
+        using StringWriter error = new(CultureInfo.InvariantCulture);
+        Assert.Equal(2, await AgenticCli.InvokeAsync([], output: root, error: error, readEnvironment: _ => launcherVersion).ConfigureAwait(true));
+        string rootHelp = root.ToString().ReplaceLineEndings("\n");
+        Assert.Contains($"\n  {usage} [command] [options]\n", rootHelp, StringComparison.Ordinal);
+        Assert.Contains("dna is the shorthand for dotnet agentic", rootHelp, StringComparison.Ordinal);
+        Assert.Contains("Keeps instructions and this tool versioned together", rootHelp, StringComparison.Ordinal);
+        Assert.Contains("Required command was not provided.", error.ToString(), StringComparison.Ordinal);
+        using StringWriter wrap = new(CultureInfo.InvariantCulture);
+        Assert.Equal(0, await AgenticCli.InvokeAsync(["prompt-log", "wrap", "--help"], output: wrap, readEnvironment: _ => launcherVersion).ConfigureAwait(true));
+        Assert.Contains($"\n  {usage} prompt-log wrap [options]\n", wrap.ToString().ReplaceLineEndings("\n"), StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task DefaultContextAndHelpRemainAvailable()
     {

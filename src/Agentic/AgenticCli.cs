@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.CommandLine.Help;
 using System.Reflection;
 
 namespace Agentic;
@@ -14,6 +15,7 @@ static class AgenticCli
         string? directory = null,
         string? runningVersion = null,
         Action<CompatibilityContext>? observeContext = null,
+        Func<string, string?>? readEnvironment = null,
         CancellationToken cancellationToken = default)
     {
         output ??= Console.Out;
@@ -23,7 +25,11 @@ static class AgenticCli
             return await ToolLauncher.CheckAsync(checkArguments, directory ?? Environment.CurrentDirectory, error, cancellationToken).ConfigureAwait(false);
         runningVersion ??= typeof(AgenticCli).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion;
         var running = ToolVersion.Parse(runningVersion);
-        Option<string?> minimum = new("--minver", "-m") { Recursive = true, Description = "Required major.minor; same major, this minor or later. Defaults to the running tool's major.minor." };
+        Option<string?> minimum = new("--minver", "-m")
+        {
+            Recursive = true,
+            Description = "The major.minor a directive or skill was written for. Keeps instructions and this tool versioned together: fails on another major or an older minor. Defaults to the running version."
+        };
         minimum.Validators.Add(result =>
         {
             try
@@ -38,7 +44,9 @@ static class AgenticCli
                 result.AddError(exception.Message);
             }
         });
-        RootCommand root = new("Repo-local agentic tooling. Prompt-log Git operations are read-only.");
+        // Help shows the command the user actually typed: dna when the shorthand launched us, otherwise dotnet agentic.
+        string launcher = string.IsNullOrEmpty((readEnvironment ?? Environment.GetEnvironmentVariable)(DnaLauncherContract.VersionVariable)) ? "dotnet agentic" : "dna";
+        RootCommand root = new("Folder-local agentic tool for directives, skills and humans. dna is the shorthand for dotnet agentic. Prompt-log Git operations are read-only.");
         root.Options.OfType<VersionOption>().Single().Validators.Clear();
         root.Options.Add(minimum);
         root.Subcommands.Add(new Command("check", "Run the latest stable Agentic.Check; all following arguments are forwarded."));
@@ -119,8 +127,26 @@ static class AgenticCli
 
         prompt.Action = show.Action;
         var parsed = root.Parse(args);
-        InvocationConfiguration configuration = new() { Output = output, Error = error, EnableDefaultExceptionHandler = false };
+        // System.CommandLine 2.0.9 prints the executable name in Usage lines and offers no way to rename it,
+        // so help and parse-error output is buffered and those lines are rewritten to the launcher command.
+        StringWriter? help = parsed.Action is HelpAction || parsed.Errors.Count > 0 ? new() : null;
+        InvocationConfiguration configuration = new() { Output = help ?? output, Error = error, EnableDefaultExceptionHandler = false };
         int code = await parsed.InvokeAsync(configuration, cancellationToken).ConfigureAwait(false);
+        if (help is not null)
+            await output.WriteAsync(WithLauncherUsage(help.ToString(), launcher)).ConfigureAwait(false);
         return parsed.Errors.Count > 0 ? 2 : code;
+    }
+
+    internal static string WithLauncherUsage(string helpText, string launcher)
+    {
+        string usage = "  " + RootCommand.ExecutableName;
+        string[] lines = helpText.Split('\n');
+        for (int i = 0; i < lines.Length; i++)
+        {
+            string line = lines[i].TrimEnd('\r');
+            if (line == usage || line.StartsWith(usage + " ", StringComparison.Ordinal))
+                lines[i] = "  " + launcher + lines[i][usage.Length..];
+        }
+        return string.Join('\n', lines);
     }
 }

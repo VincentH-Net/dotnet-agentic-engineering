@@ -2,13 +2,13 @@ using System.Reflection;
 using Agentic;
 using Dna;
 
+// Children see which launcher started them: Agentic.Check verifies this version and must not replace
+// the running dna; dotnet agentic shows dna in its help.
+Environment.SetEnvironmentVariable(DnaLauncherContract.VersionVariable,
+    typeof(Program).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion);
+
 if (args is ["check", .. var arguments])
-{
-    // Agentic.Check verifies this launcher version and must not replace the running dna.
-    Environment.SetEnvironmentVariable(DnaLauncherContract.VersionVariable,
-        typeof(Program).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion);
     return await ToolLauncher.CheckAsync(arguments, Environment.CurrentDirectory, Console.Error).ConfigureAwait(false);
-}
 
 if (await LocalCompanion.IsMissingAsync(Environment.CurrentDirectory).ConfigureAwait(false))
 {
