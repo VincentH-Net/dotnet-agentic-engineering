@@ -116,9 +116,12 @@ dotnet new mcs-editorconfig -s
 
 ## 7. Build diagnostic handling
 
-Before building, check whether `AGENTS.md` or `AGENTS.MD` in the current working folder contains
-`<!-- dotnet-build-errors-and-warnings:start -->`.
-If the marker is absent, run `dnx agentic.check` in the current folder. When it has no interactive terminal it opens one for the user and exits with code 3; wait for the user to finish there before continuing.
+Before building, check whether `AGENTS.md` (or `AGENTS.MD`) in the current working folder or any
+parent folder up to the repository root contains `<!-- dotnet-build-errors-and-warnings:start -->`.
+If the marker is absent, do not build. Ask the user to exit this agent session, run `dna check`
+(or `dnx agentic.check`) in the folder that holds the AGENTS.md to update (usually the repository
+root), and restart or resume the session, because the updated AGENTS.md only loads at session start.
+Stop until that is done.
 
 Use the installed `dotnet-build-errors-and-warnings` directive for build verification and diagnostic fixes.
 That directive governs when to run `dotnet format`, how to fix build errors and warnings, and when suppressions are allowed.

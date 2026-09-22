@@ -56,7 +56,8 @@ public sealed class CompanionTests
         Assert.Empty(git.Calls);
         Assert.False(File.Exists(destination));
         Assert.Contains("major 2, minor 3 or later", error.ToString(), StringComparison.Ordinal);
-        Assert.Contains("agentic-check interactively", error.ToString(), StringComparison.Ordinal);
+        Assert.Contains("exit this agent session, run `dna check`", error.ToString(), StringComparison.Ordinal);
+        Assert.Contains("restart or resume the session", error.ToString(), StringComparison.Ordinal);
         using StringReader validInput = new("entry");
         CompatibilityContext? context = null;
         Assert.Equal(0, await AgenticCli.InvokeAsync(args, validInput, TextWriter.Null, error, git, workspace.Path, "2.4.0-preview.1", value => context = value).ConfigureAwait(true));

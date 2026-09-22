@@ -54,8 +54,9 @@ Prompt logs in older formats in your history are still displayed.
 ## Compatibility
 
 Directive invocations pass `-m 2.3` (`--minver`): the installed tool must have that major
-version and at least that minor. On a mismatch the command stops and asks to run Agentic.Check
-in the target directory. Do not remove `-m` to bypass this. Without `-m`, the running version is assumed.
+version and at least that minor. On a mismatch the command stops and tells the agent to have you
+exit the session, run `dna check` in the target directory, and restart or resume it. Do not remove
+`-m` to bypass this. Without `-m`, the running version is assumed.
 
 Exit codes: **0** success, **1** failure, **2** invalid arguments. Diagnostics go to stderr.
 

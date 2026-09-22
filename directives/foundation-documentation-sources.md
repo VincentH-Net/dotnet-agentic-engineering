@@ -2,7 +2,7 @@
 
 Prefer first-party vendor MCPs when looking up external documentation.
 
-Use the `agentic-check` tool to install or update directives for your technology, or manually copy below markdown in your `AGENTS.MD`:
+Use `dna check` to install or update directives for your technology, or manually copy below markdown in your `AGENTS.MD`:
 
 ~~~md
 <!-- foundation-documentation-sources:start -->

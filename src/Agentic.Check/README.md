@@ -58,10 +58,6 @@ dna check --yes       # apply all recommended actions without prompting
 dna check -h          # all options
 ```
 
-Started without an interactive terminal, for example by a coding agent, `agentic.check` opens a new
-terminal window for you to make the selections and exits with code 3. Use `--yes` or `--dry-run`
-for automation.
-
 ### Tools
 
 Directives and skills can depend on tools, which are installed before the content that needs them.

@@ -30,7 +30,7 @@ Select this skill for any of:
 
 Before applying edits from this skill, run this prerequisite check in the current working folder and act on the result.
 
-A **Uno Platform** app project must exist in the working folder. Find the Uno app `.csproj` in the working folder. A valid Uno app project must use the Uno SDK and contain `App.xaml.cs` in or under the project folder.
+A **Uno Platform** app project must exist in or under the working folder. Find the Uno app `.csproj` in the working folder or any subfolder. A valid Uno app project must use the Uno SDK and contain `App.xaml.cs` in or under the project folder.
 
 If the Uno Platform app project is not found, report this to the user and STOP.
 

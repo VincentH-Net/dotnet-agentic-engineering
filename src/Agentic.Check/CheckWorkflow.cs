@@ -27,8 +27,7 @@ sealed class CheckWorkflow(
     ISourceVersionResolver? sourceVersionResolver = null,
     IReadOnlyList<SkillManifestEntry>? skillManifest = null,
     DnaInstaller? dnaInstaller = null,
-    Func<string, string?>? readEnvironment = null,
-    Func<CancellationToken, Task<int>>? interactiveHandOff = null)
+    Func<string, string?>? readEnvironment = null)
 {
     // A manual test shell sets this so every check it starts, including dna check and dnx, reads pinned content.
     internal const string PreviewSourceRefVariable = "AGENTIC_CHECK_PREVIEW_SOURCE_REF";
@@ -119,11 +118,6 @@ sealed class CheckWorkflow(
             await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
             return new CheckRunResult(2, report);
         }
-
-        // Everything but --yes and --dry-run is interactive. Arguments are validated above; without an
-        // interactive terminal the run now hands off to a new one instead of reaching the prompts.
-        if (!options.DryRun && !options.Yes && !prompts.IsInteractive && interactiveHandOff is not null)
-            return new CheckRunResult(await interactiveHandOff(cancellationToken).ConfigureAwait(false), report);
 
         var launcher = DnaInstaller.Launcher(readEnvironment ?? Environment.GetEnvironmentVariable);
         if (launcher is not null)

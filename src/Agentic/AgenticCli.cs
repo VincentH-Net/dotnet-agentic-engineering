@@ -102,7 +102,7 @@ static class AgenticCli
                     CompatibilityContext context = new(running, requested is null ? new(running.Major, running.Minor, 0, string.Empty) : ToolVersion.ParseMinimum(requested), requested is not null);
                     if (!running.Satisfies(context.Required))
                     {
-                        await error.WriteLineAsync($"InnoWvate.Agentic {runningVersion} is incompatible with --minver {context.Required.Minimum}.\nRequired: major {context.Required.Major}, minor {context.Required.Minor} or later.\nStop this operation and ask the user to run agentic-check interactively\nin the intended target directory, then retry.").ConfigureAwait(false);
+                        await error.WriteLineAsync($"InnoWvate.Agentic {runningVersion} is incompatible with --minver {context.Required.Minimum}.\nRequired: major {context.Required.Major}, minor {context.Required.Minor} or later.\nStop and ask the user to exit this agent session, run `dna check` (or `dnx agentic.check`)\nin the folder that holds the AGENTS.md with this directive (usually the repository root),\nand restart or resume the session; updated AGENTS.md / CLAUDE.md content only loads at session start.").ConfigureAwait(false);
                         return 1;
                     }
 

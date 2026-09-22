@@ -4,7 +4,7 @@ Keep the **most important part of your source** - your prompts and your answers 
 
 This preserves **intent** in source control, using the same unit of work as your branching strategy, and makes it possible to **replay** your input at a later stage with better models, harnesses and tools.
 
-Use the `agentic-check` tool to install or update directives for your technology, or manually copy below markdown in your `AGENTS.MD`:
+Use `dna check` to install or update directives for your technology, or manually copy below markdown in your `AGENTS.MD`:
 
 ~~~md
 <!-- foundation-prompt-log:start -->
@@ -45,8 +45,7 @@ dotnet agentic prompt-log wrap --input prompt-log-input.txt --prompt-log prompt-
 Use the output only after the command succeeds. Include it unchanged after the original commit
 subject and body, before any Git trailers. Git's normal whitespace cleanup is acceptable.
 
-On compatibility failure, stop and ask the user to run `dnx Agentic.Check` interactively in the
-intended target directory, then retry. Do not bypass the check by removing `-m` / `--minver`.
+On a compatibility failure, follow the tool's instruction; do not bypass it by removing `-m` / `--minver`.
 
 ### Reading and Checking Logs
 

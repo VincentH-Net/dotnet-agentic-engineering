@@ -165,7 +165,6 @@ static class AgenticCheckCli
             async (parseResult, cancellationToken) =>
             {
                 SpectreReporter reporter = new(AnsiConsole.Console);
-                SpectreUserPrompts userPrompts = new(AnsiConsole.Console);
                 try
                 {
                     reporter.Header();
@@ -203,9 +202,8 @@ static class AgenticCheckCli
 
                     var workflow = new CheckWorkflow(
                         new ProcessCommandRunner(),
-                        userPrompts,
-                        reporter,
-                        interactiveHandOff: token => InteractiveTerminal.HandOffAsync(args, Console.Out, Console.Error, token));
+                        new SpectreUserPrompts(AnsiConsole.Console),
+                        reporter);
 
                     var result = await workflow.RunAsync(options, CancellationToken.None).ConfigureAwait(false);
                     return result.ExitCode;

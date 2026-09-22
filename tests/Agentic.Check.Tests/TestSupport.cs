@@ -126,10 +126,6 @@ sealed class FakePrompts : IUserPrompts
 {
     public bool ConfirmResult { get; init; } = true;
 
-    public bool Interactive { get; init; } = true;
-
-    public bool IsInteractive => Interactive;
-
     public List<string> ConfirmPrompts { get; } = [];
 
     public IReadOnlyList<string>? SelectedDirectiveNames { get; init; }
