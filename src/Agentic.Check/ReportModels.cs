@@ -14,6 +14,8 @@ sealed class AgenticCheckReport
 
     public DnaReport? Dna { get; set; }
 
+    public CodexRulesReport? CodexRules { get; set; }
+
     public string? RepoRoot { get; set; }
 
     public string? SkillsDirectory { get; set; }

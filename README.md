@@ -63,7 +63,7 @@ From a folder in your repo, run:
 dna check
 ```
 
-It runs the latest `agentic.check`: it detects .NET, ASP.NET Core, Orleans and Uno Platform usage, lists the recommended directives, skills and tools, and lets you select which to apply. Directives are installed in `AGENTS.md` / `CLAUDE.md`, skills with `gh skill`, tools with `dotnet tool`. Run `dna check -h` for options such as `--dry-run` and `--preview`.
+It runs the latest `agentic.check`: it detects .NET, ASP.NET Core, Orleans and Uno Platform usage, lists the recommended directives, skills and tools, and lets you select which to apply. Directives are installed in `AGENTS.md` / `CLAUDE.md`, skills with `gh skill`, tools with `dotnet tool`; for Codex, rules that run `dotnet` outside its sandbox go in `.codex/rules`. Run `dna check -h` for options such as `--dry-run` and `--preview`.
 
 Selecting the **Prompt Log** directive also selects the tool it uses: `InnoWvate.Agentic`, the folder-local `dotnet agentic` tool. It is pinned in the target folder's `.config/dotnet-tools.json`, so it travels with your source and matches the directives and skills installed there. Specialized folders can have their own version.
 
@@ -111,7 +111,7 @@ This repo offers the following directives (markdown snippets to include in your 
 |----------|-------------|
 | [`foundation-documentation-sources`](./directives/foundation-documentation-sources.md) | Prioritizes first-party vendor MCPs for external documentation, using Microsoft Learn before Context7 for Microsoft technologies. |
 | [`foundation-prompt-log`](./directives/foundation-prompt-log.md) | Records sanitized user prompts and agent question-and-answer pairs in code commit messages so intent is preserved and can be replayed later. Uses the `dotnet agentic` tool. |
-| [`dotnet-cli-run`](./directives/dotnet-cli-run.md) | Prevents long agent timeout delays from running `dotnet` in the background. |
+| [`dotnet-cli-run`](./directives/dotnet-cli-run.md) | Prevents long agent timeout delays from running `dotnet` in the background. For Codex, `dna check` also offers rules that run `dotnet` outside the sandbox without approval prompts. |
 | [`dotnet-build-errors-and-warnings`](./directives/dotnet-build-errors-and-warnings.md) | Configures .NET build warnings and errors and a modern C# .editorconfig, then directs agents to fix build errors and warnings or document rare justified suppressions. |
 | [`uno-build-and-run`](./directives/uno-build-and-run.md) | Standardizes Uno app launch for agents by skipping redundant pre-builds, writing per-run stdout logs via `AGENT_CONSOLE_LOG`, and verifying or stopping the app with the Uno runtime tools. |
 

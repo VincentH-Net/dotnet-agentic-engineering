@@ -8,13 +8,14 @@ static class AgentSkillRegistry
     public const string DetectedAgentsFallback = "codex";
     public const string AgentsProjectDirectory = ".agents/skills";
     public const string ClaudeCodeAgentId = "claude-code";
+    public const string CodexAgentId = "codex";
 
     static readonly IReadOnlyList<AgentSkillHost> Hosts =
     [
         new("github-copilot", "GitHub Copilot", AgentsProjectDirectory),
         new(ClaudeCodeAgentId, "Claude Code", ".claude/skills"),
         new("cursor", "Cursor", AgentsProjectDirectory),
-        new("codex", "Codex", AgentsProjectDirectory),
+        new(CodexAgentId, "Codex", AgentsProjectDirectory),
         new("gemini-cli", "Gemini CLI", AgentsProjectDirectory),
         new("antigravity", "Antigravity", AgentsProjectDirectory),
         new("adal", "AdaL", ".adal/skills"),
@@ -145,6 +146,7 @@ static class AgentSkillRegistry
         List<string> directories = [];
         HashSet<string> seenDirectories = new(StringComparer.OrdinalIgnoreCase);
         bool manageClaude = false;
+        bool installCodexRules = false;
 
         foreach (string agentId in agentIds)
         {
@@ -156,12 +158,13 @@ static class AgentSkillRegistry
 
             AddDirectory(Path.GetFullPath(Path.Combine(repoRoot, host.ProjectDirectory)));
             manageClaude |= host.Id.Equals(ClaudeCodeAgentId, StringComparison.OrdinalIgnoreCase);
+            installCodexRules |= host.Id.Equals(CodexAgentId, StringComparison.OrdinalIgnoreCase);
         }
 
         return unknownAgents.Count > 0
             ? AgentDirectoryResolution.Invalid(
                 $"Unknown agent value(s): {string.Join(", ", unknownAgents)}. Valid values: {AgentIds}.")
-            : AgentDirectoryResolution.Valid(directories, manageClaude);
+            : AgentDirectoryResolution.Valid(directories, manageClaude, installCodexRules);
 
         void AddDirectory(string directory)
         {
@@ -191,11 +194,12 @@ sealed record AgentDirectoryResolution(
     bool Success,
     IReadOnlyList<string> Directories,
     bool ManageClaude,
+    bool InstallCodexRules,
     string? Error)
 {
-    public static AgentDirectoryResolution Valid(IReadOnlyList<string> directories, bool manageClaude)
-        => new(true, directories, manageClaude, null);
+    public static AgentDirectoryResolution Valid(IReadOnlyList<string> directories, bool manageClaude, bool installCodexRules)
+        => new(true, directories, manageClaude, installCodexRules, null);
 
     public static AgentDirectoryResolution Invalid(string error)
-        => new(false, [], false, error);
+        => new(false, [], false, false, error);
 }

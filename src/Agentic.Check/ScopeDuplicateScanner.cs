@@ -90,7 +90,7 @@ static class ScopeDuplicateScanner
                 continue;
             }
 
-            if (item.Skill is null || item.Skill.IsCompanion)
+            if (item.Skill is null || item.Skill.IsCompanion || item.Skill.IsCodexRules)
             {
                 continue;
             }

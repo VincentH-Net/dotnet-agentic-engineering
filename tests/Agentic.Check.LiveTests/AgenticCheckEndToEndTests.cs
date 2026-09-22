@@ -475,6 +475,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
         Assert.Contains("<!-- dotnet-cli-run:start -->", await workspace.ReadRepoFileAsync("AGENTS.md").ConfigureAwait(true), StringComparison.Ordinal);
         Assert.True(File.Exists(Path.Combine(workspace.RepoPath, ".claude", "skills", "dotnet-livecharts2", "SKILL.md")));
         Assert.True(File.Exists(Path.Combine(workspace.RepoPath, ".agents", "skills", "dotnet-livecharts2", "SKILL.md")));
+        Assert.Contains("prefix_rule(", await workspace.ReadRepoFileAsync(Path.Combine(".codex", "rules", "dna-dotnet.rules")).ConfigureAwait(true), StringComparison.Ordinal);
 
         string ghLog = await workspace.ReadGhLogAsync().ConfigureAwait(true);
         Assert.Contains("skill install VincentH-Net/dotnet-agentic-engineering dotnet-livecharts2 --dir", ghLog, StringComparison.Ordinal);

@@ -114,7 +114,8 @@ interface IReporter
         int missingCount,
         int outdatedCount,
         SourceVersionMode sourceMode = SourceVersionMode.Stable,
-        string? sourcePin = null);
+        string? sourcePin = null,
+        string? codexRules = null);
 
     Task RunProgressAsync(
         string description,
@@ -199,7 +200,8 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
         int missingCount,
         int outdatedCount,
         SourceVersionMode sourceMode = SourceVersionMode.Stable,
-        string? sourcePin = null)
+        string? sourcePin = null,
+        string? codexRules = null)
         => console.Write(CreateSummaryTable(
             targetDirectory,
             technologies,
@@ -211,7 +213,8 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
             missingCount,
             outdatedCount,
             sourceMode,
-            sourcePin));
+            sourcePin,
+            codexRules));
 
     internal static Table CreateSummaryTable(
         string targetDirectory,
@@ -224,7 +227,8 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
         int missingCount,
         int outdatedCount,
         SourceVersionMode sourceMode = SourceVersionMode.Stable,
-        string? sourcePin = null)
+        string? sourcePin = null,
+        string? codexRules = null)
     {
         Table table = new()
         {
@@ -240,6 +244,11 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
         _ = table.AddRow("Skills directories", Markup.Escape(FormatSkillsDirectories(targetDirectory, skillsDirectories)));
         _ = table.AddRow("Create AGENTS.md", directiveSummary.CreateAgentsFile ? "yes" : "no");
         _ = table.AddRow("Create CLAUDE.md", directiveSummary.CreateClaudeFile ? "yes" : "no");
+        if (codexRules is not null)
+        {
+            _ = table.AddRow("Codex rules", Markup.Escape(codexRules));
+        }
+
         _ = table.AddRow("Source channel", sourceMode == SourceVersionMode.Preview
             ? Markup.Escape($"Preview{(sourcePin is null ? string.Empty : $"\n* pinned to {sourcePin}")}\n* no skills update check - always (re)installs")
             : "Stable");
@@ -435,7 +444,8 @@ sealed class NullReporter : IReporter
         int missingCount,
         int outdatedCount,
         SourceVersionMode sourceMode = SourceVersionMode.Stable,
-        string? sourcePin = null)
+        string? sourcePin = null,
+        string? codexRules = null)
     {
     }
 

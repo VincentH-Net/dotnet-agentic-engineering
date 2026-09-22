@@ -196,6 +196,8 @@ sealed class RecordingReporter : IReporter
 
     public string? SourcePin { get; private set; }
 
+    public string? CodexRules { get; private set; }
+
     public void Plain(string message)
     {
         PlainMessages.Add(message);
@@ -241,11 +243,13 @@ sealed class RecordingReporter : IReporter
         int missingCount,
         int outdatedCount,
         SourceVersionMode sourceMode = SourceVersionMode.Stable,
-        string? sourcePin = null)
+        string? sourcePin = null,
+        string? codexRules = null)
     {
         TargetAgents = targetAgents;
         OutdatedSkillCount = outdatedCount;
         SourcePin = sourcePin;
+        CodexRules = codexRules;
     }
 
     public async Task RunProgressAsync(

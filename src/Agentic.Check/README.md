@@ -7,6 +7,8 @@
 - You select which to apply
 - Directives are installed / updated in `AGENTS.md` / `CLAUDE.md`, directly from the
   dotnet-agentic-engineering GitHub repo
+- For Codex, rules that run `dotnet` outside its sandbox are installed in `.codex/rules`, so
+  `dotnet` has network access without approval prompts
 - Skills are installed / updated directly from source GitHub skill repo's with `gh skill`
 - Tools that directives and skills depend on are installed / updated with `dotnet tool`, pinned in the target folder
 

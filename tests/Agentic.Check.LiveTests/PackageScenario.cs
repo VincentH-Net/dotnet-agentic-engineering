@@ -172,7 +172,8 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
             || dryReport.GetProperty("missingSkills").GetArrayLength() > 0 || preview
             || dryReport.GetProperty("actions").EnumerateArray().Any(action => action.GetString()!.StartsWith("Would install ", StringComparison.Ordinal))
             || (dryReport.TryGetProperty("companion", out var companion) && companion.ValueKind == JsonValueKind.Object)
-            || (dryReport.TryGetProperty("dna", out var dna) && dna.ValueKind == JsonValueKind.Object);
+            || (dryReport.TryGetProperty("dna", out var dna) && dna.ValueKind == JsonValueKind.Object)
+            || (dryReport.TryGetProperty("codexRules", out var codexRules) && codexRules.ValueKind == JsonValueKind.Object);
         if (hasActions)
         {
             await auto.WaitUntilTextAsync("select which to apply:").ConfigureAwait(false);
@@ -214,7 +215,8 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
     {
         var after = FixtureFiles.Inventory(workspace.Target);
         foreach (var (path, hash) in before.Where(file => file.Key is not "AGENTS.md" and not "CLAUDE.md" and not ".config/dotnet-tools.json"
-            && !file.Key.StartsWith(".agents/skills/", StringComparison.Ordinal) && !file.Key.StartsWith(".claude/skills/", StringComparison.Ordinal)))
+            && !file.Key.StartsWith(".agents/skills/", StringComparison.Ordinal) && !file.Key.StartsWith(".claude/skills/", StringComparison.Ordinal)
+            && !file.Key.StartsWith(".codex/rules/", StringComparison.Ordinal)))
         {
             FixtureFiles.Require(after.GetValueOrDefault(path) == hash, $"Unrelated file changed: {path}");
         }

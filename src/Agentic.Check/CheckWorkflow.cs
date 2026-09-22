@@ -160,12 +160,15 @@ sealed class CheckWorkflow(
 
         IReadOnlyList<string> skillsDirectories;
         bool manageClaudeFile;
+        bool installCodexRules;
         string targetAgents;
         if (!string.IsNullOrWhiteSpace(skillsDirectoryValidation.Directory))
         {
             string skillsDirectory = skillsDirectoryValidation.Directory;
             skillsDirectories = [skillsDirectory];
             manageClaudeFile = IsClaudeSkillsDirectory(skillsDirectory);
+            // A custom skills directory names no agent, so no agent-specific rules are offered.
+            installCodexRules = false;
             targetAgents = "custom skills directory";
         }
         else
@@ -183,6 +186,7 @@ sealed class CheckWorkflow(
 
             skillsDirectories = directoryResolution.Directories;
             manageClaudeFile = directoryResolution.ManageClaude;
+            installCodexRules = directoryResolution.InstallCodexRules;
         }
 
         StackDetectionResult? stack = null;
@@ -309,6 +313,11 @@ sealed class CheckWorkflow(
         stack = stack ?? throw new InvalidOperationException("Target directory scan did not detect a stack.");
         directivePlan = directivePlan ?? throw new InvalidOperationException("Target directory scan did not plan directives.");
 
+        // Offered like any other item: only when a required rule is missing from every .codex/rules file.
+        var codexRulesPlan = installCodexRules && stack.Technologies.Contains(TechnologyNames.Dotnet, StringComparer.OrdinalIgnoreCase)
+            ? CodexRulesInstaller.Plan(targetDirectory, stack)
+            : null;
+
         report.AgentsFile = directivePlan.AgentsFile;
         report.ClaudeFile = directivePlan.ClaudeFile;
         report.Directives.AddRange(directivePlan.Directives.Select(directive => new DirectiveReportItem(directive.Name, directive.Status)));
@@ -327,7 +336,7 @@ sealed class CheckWorkflow(
         report.DirectiveSummary = directiveSummary;
 
         reporter.Summary(targetDirectory, stack.Technologies, stack.InstallGates, targetAgents, skillsDirectories, directiveSummary, recommended.Count, missing.Count, report.OutdatedSkills, sourceMode,
-            sourcePin is null ? null : $"{options.PreviewSourceRef} ({sourcePin})");
+            sourcePin is null ? null : $"{options.PreviewSourceRef} ({sourcePin})", codexRulesPlan?.Status);
         reporter.Info($"GitHub cache duration: {directiveCacheSettings.DurationDescription}");
 
         foreach (string warning in report.Warnings)
@@ -437,6 +446,11 @@ sealed class CheckWorkflow(
             recommendedSkillActions = [.. recommendedSkillActions, DnaInstaller.Action(dnaInstallation)];
         }
 
+        if (codexRulesPlan is { IsCurrent: false })
+        {
+            recommendedSkillActions = [.. recommendedSkillActions, CodexRulesInstaller.Action(codexRulesPlan)];
+        }
+
         IReadOnlyList<DirectivePlanItem> selectedDirectives = [];
         IReadOnlyList<SkillManifestEntry> selectedSkills = [];
         if (!options.DryRun && !options.Preview)
@@ -526,7 +540,24 @@ sealed class CheckWorkflow(
             }
         }
 
-        selectedSkills = [.. selectedSkills.Where(skill => !skill.IsCompanion && !skill.IsDna)];
+        if (selectedSkills.Any(skill => skill.IsCodexRules))
+        {
+            var codexRules = await CodexRulesInstaller.EnsureAsync(codexRulesPlan!, options.DryRun, cancellationToken).ConfigureAwait(false);
+            report.CodexRules = codexRules;
+            string verb = options.DryRun ? $"Would {codexRules.Action}" : codexRules.Action == "install" ? "Installed" : "Updated";
+            string description = ActionOutputFormatter.FormatLine($"{verb} Codex rules", CodexRulesInstaller.RelativePath);
+            report.Actions.Add($"{verb} Codex rules in {codexRules.File}: {string.Join(", ", codexRules.Rules)}.");
+            if (codexRules.Success)
+            {
+                reporter.Success(description);
+            }
+            else
+            {
+                reporter.Error($"{description}: {codexRules.Error}");
+            }
+        }
+
+        selectedSkills = [.. selectedSkills.Where(skill => !skill.IsCompanion && !skill.IsDna && !skill.IsCodexRules)];
 
         var directiveResult = await directiveInstaller
             .ApplyAsync(directivePlan, selectedDirectives.Select(directive => directive.Name), options.DryRun, cancellationToken)
@@ -562,7 +593,7 @@ sealed class CheckWorkflow(
             }
 
             await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
-            return new CheckRunResult(report.Companion?.Success == false || report.Dna?.Success == false ? 1 : 0, report);
+            return new CheckRunResult(report.Companion?.Success == false || report.Dna?.Success == false || report.CodexRules?.Success == false ? 1 : 0, report);
         }
 
         if (selectedSkills.Count > 0)
@@ -636,7 +667,7 @@ sealed class CheckWorkflow(
             }, cancellationToken).ConfigureAwait(false);
         }
 
-        int exitCode = report.Companion?.Success == false || report.Dna?.Success == false || report.SkillUpdates.Any(result => !result.Success) || report.InstallResults.Any(result => !result.Success) || report.SkillCopyResults.Any(result => !result.Success) ? 1 : 0;
+        int exitCode = report.Companion?.Success == false || report.Dna?.Success == false || report.CodexRules?.Success == false || report.SkillUpdates.Any(result => !result.Success) || report.InstallResults.Any(result => !result.Success) || report.SkillCopyResults.Any(result => !result.Success) ? 1 : 0;
         await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
         return new CheckRunResult(exitCode, report);
     }

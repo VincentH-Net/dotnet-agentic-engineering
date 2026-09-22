@@ -114,6 +114,8 @@ static class AgenticCheckCli
         - You select which to apply
         - Directives are installed / updated in AGENTS.md, directly from the
           dotnet-agentic-engineering GitHub repo
+        - For Codex, rules that run dotnet outside its sandbox are installed in
+          .codex/rules, so dotnet has network access without approval prompts
         - Skills are installed / updated directly from source GitHub skill repo's with 
           'gh skill'
         - Required InnoWvate.Agentic tools are installed locally before dependent content.

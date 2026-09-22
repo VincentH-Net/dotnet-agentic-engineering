@@ -1037,6 +1037,88 @@ public sealed class WorkflowTests
         }
     }
 
+    [Fact]
+    public async Task CodexTargetOffersAndInstallsCodexRulesAsAToolItem()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
+        tempDirectory.Write("App.csproj", "<Project />");
+        FakeCommandRunner commandRunner = new();
+        commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "No updates available.", string.Empty));
+        RecordingReporter reporter = new();
+        FakePrompts prompts = new()
+        {
+            SelectedDirectiveNames = [],
+            SelectedSkillInstallArgs = [CodexRulesInstaller.Identity.InstallArg]
+        };
+        CheckWorkflow workflow = new(commandRunner, prompts, reporter, new FakeDirectiveSource(), new FakeSourceVersionResolver());
+
+        var result = await workflow.RunAsync(
+            new AgenticCheckOptions(tempDirectory.Path, false, false, null, null, "codex", false),
+            CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        var offered = Assert.Single(prompts.RecommendedSkillActions, skill => skill.IsCodexRules);
+        Assert.Equal("Codex rules: run dotnet outside the sandbox (install)", RecommendationSelectionPrompt.FormatSkillListItem(offered));
+        Assert.Equal("install", reporter.CodexRules);
+        string rulesFile = Path.Combine(tempDirectory.Path, ".codex", "rules", "dna-dotnet.rules");
+        Assert.True(File.Exists(rulesFile));
+        Assert.Equal(rulesFile, result.Report.CodexRules?.File);
+        Assert.Contains(ActionOutputFormatter.FormatLine("Installed Codex rules", Path.Combine(".codex", "rules", "dna-dotnet.rules")), reporter.Successes);
+        Assert.Contains(result.Report.Actions, action => action.StartsWith("Installed Codex rules in ", StringComparison.Ordinal));
+        Assert.DoesNotContain(commandRunner.Calls, call => call.Arguments.Contains("install"));
+    }
+
+    [Fact]
+    public async Task InstalledCodexRulesAreNotOfferedAgain()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
+        tempDirectory.Write("App.csproj", "<Project />");
+        tempDirectory.Write(".codex/rules/team.rules", "prefix_rule(pattern = [\"dotnet\"])\nprefix_rule(pattern = [\"dnx\"])\nprefix_rule(pattern = [\"dna\"])\n");
+        FakeCommandRunner commandRunner = new();
+        commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "No updates available.", string.Empty));
+        RecordingReporter reporter = new();
+        FakePrompts prompts = new();
+        CheckWorkflow workflow = new(commandRunner, prompts, reporter, new FakeDirectiveSource(), new FakeSourceVersionResolver());
+
+        var result = await workflow.RunAsync(
+            new AgenticCheckOptions(tempDirectory.Path, true, false, null, null, "codex", false),
+            CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Equal("up to date", reporter.CodexRules);
+        Assert.Null(result.Report.CodexRules);
+        Assert.DoesNotContain(result.Report.Actions, action => action.Contains("Codex rules", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ClaudeCodeOnlyTargetDoesNotOfferCodexRules()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
+        tempDirectory.Write("App.csproj", "<Project />");
+        FakeCommandRunner commandRunner = new();
+        commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "No updates available.", string.Empty));
+        RecordingReporter reporter = new();
+        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), reporter, new FakeDirectiveSource(), new FakeSourceVersionResolver());
+
+        var result = await workflow.RunAsync(
+            new AgenticCheckOptions(tempDirectory.Path, true, false, null, null, "claude-code", false),
+            CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Null(reporter.CodexRules);
+        Assert.Null(result.Report.CodexRules);
+        Assert.DoesNotContain(result.Report.Actions, action => action.Contains("Codex rules", StringComparison.Ordinal));
+    }
+
     static bool IsLegacyDirectiveStatusMessage(string message)
         => message.StartsWith("Directive ", StringComparison.Ordinal)
             && !message.StartsWith("GitHub cache duration:", StringComparison.Ordinal);
