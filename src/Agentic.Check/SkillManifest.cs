@@ -108,9 +108,9 @@ static class StaticSkillManifest
             new(2026, 6, 12, 14, 59, 14, TimeSpan.Zero)),
         new(
             UnoStudioRepo,
-            "af302962882751455551bdb35e81a4f7d7d4ba9f",
-            new(2026, 6, 9, 20, 52, 25, TimeSpan.Zero),
-            new(2026, 6, 12, 14, 59, 14, TimeSpan.Zero)),
+            "609cb685ecf77ae9ade89fc8c0a459f85df0413e",
+            new(2026, 9, 21, 16, 10, 10, TimeSpan.Zero),
+            new(2026, 9, 22, 7, 43, 59, TimeSpan.Zero)),
         new(
             DotnetSkillsRepo,
             "8bbfe7a4d1c5c0cd42cd04e38031779c75f2dda3",

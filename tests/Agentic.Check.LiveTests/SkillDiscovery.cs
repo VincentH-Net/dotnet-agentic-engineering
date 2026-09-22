@@ -3,6 +3,7 @@
 enum SkillDiscoveryKind
 {
     NewCandidate,
+    Deferred,
     PossibleMove,
     MissingUpstream,
     AlternativeLocation,
@@ -175,6 +176,23 @@ static class SkillDiscovery
 
     internal static bool NeedsReview(SkillDiscoveryItem item)
         => item.Kind is SkillDiscoveryKind.NewCandidate or SkillDiscoveryKind.PossibleMove or SkillDiscoveryKind.MissingUpstream;
+
+    // A deferred skill stays out of the review count until releasedIn reports its trigger release; it then
+    // becomes a new candidate again even when the review baseline already contains it.
+    internal static IReadOnlyList<SkillDiscoveryItem> ApplyDeferrals(IReadOnlyList<SkillDiscoveryItem> items,
+        IReadOnlyList<SkillDeferral> deferrals, Func<SkillDeferral, string?> releasedIn)
+        => [.. items.Select(item =>
+        {
+            if (item.Kind is not (SkillDiscoveryKind.NewCandidate or SkillDiscoveryKind.ExcludedAtBaseline))
+                return item;
+            var deferral = deferrals.FirstOrDefault(candidate => candidate.SkillName.Equals(item.Skill.Name, StringComparison.Ordinal));
+            if (deferral is null)
+                return item;
+            string? release = releasedIn(deferral);
+            return release is null
+                ? item with { Kind = SkillDiscoveryKind.Deferred, Detail = $"Waiting for {deferral.WaitingFor} ({deferral.Trigger})." }
+                : item with { Kind = SkillDiscoveryKind.NewCandidate, Detail = $"Deferred until {deferral.WaitingFor}; now released in {deferral.TriggerRepo} {release}. Include or exclude it." };
+        })];
 
 
     internal static string Escape(string value)

@@ -18,6 +18,7 @@ public sealed class SkillDiscoveryLiveTests(ITestOutputHelper output)
         List<SkillRepositoryScan> scans = [];
         List<SkillScanError> errors = [];
         List<string> failures = [];
+        Dictionary<SkillDeferral, string?> releases = [];
         foreach (var review in StaticSkillManifest.SourceReviews)
         {
             output.WriteLine($"Scanning {review.SourceRepo}");
@@ -33,8 +34,14 @@ public sealed class SkillDiscoveryLiveTests(ITestOutputHelper output)
                 baselineFiles = await DescribeAsync(gh, review.SourceRepo, baselineFiles, skill => !previewPaths.Contains(skill.Path), cancellation.Token).ConfigureAwait(true);
                 stableFiles = await DescribeAsync(gh, review.SourceRepo, stableFiles, skill => !baselinePaths.Contains(skill.Path), cancellation.Token, identifyAll: true).ConfigureAwait(true);
                 previewFiles = await DescribeAsync(gh, review.SourceRepo, previewFiles, skill => !baselinePaths.Contains(skill.Path), cancellation.Token, identifyAll: true).ConfigureAwait(true);
-                var items = SkillDiscovery.Compare(review.SourceRepo, baselineFiles, stableFiles, previewFiles,
-                    StaticSkillManifest.All, StaticSkillManifest.Preview, stable.CommittedAt <= review.ReviewedAt);
+                var deferrals = SkillDeferrals.For(review.SourceRepo);
+                foreach (var deferral in deferrals)
+                {
+                    releases[deferral] = await ReleasedInAsync(gh, deferral, cancellation.Token).ConfigureAwait(true);
+                    output.WriteLine($"{review.SourceRepo}: {deferral.SkillName} deferred until {deferral.WaitingFor}: {(releases[deferral] is { } release ? $"released in {release}" : "not released")}");
+                }
+                var items = SkillDiscovery.ApplyDeferrals(SkillDiscovery.Compare(review.SourceRepo, baselineFiles, stableFiles, previewFiles,
+                    StaticSkillManifest.All, StaticSkillManifest.Preview, stable.CommittedAt <= review.ReviewedAt), deferrals, deferral => releases[deferral]);
                 scans.Add(new(review, stable, preview, items));
                 int count = items.Count(SkillDiscovery.NeedsReview);
                 output.WriteLine($"{review.SourceRepo}: {count} item(s) require review.");
@@ -56,12 +63,29 @@ public sealed class SkillDiscoveryLiveTests(ITestOutputHelper output)
             gh.CacheDuration,
             Cache = "gh api cache; separate from agentic-check. Cache hits are not tracked; no stale fallback.",
             Sources = scans.Select(scan => new { scan.Review, scan.Stable, scan.Preview }),
+            Deferrals = releases.Select(pair => new { pair.Key.SourceRepo, pair.Key.SkillName, pair.Key.TriggerRepo, pair.Key.TriggerPath, ReleasedIn = pair.Value }),
             Errors = errors
         }, ReportJsonOptions);
         _ = await MaintenanceReport.WriteAsync("skill-discovery-sources.json", metadata).ConfigureAwait(true);
         string path = await MaintenanceReport.WriteAsync("skill-discovery.md", SkillDiscoveryReport.Render(scans, errors, generatedAt)).ConfigureAwait(true);
         output.WriteLine($"Report: {path}");
         Assert.True(failures.Count == 0, $"{string.Join(Environment.NewLine, failures)}{Environment.NewLine}Report: {path}");
+    }
+
+    // The trigger is released when its path exists in the trigger repo's latest release (default branch without releases).
+    static async Task<string?> ReleasedInAsync(MaintenanceGh gh, SkillDeferral deferral, CancellationToken cancellationToken)
+    {
+        var defaultBranch = await gh.DefaultBranchAsync(deferral.TriggerRepo, cancellationToken).ConfigureAwait(false);
+        var stable = await gh.StableAsync(deferral.TriggerRepo, defaultBranch, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            _ = await gh.ApiAsync($"repos/{deferral.TriggerRepo}/contents/{deferral.TriggerPath}?ref={stable.CommitSha}", cancellationToken).ConfigureAwait(false);
+            return stable.Ref;
+        }
+        catch (IOException exception) when (exception.Message.Contains("404", StringComparison.Ordinal))
+        {
+            return null;
+        }
     }
 
     static async Task<IReadOnlyList<SkillTreeFile>> DescribeAsync(MaintenanceGh gh, string repo, IReadOnlyList<SkillTreeFile> files,

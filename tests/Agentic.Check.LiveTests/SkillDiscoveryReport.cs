@@ -13,7 +13,7 @@ static class SkillDiscoveryReport
     {
         StringBuilder report = new("# Skill maintenance review\n\n");
         _ = report.AppendLine(CultureInfo.InvariantCulture, $"Generated: {generatedAt:yyyy-MM-dd HH:mm zzz}\n");
-        _ = report.AppendLine("[New candidates](#new-candidates) | [Missing / moved skills](#missing--moved-skills) | [Alternative locations](#alternative-locations) | [Excluded skills](#excluded-skills)\n");
+        _ = report.AppendLine("[New candidates](#new-candidates) | [Deferred candidates](#deferred-candidates) | [Missing / moved skills](#missing--moved-skills) | [Alternative locations](#alternative-locations) | [Excluded skills](#excluded-skills)\n");
         if (errors.Count > 0)
         {
             _ = report.AppendLine("## Scan errors\n\nThese repos are incomplete. Do not advance their review baselines.\n");
@@ -34,10 +34,18 @@ static class SkillDiscoveryReport
 
         _ = report.AppendLine("## New candidates\n");
         var candidates = rows.Where(row => row.Item.Kind == SkillDiscoveryKind.NewCandidate).ToArray();
-        _ = report.AppendLine(candidates.Length == 0 ? "None.\n" : "| Repo | Folder | Skill | Available in |\n| --- | --- | --- | --- |");
+        _ = report.AppendLine(candidates.Length == 0 ? "None.\n" : "| Repo | Folder | Skill | Available in | Note |\n| --- | --- | --- | --- | --- |");
         foreach (var (scan, item) in candidates)
         {
-            _ = report.AppendLine(CultureInfo.InvariantCulture, $"| {Escape(scan.Review.SourceRepo)} | {Escape(ParentFolder(item.Skill.Path))} | {SkillLink(scan, item)} | {item.Availability} |");
+            _ = report.AppendLine(CultureInfo.InvariantCulture, $"| {Escape(scan.Review.SourceRepo)} | {Escape(ParentFolder(item.Skill.Path))} | {SkillLink(scan, item)} | {item.Availability} | {Escape(item.Detail)} |");
+        }
+
+        _ = report.AppendLine("\n## Deferred candidates\n");
+        var deferred = rows.Where(row => row.Item.Kind == SkillDiscoveryKind.Deferred).ToArray();
+        _ = report.AppendLine(deferred.Length == 0 ? "None.\n" : "Reported, not failing, until their trigger is released (see SkillDeferrals.cs).\n\n| Repo | Folder | Skill | Available in | Waiting for |\n| --- | --- | --- | --- | --- |");
+        foreach (var (scan, item) in deferred)
+        {
+            _ = report.AppendLine(CultureInfo.InvariantCulture, $"| {Escape(scan.Review.SourceRepo)} | {Escape(ParentFolder(item.Skill.Path))} | {SkillLink(scan, item)} | {item.Availability} | {Escape(item.Detail)} |");
         }
 
         _ = report.AppendLine("\n## Missing / moved skills\n");

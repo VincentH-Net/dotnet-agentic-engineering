@@ -27,6 +27,34 @@ public sealed class SkillDiscoveryTests
     }
 
     [Fact]
+    public void DeferredCandidatesStayOutOfReviewUntilTheirTriggerIsReleased()
+    {
+        var flat = File("skills/flex/SKILL.md") with { Name = "uno-flex" };
+        var plugin = File("plugins/p/skills/flex/SKILL.md") with { Name = "uno-flex" };
+        var other = File("skills/other/SKILL.md") with { Name = "other" };
+        var compared = SkillDiscovery.Compare(Repo, [], [flat, plugin, other], [flat, plugin, other], [], []);
+        SkillDeferral[] deferrals = [new(Repo, "uno-flex", "vendor/toolkit", "doc/Flex.md", "a toolkit release with Flex")];
+
+        var waiting = SkillDiscovery.ApplyDeferrals(compared, deferrals, _ => null);
+        Assert.Equal(SkillDiscoveryKind.Deferred, Item(waiting, flat.Path).Kind);
+        Assert.Equal(SkillDiscoveryKind.Deferred, Item(waiting, plugin.Path).Kind);
+        Assert.Contains("Waiting for a toolkit release with Flex (vendor/toolkit: doc/Flex.md).", Item(waiting, flat.Path).Detail, StringComparison.Ordinal);
+        Assert.Equal(SkillDiscoveryKind.NewCandidate, Item(waiting, other.Path).Kind);
+        Assert.Equal(1, waiting.Count(SkillDiscovery.NeedsReview));
+
+        var released = SkillDiscovery.ApplyDeferrals(compared, deferrals, _ => "9.2.0");
+        Assert.Equal(SkillDiscoveryKind.NewCandidate, Item(released, flat.Path).Kind);
+        Assert.Contains("now released in vendor/toolkit 9.2.0. Include or exclude it.", Item(released, plugin.Path).Detail, StringComparison.Ordinal);
+        Assert.Equal(3, released.Count(SkillDiscovery.NeedsReview));
+
+        // A baseline advanced while waiting must not hide the release.
+        var excluded = SkillDiscovery.Compare(Repo, [flat, plugin], [flat, plugin, other], [flat, plugin, other], [], []);
+        Assert.Equal(SkillDiscoveryKind.ExcludedAtBaseline, Item(excluded, flat.Path).Kind);
+        Assert.Equal(SkillDiscoveryKind.Deferred, Item(SkillDiscovery.ApplyDeferrals(excluded, deferrals, _ => null), flat.Path).Kind);
+        Assert.Equal(SkillDiscoveryKind.NewCandidate, Item(SkillDiscovery.ApplyDeferrals(excluded, deferrals, _ => "9.2.0"), flat.Path).Kind);
+    }
+
+    [Fact]
     public void SameNamesInOtherReposAndFoldersDoNotBecomeIncluded()
     {
         var selected = File("plugins/a/skills/check/SKILL.md");

@@ -8,6 +8,10 @@ public sealed class SkillDiscoveryReportTests
         var scans = new[] { Scan("owner/one"), Scan("owner/two") };
         string report = SkillDiscoveryReport.Render(scans, [], DateTimeOffset.UnixEpoch);
         Assert.Equal(1, Count(report, "## New candidates\n"));
+        Assert.Equal(1, Count(report, "## Deferred candidates\n"));
+        Assert.Contains("| owner/one | skills | [deferred](https://github.com/owner/one/blob/preview-sha/skills/deferred/SKILL.md) | preview | Waiting for a release (v/t: doc/x.md). |", report, StringComparison.Ordinal);
+        Assert.True(report.IndexOf("## New candidates", StringComparison.Ordinal) < report.IndexOf("## Deferred candidates", StringComparison.Ordinal));
+        Assert.True(report.IndexOf("## Deferred candidates", StringComparison.Ordinal) < report.IndexOf("## Missing / moved skills", StringComparison.Ordinal));
         Assert.Equal(1, Count(report, "## Missing / moved skills\n"));
         Assert.Equal(1, Count(report, "## Alternative locations\n"));
         Assert.Equal(2, Count(report, "### Excluded: "));
@@ -55,6 +59,7 @@ public sealed class SkillDiscoveryReportTests
             new("v1", "stable-sha", DateTimeOffset.UnixEpoch), new("main", "preview-sha", DateTimeOffset.UnixEpoch),
             [
                 Item(SkillDiscoveryKind.NewCandidate, "new", "skills/new/SKILL.md"),
+                Item(SkillDiscoveryKind.Deferred, "deferred", "skills/deferred/SKILL.md") with { Detail = "Waiting for a release (v/t: doc/x.md)." },
                 Item(SkillDiscoveryKind.MissingUpstream, "missing", "skills/missing/SKILL.md"),
                 Item(SkillDiscoveryKind.PossibleMove, "moved", "skills/moved/SKILL.md") with { RelatedPaths = ["old/skills/moved/SKILL.md"] },
                 Item(SkillDiscoveryKind.AlternativeLocation, "copy-one", "copies/one/SKILL.md") with { RelatedPaths = ["included/one/SKILL.md"] },
