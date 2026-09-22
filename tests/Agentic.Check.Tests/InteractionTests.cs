@@ -87,8 +87,9 @@ public sealed class InteractionTests
         commandRunner.Set("gemini", ["--help"], new CommandResult(0, "1.2.3", string.Empty));
         commandRunner.Set("qwen", ["--help"], new CommandResult(0, "Qwen Code help", string.Empty));
 
+        using TempDirectory roots = new();
         string defaultAgents = await AgentCliDetector
-            .DetectDefaultAgentsAsync(commandRunner, "/repo", CancellationToken.None)
+            .DetectDefaultAgentsAsync(commandRunner, "/repo", CancellationToken.None, folder => Path.Combine(roots.Path, folder.ToString()))
             .ConfigureAwait(true);
 
         Assert.Equal("github-copilot,claude-code,codex,qwen-code", defaultAgents);
@@ -100,11 +101,67 @@ public sealed class InteractionTests
     {
         MappedCommandRunner commandRunner = new();
 
+        using TempDirectory roots = new();
         string defaultAgents = await AgentCliDetector
-            .DetectDefaultAgentsAsync(commandRunner, "/repo", CancellationToken.None)
+            .DetectDefaultAgentsAsync(commandRunner, "/repo", CancellationToken.None, folder => Path.Combine(roots.Path, folder.ToString()))
             .ConfigureAwait(true);
 
         Assert.Equal("codex", defaultAgents);
+    }
+
+    [Fact]
+    public async Task AgentDetectorFindsDesktopAppsAndCliFoldersByTheirDocumentedFolders()
+    {
+        using TempDirectory roots = new();
+        string home = roots.CreateDirectory("UserProfile");
+        string appData = roots.CreateDirectory("ApplicationData");
+        _ = roots.CreateDirectory("UserProfile/.claude");
+        _ = roots.CreateDirectory("UserProfile/.gemini/antigravity-ide");
+        _ = roots.CreateDirectory("UserProfile/.config/opencode");
+        _ = roots.CreateDirectory("UserProfile/.kiro");
+        _ = roots.CreateDirectory("ApplicationData/Devin");
+        _ = roots.CreateDirectory("ApplicationData/Trae");
+        MappedCommandRunner commandRunner = new();
+
+        string defaultAgents = await AgentCliDetector
+            .DetectDefaultAgentsAsync(commandRunner, "/repo", CancellationToken.None,
+                folder => folder == Environment.SpecialFolder.ApplicationData ? appData : home)
+            .ConfigureAwait(true);
+
+        Assert.Equal("claude-code,gemini-cli,antigravity,devin,kiro-cli,opencode,trae", defaultAgents);
+        Assert.DoesNotContain(commandRunner.Calls, call => call.FileName == "claude");
+    }
+
+    [Fact]
+    public async Task AgentDetectorCombinesCliProbesWithFolders()
+    {
+        using TempDirectory roots = new();
+        string home = roots.CreateDirectory("UserProfile");
+        _ = roots.CreateDirectory("UserProfile/.cursor");
+        MappedCommandRunner commandRunner = new();
+        commandRunner.Set("codex", ["--version"], new CommandResult(0, "codex 0.1.0", string.Empty));
+
+        string defaultAgents = await AgentCliDetector
+            .DetectDefaultAgentsAsync(commandRunner, "/repo", CancellationToken.None, folder => folder == Environment.SpecialFolder.UserProfile ? home : string.Empty)
+            .ConfigureAwait(true);
+
+        Assert.Equal("cursor,codex", defaultAgents);
+    }
+
+    [Fact]
+    public async Task AgentDetectorIgnoresPlainFilesAndUnresolvedRoots()
+    {
+        using TempDirectory roots = new();
+        roots.Write("UserProfile/.codex", "a file, not a folder");
+        string home = Path.Combine(roots.Path, "UserProfile");
+        MappedCommandRunner commandRunner = new();
+
+        string defaultAgents = await AgentCliDetector
+            .DetectDefaultAgentsAsync(commandRunner, "/repo", CancellationToken.None, folder => folder == Environment.SpecialFolder.UserProfile ? home : string.Empty)
+            .ConfigureAwait(true);
+
+        Assert.Equal("codex", defaultAgents);
+        Assert.Contains(commandRunner.Calls, call => call.FileName == "codex");
     }
 
     [Fact]

@@ -88,6 +88,8 @@ static class AgenticCheckCli
         {
             Description = $"""
             Comma-separated agent values to support. [default: {defaultAgents}]
+            The default lists the agents found on this machine: a CLI on PATH, or the
+            folder that its CLI or desktop app keeps in your user profile or app data.
 
             Supported agent values (identical to what 'gh skill' supports):
             {AgentSkillRegistry.AgentHelpLines}

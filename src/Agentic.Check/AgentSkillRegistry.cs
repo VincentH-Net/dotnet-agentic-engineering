@@ -10,7 +10,7 @@ static class AgentSkillRegistry
     public const string ClaudeCodeAgentId = "claude-code";
     public const string CodexAgentId = "codex";
 
-    static readonly IReadOnlyList<AgentSkillHost> Hosts =
+    internal static readonly IReadOnlyList<AgentSkillHost> Hosts =
     [
         new("github-copilot", "GitHub Copilot", AgentsProjectDirectory),
         new(ClaudeCodeAgentId, "Claude Code", ".claude/skills"),
@@ -18,6 +18,8 @@ static class AgentSkillRegistry
         new(CodexAgentId, "Codex", AgentsProjectDirectory),
         new("gemini-cli", "Gemini CLI", AgentsProjectDirectory),
         new("antigravity", "Antigravity", AgentsProjectDirectory),
+        new("antigravity-cli", "Antigravity CLI", AgentsProjectDirectory),
+        new("antigravity2.0", "Antigravity 2.0", AgentsProjectDirectory),
         new("adal", "AdaL", ".adal/skills"),
         new("amp", "Amp", AgentsProjectDirectory),
         new("augment", "Augment", ".augment/skills"),
@@ -29,9 +31,11 @@ static class AgentSkillRegistry
         new("cortex", "Cortex Code", ".cortex/skills"),
         new("crush", "Crush", ".crush/skills"),
         new("deepagents", "Deep Agents", AgentsProjectDirectory),
+        new("devin", "Devin", ".devin/skills"),
         new("droid", "Droid", ".factory/skills"),
         new("firebender", "Firebender", AgentsProjectDirectory),
         new("goose", "Goose", ".goose/skills"),
+        new("grok", "Grok", ".grok/skills"),
         new("iflow-cli", "iFlow CLI", ".iflow/skills"),
         new("junie", "Junie", ".junie/skills"),
         new("kilo", "Kilo Code", ".kilocode/skills"),
@@ -55,7 +59,6 @@ static class AgentSkillRegistry
         new("trae-cn", "Trae CN", ".trae/skills"),
         new("universal", "Universal", AgentsProjectDirectory),
         new("warp", "Warp", AgentsProjectDirectory),
-        new("windsurf", "Windsurf", ".windsurf/skills"),
         new("zencoder", "Zencoder", ".zencoder/skills")
     ];
 

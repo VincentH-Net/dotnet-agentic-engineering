@@ -12,12 +12,15 @@ AGENTIC_CHECK_SKILL_MAINTENANCE=1 dotnet test tests/Agentic.Check.LiveTests --fi
 
 In PowerShell, first set `$env:AGENTIC_CHECK_SKILL_MAINTENANCE = '1'`, then run the same `dotnet test` command without the environment assignment prefix.
 
-Run only discovery or manifest validation by replacing the filter with:
+Run only discovery, manifest validation, or the agent registry comparison by replacing the filter with:
 
 ```text
 FullyQualifiedName~SourceRepositoriesHaveNoUnreviewedSkills
 FullyQualifiedName~AllManifestSkillsCanBeFoundByGhSkillPreview
+FullyQualifiedName~AgentRegistryMatchesGhSkill
 ```
+
+The agent registry comparison reads `internal/skills/registry/registry.go` from the latest `cli/cli` release, so an older local `gh` cannot hide new, renamed or moved agents, and writes `agent-registry.md` next to the other maintenance reports.
 
 Run the offline classification and report tests without GitHub access:
 
