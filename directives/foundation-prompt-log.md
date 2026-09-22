@@ -17,8 +17,9 @@ Include user prompts and agent questions with their answers since the previous p
 (or session start if none yet). Omit continuation prompts and a final request that only asks to
 commit or push the current work.
 
-- Redact secrets, tokens, credentials, private URLs, and personal data. Preserve everything
-  else verbatim; do not summarize.
+- Redact secrets, tokens, credentials, private URLs, and personal data. Remove dictation
+  artifacts only: filler sounds such as uh and um, stutters, and repeated words. Preserve
+  everything else verbatim; do not summarize or rephrase.
 - Log only what the user typed. Omit anything the harness adds to a message, such as AGENTS.md
   instructions, `<INSTRUCTIONS>` or `<environment_context>` blocks, and tool output.
 - Separate entries with blank lines. Leave standalone user prompts unlabeled, even questions.
