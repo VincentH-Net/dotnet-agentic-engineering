@@ -6,11 +6,87 @@ sealed record CompanionReport(string ManifestPath, string? InstalledVersion, str
 
 sealed class CompanionInstaller(ICommandRunner runner)
 {
-    internal static string ManifestPath(string target) => Path.Combine(target, ".config", "dotnet-tools.json");
+    // One pin per repository. The nearest manifest on the path from the target up to the git root that
+    // pins the companion is the one to read and update; when none does, the pin is created at the git
+    // root, or at the target outside a git repository. The SDK resolves local tools upward through
+    // manifests, so that single pin serves every folder of the repository.
+    internal static string ManifestPath(string target)
+    {
+        var directories = RepositoryScope.DirectoriesUpToGitRoot(target);
+        foreach (string directory in directories)
+        {
+            string manifest = ManifestIn(directory);
+            if (ReadVersion(manifest) is not null)
+            {
+                return manifest;
+            }
+        }
+
+        return ManifestIn(directories[^1]);
+    }
 
     internal static string? InstalledVersion(string target)
+        => ReadVersion(ManifestPath(target));
+
+    // A pin below the target shadows the repository pin for its own subtree, so the check reports it.
+    internal static IReadOnlyList<string> PinsBelow(string target)
     {
-        string manifest = ManifestPath(target);
+        string repositoryPin = ManifestPath(target);
+        List<string> pins = [];
+        try
+        {
+            Collect(Path.GetFullPath(target));
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // Report what could be read; an unreadable folder is not this check's concern.
+        }
+
+        return pins;
+
+        void Collect(string directory)
+        {
+            foreach (string child in Directory.EnumerateDirectories(directory))
+            {
+                if (StackDetector.ExcludedDirectoryNames.Contains(Path.GetFileName(child), StringComparer.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                string manifest = ManifestIn(child);
+                if (manifest != repositoryPin && TryReadVersion(manifest) is not null)
+                {
+                    pins.Add(manifest);
+                }
+
+                Collect(child);
+            }
+        }
+    }
+
+    static bool OwnsManifest(string target, string manifest)
+        => string.Equals(
+            Path.TrimEndingDirectorySeparator(Path.GetFullPath(target)),
+            Path.GetDirectoryName(Path.GetDirectoryName(manifest)),
+            OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
+
+    static string ManifestIn(string directory)
+        => Path.Combine(directory, ".config", "dotnet-tools.json");
+
+    static string? TryReadVersion(string manifest)
+    {
+        try
+        {
+            return ReadVersion(manifest);
+        }
+        catch (Exception exception) when (exception is JsonException or KeyNotFoundException or InvalidOperationException)
+        {
+            return null;
+        }
+    }
+
+    static string? ReadVersion(string manifest)
+    {
         if (!File.Exists(manifest))
         {
             return null;
@@ -43,6 +119,13 @@ sealed class CompanionInstaller(ICommandRunner runner)
             if (restoreOnly && (before is null || !ToolVersion.Parse(before).Satisfies(requirement)))
             {
                 throw new FormatException("Refusing to restore an absent or incompatible companion.");
+            }
+
+            // A major change moves the whole repository, so only the folder that owns the pin may make it.
+            if (before is not null && !restoreOnly && !OwnsManifest(target, manifest) && ToolVersion.Parse(before).Major != requirement.Major)
+            {
+                string owner = Path.GetDirectoryName(Path.GetDirectoryName(manifest))!;
+                throw new FormatException($"The repository pins {CompanionDependency.PackageId} {before} in {manifest}, and the selected content needs {requirement.Minimum}, a different major. Run dna check in {owner} first so the repository moves as a whole.");
             }
 
             if (dryRun)

@@ -356,6 +356,12 @@ sealed class CheckWorkflow(
         try
         {
             installedCompanion = CompanionInstaller.InstalledVersion(targetDirectory);
+            foreach (string pin in CompanionInstaller.PinsBelow(targetDirectory))
+            {
+                string warning = $"{CompanionDependency.PackageId} is also pinned in {pin}; folders below it use that version instead of the repository pin {CompanionInstaller.ManifestPath(targetDirectory)}. Remove the extra entry to keep one version per repository.";
+                report.Warnings.Add(warning);
+                reporter.Warning(warning);
+            }
             List<string> installedConsumers = [];
             foreach (var directive in directivePlan.Directives)
             {

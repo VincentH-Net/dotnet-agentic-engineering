@@ -12,7 +12,7 @@ dna prompt-log check --commit HEAD
 dna -h
 ```
 
-`dna <args>` runs `dotnet agentic <args>` in the current folder, so that folder's pinned
+`dna <args>` runs `dotnet agentic <args>` in the current folder, so the repository's pinned
 [InnoWvate.Agentic](https://www.nuget.org/packages/InnoWvate.Agentic) version is used.
 `dna check` runs the latest stable [Agentic.Check](https://www.nuget.org/packages/Agentic.Check)
 directly and works before the local tool is installed. Once `dna` is on a machine, `dna check`
@@ -51,4 +51,4 @@ Please run `dna check` to install it.
 ```
 
 The launcher is deliberately tiny and versioned independently. Functionality lives in the
-folder-pinned InnoWvate.Agentic and the latest Agentic.Check.
+repository-pinned InnoWvate.Agentic and the latest Agentic.Check.

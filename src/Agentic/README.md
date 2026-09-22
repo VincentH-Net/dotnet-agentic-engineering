@@ -4,8 +4,8 @@ The folder-local `dotnet agentic` tool: deterministic prompt-log commands for co
 humans, plus a `check` shortcut to the latest Agentic.Check.
 
 [Agentic.Check](https://www.nuget.org/packages/Agentic.Check) installs and updates it when you
-select the Prompt Log directive, pinned in the target folder's `.config/dotnet-tools.json` so the
-tool, directive and skill versions travel together. Specialized folders can have their own version. The optional global
+select the Prompt Log directive, pinned once per repository in the repo root's `.config/dotnet-tools.json`
+so the tool, directive and skill versions travel together. The optional global
 [`dna` shorthand](https://www.nuget.org/packages/InnoWvate.Dna) lets you type `dna` instead of
 `dotnet agentic`.
 

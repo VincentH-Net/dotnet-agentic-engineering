@@ -37,7 +37,7 @@ static class CodexRulesInstaller
     internal static CodexRulesPlan Plan(string targetDirectory)
     {
         string? file = null;
-        foreach (string directory in DirectoriesUpToGitRoot(targetDirectory))
+        foreach (string directory in RepositoryScope.DirectoriesUpToGitRoot(targetDirectory))
         {
             string candidate = Path.Combine(directory, RelativePath);
             if (File.Exists(candidate))
@@ -78,23 +78,6 @@ static class CodexRulesInstaller
         {
             return new(plan.File, plan.Action, Commands, false, exception.Message);
         }
-    }
-
-    // The target itself, then each parent up to and including the nearest git root. Without a git
-    // root only the target counts, so a user-level .codex folder is never mistaken for a project one.
-    static List<string> DirectoriesUpToGitRoot(string targetDirectory)
-    {
-        List<string> directories = [];
-        for (string? current = Path.GetFullPath(targetDirectory); current is not null; current = Path.GetDirectoryName(current))
-        {
-            directories.Add(current);
-            if (Directory.Exists(Path.Combine(current, ".git")) || File.Exists(Path.Combine(current, ".git")))
-            {
-                return directories;
-            }
-        }
-
-        return [directories[0]];
     }
 
     static string Render()

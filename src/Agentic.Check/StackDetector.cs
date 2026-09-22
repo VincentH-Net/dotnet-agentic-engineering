@@ -4,7 +4,7 @@ namespace Agentic.Check;
 
 static class StackDetector
 {
-    static readonly string[] ExcludedDirectoryNames = [".git", ".vs", "bin", "obj", "node_modules"];
+    internal static readonly string[] ExcludedDirectoryNames = [".git", ".vs", "bin", "obj", "node_modules"];
 
     internal static StackDetectionResult Detect(string repoRoot)
     {

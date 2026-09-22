@@ -545,9 +545,94 @@ public sealed class CompanionTests
         Assert.Contains(expected, result.Report.Actions);
     }
 
+    [Fact]
+    public void RepositoryPinIsResolvedFromTheTargetUpToTheGitRoot()
+    {
+        using TempDirectory temp = new();
+        _ = temp.CreateDirectory(".git");
+        string backend = temp.CreateDirectory("backend");
+        string api = temp.CreateDirectory("backend/api");
+        string rootManifest = Path.Combine(temp.Path, ".config", "dotnet-tools.json");
+
+        // Nothing pinned yet: a subfolder check creates the pin at the git root, not in the subfolder.
+        Assert.Equal(rootManifest, CompanionInstaller.ManifestPath(backend));
+        Assert.Null(CompanionInstaller.InstalledVersion(backend));
+
+        WriteManifest(temp.Path, "2.3.0");
+        Assert.Equal(rootManifest, CompanionInstaller.ManifestPath(api));
+        Assert.Equal("2.3.0", CompanionInstaller.InstalledVersion(api));
+
+        // A nearer pin wins for its own subtree, as the SDK resolves it.
+        WriteManifest(backend, "2.2.0");
+        Assert.Equal(Path.Combine(backend, ".config", "dotnet-tools.json"), CompanionInstaller.ManifestPath(api));
+        Assert.Equal("2.2.0", CompanionInstaller.InstalledVersion(api));
+        Assert.Equal("2.3.0", CompanionInstaller.InstalledVersion(temp.Path));
+    }
+
+    [Fact]
+    public void WithoutAGitRootOnlyTheTargetCounts()
+    {
+        using TempDirectory temp = new();
+        WriteManifest(temp.Path, "2.3.0");
+        string child = temp.CreateDirectory("child");
+
+        Assert.Equal(Path.Combine(child, ".config", "dotnet-tools.json"), CompanionInstaller.ManifestPath(child));
+        Assert.Null(CompanionInstaller.InstalledVersion(child));
+    }
+
+    [Fact]
+    public void PinsBelowTheTargetAreReportedExceptInExcludedFolders()
+    {
+        using TempDirectory temp = new();
+        _ = temp.CreateDirectory(".git");
+        WriteManifest(temp.Path, "2.3.0");
+        WriteManifest(temp.CreateDirectory("backend"), "2.2.0");
+        WriteManifest(temp.CreateDirectory("frontend"), null);
+        WriteManifest(temp.CreateDirectory("node_modules/pkg"), "2.1.0");
+        temp.Write("tools/.config/dotnet-tools.json", "not json");
+
+        Assert.Equal([Path.Combine(temp.Path, "backend", ".config", "dotnet-tools.json")], CompanionInstaller.PinsBelow(temp.Path));
+        Assert.Empty(CompanionInstaller.PinsBelow(Path.Combine(temp.Path, "backend")));
+    }
+
+    [Theory]
+    [InlineData("2.4", true)]
+    [InlineData("3.0", false)]
+    public async Task MajorChangesAreOnlyMadeFromTheFolderThatOwnsThePin(string minimum, bool allowed)
+    {
+        using TempDirectory temp = new();
+        _ = temp.CreateDirectory(".git");
+        WriteManifest(temp.Path, "2.3.0");
+        string backend = temp.CreateDirectory("backend");
+        string rootManifest = Path.Combine(temp.Path, ".config", "dotnet-tools.json");
+        ToolRunner runner = new() { Resolved = allowed ? "2.4.1" : "3.0.0" };
+
+        var result = await new CompanionInstaller(runner).EnsureAsync(backend, ToolVersion.ParseMinimum(minimum), false, false, false, CancellationToken.None);
+
+        Assert.Equal(allowed, result.Success);
+        Assert.Equal(rootManifest, result.ManifestPath);
+        if (allowed)
+        {
+            Assert.Contains(rootManifest, Assert.Single(runner.Calls).Arguments);
+            Assert.Equal("2.4.1", CompanionInstaller.InstalledVersion(backend));
+            Assert.False(Directory.Exists(Path.Combine(backend, ".config")));
+            return;
+        }
+
+        Assert.Empty(runner.Calls);
+        Assert.Contains("different major", result.Error, StringComparison.Ordinal);
+        Assert.Contains(temp.Path, result.Error, StringComparison.Ordinal);
+        Assert.Equal("2.3.0", CompanionInstaller.InstalledVersion(backend));
+        // The folder that owns the pin may move the repository to the new major.
+        var fromRoot = await new CompanionInstaller(runner).EnsureAsync(temp.Path, ToolVersion.ParseMinimum(minimum), false, false, false, CancellationToken.None);
+        Assert.True(fromRoot.Success, fromRoot.Error);
+        Assert.Equal("3.0.0", CompanionInstaller.InstalledVersion(backend));
+    }
+
+    // Writes the manifest of this exact folder; production code resolves the repository pin instead.
     internal static void WriteManifest(string target, string? version)
     {
-        string manifest = CompanionInstaller.ManifestPath(target);
+        string manifest = Path.Combine(target, ".config", "dotnet-tools.json");
         _ = Directory.CreateDirectory(Path.GetDirectoryName(manifest)!);
         var tools = new System.Text.Json.Nodes.JsonObject { ["unrelated"] = new System.Text.Json.Nodes.JsonObject { ["version"] = "1.0.0", ["commands"] = new System.Text.Json.Nodes.JsonArray("other") } };
         if (version is not null)
@@ -583,7 +668,9 @@ sealed class ToolRunner : ICommandRunner
 
             if (arguments[1] is "install" or "update")
             {
-                CompanionTests.WriteManifest(workingDirectory, Resolved);
+                int manifestIndex = arguments.ToList().IndexOf("--tool-manifest");
+                string folder = manifestIndex >= 0 ? Path.GetDirectoryName(Path.GetDirectoryName(arguments[manifestIndex + 1]))! : workingDirectory;
+                CompanionTests.WriteManifest(folder, Resolved);
             }
 
             return Task.FromResult(new CommandResult(0, arguments[1] == "run" ? Resolved : "localized SDK output", ""));

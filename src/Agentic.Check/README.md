@@ -10,7 +10,7 @@
 - For Codex, rules that run `dotnet` outside its sandbox are installed in `.codex/rules`, so
   `dotnet` has network access without approval prompts
 - Skills are installed / updated directly from source GitHub skill repo's with `gh skill`
-- Tools that directives and skills depend on are installed / updated with `dotnet tool`, pinned in the target folder
+- Tools that directives and skills depend on are installed / updated with `dotnet tool`, pinned once per repository
 
 The skills available for composition are carefully tested and are selected from
 best-in-class GitHub skills repo's:
@@ -66,9 +66,11 @@ Directives and skills can depend on tools, which are installed before the conten
 Currently the **Prompt Log** directive (`foundation-prompt-log`) does; selecting it also selects:
 
 - **InnoWvate.Agentic**: the folder-local `dotnet agentic` tool that the directive invokes.
-  It is installed in the target's `.config/dotnet-tools.json` at the newest version compatible
-  with the selected directives and skills (`major.*`, or `major.*-*` with `--preview`). If that
-  fails, the dependent directives and skills are skipped and reported.
+  It is installed once per repository, in the repo root's `.config/dotnet-tools.json` (the target
+  folder outside a git repository), at the newest version compatible with the selected directives
+  and skills (`major.*`, or `major.*-*` with `--preview`); a check in a specialized subfolder reuses
+  and updates that pin, and reports any extra pin below the target. If the install fails, the
+  dependent directives and skills are skipped and reported.
 - **`dna` shorthand for `dotnet agentic`**: the global `InnoWvate.Dna` launcher, offered when
   `agentic.check` is started with `dnx agentic.check` or `dotnet agentic check`. Deselect it to
   opt out. If another `dna` command is already on your PATH, `agentic.check` shows where it is

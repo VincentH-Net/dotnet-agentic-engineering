@@ -1119,6 +1119,30 @@ public sealed class WorkflowTests
         Assert.DoesNotContain(result.Report.Actions, action => action.Contains("Codex rules", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task CompanionPinsBelowTheTargetAreReportedAsWarnings()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
+        tempDirectory.Write("App.csproj", "<Project />");
+        CompanionTests.WriteManifest(Path.Combine(tempDirectory.Path, "backend"), "2.2.0");
+        FakeCommandRunner commandRunner = new();
+        commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "No updates available.", string.Empty));
+        RecordingReporter reporter = new();
+        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), reporter, new FakeDirectiveSource(), new FakeSourceVersionResolver());
+
+        var result = await workflow.RunAsync(
+            new AgenticCheckOptions(tempDirectory.Path, true, false, null, null, "codex", false),
+            CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        string pin = Path.Combine(tempDirectory.Path, "backend", ".config", "dotnet-tools.json");
+        Assert.Contains(result.Report.Warnings, warning => warning.Contains(pin, StringComparison.Ordinal));
+        Assert.Contains(reporter.Warnings, warning => warning.Contains(pin, StringComparison.Ordinal));
+    }
+
     static bool IsLegacyDirectiveStatusMessage(string message)
         => message.StartsWith("Directive ", StringComparison.Ordinal)
             && !message.StartsWith("GitHub cache duration:", StringComparison.Ordinal);
