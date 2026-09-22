@@ -65,7 +65,7 @@ dna check -h          # all options
 Directives and skills can depend on tools, which are installed before the content that needs them.
 Currently the **Prompt Log** directive (`foundation-prompt-log`) does; selecting it also selects:
 
-- **InnoWvate.Agentic**: the folder-local `dotnet agentic` tool that the directive invokes.
+- **InnoWvate.Agentic**: the repo-local `dotnet agentic` tool that the directive invokes.
   It is installed once per repository, in the repo root's `.config/dotnet-tools.json` (the target
   folder outside a git repository), at the newest version compatible with the selected directives
   and skills (`major.*`, or `major.*-*` with `--preview`); a check in a specialized subfolder reuses

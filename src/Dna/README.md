@@ -1,6 +1,6 @@
 # dna
 
-`dna` is the shorthand for `dotnet agentic`: a global launcher for that folder-local tool, so you type less:
+`dna` is the shorthand for `dotnet agentic`: a global launcher for that repo-local tool, so you type less:
 
 ```bash
 dna check                     # run the latest Agentic.Check to set up or update this repo

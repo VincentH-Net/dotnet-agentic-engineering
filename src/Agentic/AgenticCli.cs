@@ -46,7 +46,7 @@ static class AgenticCli
         });
         // Help shows the command the user actually typed: dna when the shorthand launched us, otherwise dotnet agentic.
         string launcher = string.IsNullOrEmpty((readEnvironment ?? Environment.GetEnvironmentVariable)(DnaLauncherContract.VersionVariable)) ? "dotnet agentic" : "dna";
-        RootCommand root = new("Folder-local agentic tool for directives, skills and humans. dna is the shorthand for dotnet agentic. Prompt-log Git operations are read-only.");
+        RootCommand root = new("Repo-local agentic tool for directives, skills and humans. dna is the shorthand for dotnet agentic. Prompt-log Git operations are read-only.");
         root.Options.OfType<VersionOption>().Single().Validators.Clear();
         root.Options.Add(minimum);
         root.Subcommands.Add(new Command("check", "Run the latest stable Agentic.Check; all following arguments are forwarded."));

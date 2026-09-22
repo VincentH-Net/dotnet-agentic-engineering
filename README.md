@@ -53,7 +53,7 @@ Prerequisites:
 dotnet tool install --global InnoWvate.Dna
 ```
 
-`dna` is the shorthand for `dotnet agentic`, the folder-local tool that directives and skills call. `dna check` works before that tool exists. If you cannot install a global tool, or another `dna` command is on your PATH, use `dnx agentic.check` wherever this page says `dna check`.
+`dna` is the shorthand for `dotnet agentic`, the repo-local tool that directives and skills call. `dna check` works before that tool exists. If you cannot install a global tool, or another `dna` command is on your PATH, use `dnx agentic.check` wherever this page says `dna check`.
 
 ### 2. Set up your repo, and keep it current
 
@@ -65,7 +65,7 @@ dna check
 
 It runs the latest `agentic.check`: it detects .NET, ASP.NET Core, Orleans and Uno Platform usage, lists the recommended directives, skills and tools, and lets you select which to apply. Directives are installed in `AGENTS.md` / `CLAUDE.md`, skills with `gh skill`, tools with `dotnet tool`; for Codex, rules that run `dotnet` outside its sandbox go in `.codex/rules`. Run `dna check -h` for options such as `--dry-run` and `--preview`.
 
-Selecting the **Prompt Log** directive also selects the tool it uses: `InnoWvate.Agentic`, the folder-local `dotnet agentic` tool. It is pinned once per repository, in the repo root's `.config/dotnet-tools.json` (the target folder when there is no git repository), so it travels with your source and matches the directives and skills installed there. A check in a specialized subfolder reuses and updates that same pin.
+Selecting the **Prompt Log** directive also selects the tool it uses: `InnoWvate.Agentic`, the repo-local `dotnet agentic` tool. It is pinned once per repository, in the repo root's `.config/dotnet-tools.json` (the target folder when there is no git repository), so it travels with your source and matches the directives and skills installed there. A check in a specialized subfolder reuses and updates that same pin.
 
 Run `dna check` again after adding a technology, and regularly to pick up skill updates. Directives, skills and tools are updated together. Teammates who clone the repo install `dna` the same way and run `dna check`, which restores the pinned tool; `dotnet tool restore` restores it alone.
 
@@ -90,7 +90,7 @@ Run `dna check` in the repo root for the common directives and skills, then in a
 |---|---|---|---|
 | [Agentic.Check](src/Agentic.Check/README.md) | `dna check` | Not installed; `dna check` runs the latest stable version, as does `dnx agentic.check` | Detects your stack; composes, installs and updates directives, skills and tools |
 | [InnoWvate.Agentic](src/Agentic/README.md) | `dotnet agentic` | Once per repository, pinned in the repo root's `.config/dotnet-tools.json` | Deterministic prompt-log commands for agents and humans; `check` runs the latest Agentic.Check |
-| [InnoWvate.Dna](src/Dna/README.md) | `dna` | Global, once per machine | Shorthand for the folder-local `dotnet agentic`; `dna check` works everywhere |
+| [InnoWvate.Dna](src/Dna/README.md) | `dna` | Global, once per machine | Shorthand for the repo-local `dotnet agentic`; `dna check` works everywhere |
 
 Directives and skills tell agents what to do in words. Words cost tokens on every run, and agents
 follow them imperfectly. `dotnet agentic` is where deterministic steps move out of that text into

@@ -1,6 +1,6 @@
 # InnoWvate.Agentic
 
-The folder-local `dotnet agentic` tool: deterministic prompt-log commands for coding agents and
+The repo-local `dotnet agentic` tool: deterministic prompt-log commands for coding agents and
 humans, plus a `check` shortcut to the latest Agentic.Check.
 
 [Agentic.Check](https://www.nuget.org/packages/Agentic.Check) installs and updates it when you
