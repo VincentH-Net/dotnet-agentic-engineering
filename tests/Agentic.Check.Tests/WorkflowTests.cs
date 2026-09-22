@@ -1063,10 +1063,10 @@ public sealed class WorkflowTests
         var offered = Assert.Single(prompts.RecommendedSkillActions, skill => skill.IsCodexRules);
         Assert.Equal("Codex rules: run dotnet outside the sandbox (install)", RecommendationSelectionPrompt.FormatSkillListItem(offered));
         Assert.Equal("install", reporter.CodexRules);
-        string rulesFile = Path.Combine(tempDirectory.Path, ".codex", "rules", "dna-dotnet.rules");
+        string rulesFile = Path.Combine(tempDirectory.Path, ".codex", "rules", "dotnet-agentic-engineering.rules");
         Assert.True(File.Exists(rulesFile));
         Assert.Equal(rulesFile, result.Report.CodexRules?.File);
-        Assert.Contains(ActionOutputFormatter.FormatLine("Installed Codex rules", Path.Combine(".codex", "rules", "dna-dotnet.rules")), reporter.Successes);
+        Assert.Contains(ActionOutputFormatter.FormatLine("Installed Codex rules", Path.Combine(".codex", "rules", "dotnet-agentic-engineering.rules")), reporter.Successes);
         Assert.Contains(result.Report.Actions, action => action.StartsWith("Installed Codex rules in ", StringComparison.Ordinal));
         Assert.DoesNotContain(commandRunner.Calls, call => call.Arguments.Contains("install"));
     }
@@ -1077,7 +1077,7 @@ public sealed class WorkflowTests
         using TempDirectory tempDirectory = new();
         tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
         tempDirectory.Write("App.csproj", "<Project />");
-        tempDirectory.Write(".codex/rules/dna-dotnet.rules", CodexRulesInstaller.Content);
+        tempDirectory.Write(".codex/rules/dotnet-agentic-engineering.rules", CodexRulesInstaller.Content);
         FakeCommandRunner commandRunner = new();
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));

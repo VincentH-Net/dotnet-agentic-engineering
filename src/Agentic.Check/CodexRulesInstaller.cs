@@ -18,7 +18,7 @@ sealed record CodexRulesReport(string File, string Action, IReadOnlyList<string>
 // target already covers it, while a file below it does not.
 static class CodexRulesInstaller
 {
-    internal const string FileName = "dna-dotnet.rules";
+    internal const string FileName = "dotnet-agentic-engineering.rules";
     internal static readonly string RelativePath = Path.Combine(".codex", "rules", FileName);
     internal static SkillDependency Identity { get; } = new(string.Empty, "codex-rules");
 
