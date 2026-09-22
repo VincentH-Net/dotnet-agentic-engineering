@@ -313,9 +313,9 @@ sealed class CheckWorkflow(
         stack = stack ?? throw new InvalidOperationException("Target directory scan did not detect a stack.");
         directivePlan = directivePlan ?? throw new InvalidOperationException("Target directory scan did not plan directives.");
 
-        // Offered like any other item: only when a required rule is missing from every .codex/rules file.
+        // Offered like any other item: only when the dna-owned rules file is absent or outdated on the path to the git root.
         var codexRulesPlan = installCodexRules && stack.Technologies.Contains(TechnologyNames.Dotnet, StringComparer.OrdinalIgnoreCase)
-            ? CodexRulesInstaller.Plan(targetDirectory, stack)
+            ? CodexRulesInstaller.Plan(targetDirectory)
             : null;
 
         report.AgentsFile = directivePlan.AgentsFile;
@@ -545,7 +545,7 @@ sealed class CheckWorkflow(
             var codexRules = await CodexRulesInstaller.EnsureAsync(codexRulesPlan!, options.DryRun, cancellationToken).ConfigureAwait(false);
             report.CodexRules = codexRules;
             string verb = options.DryRun ? $"Would {codexRules.Action}" : codexRules.Action == "install" ? "Installed" : "Updated";
-            string description = ActionOutputFormatter.FormatLine($"{verb} Codex rules", CodexRulesInstaller.RelativePath);
+            string description = ActionOutputFormatter.FormatLine($"{verb} Codex rules", codexRulesPlan!.Display);
             report.Actions.Add($"{verb} Codex rules in {codexRules.File}: {string.Join(", ", codexRules.Rules)}.");
             if (codexRules.Success)
             {

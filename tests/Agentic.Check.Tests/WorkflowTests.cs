@@ -1077,7 +1077,7 @@ public sealed class WorkflowTests
         using TempDirectory tempDirectory = new();
         tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
         tempDirectory.Write("App.csproj", "<Project />");
-        tempDirectory.Write(".codex/rules/team.rules", "prefix_rule(pattern = [\"dotnet\"])\nprefix_rule(pattern = [\"dnx\"])\nprefix_rule(pattern = [\"dna\"])\n");
+        tempDirectory.Write(".codex/rules/dna-dotnet.rules", CodexRulesInstaller.Content);
         FakeCommandRunner commandRunner = new();
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
