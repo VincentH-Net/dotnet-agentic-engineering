@@ -1,6 +1,7 @@
 ﻿using System.Text.Json;
 using Agentic.PackageFixtures;
 using Hex1b.Automation;
+using Hex1b.Input;
 
 namespace Agentic.Check.LiveTests;
 
@@ -187,12 +188,17 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
                 await auto.TypeAsync("InnoWvate.Agentic").ConfigureAwait(false);
                 await auto.WaitUntilTextAsync("Filter: InnoWvate.Agentic").ConfigureAwait(false);
                 await auto.SpaceAsync().ConfigureAwait(false);
+                // A deselected row leaves the selected view; F2 shows all rows so the unchecked row is visible.
+                await auto.KeyAsync(Hex1bKey.F2).ConfigureAwait(false);
                 await auto.WaitUntilTextAsync("[ ] InnoWvate.Agentic").ConfigureAwait(false);
                 await auto.EscapeAsync().ConfigureAwait(false);
-                await auto.WaitUntilTextAsync("[ ] foundation-prompt-log").ConfigureAwait(false);
+                // The cursor stays on the companion row at the bottom of this long list, so check the
+                // deselected dependent under its own filter instead of expecting it in view.
                 await auto.TypeAsync("foundation-prompt-log").ConfigureAwait(false);
                 await auto.WaitUntilTextAsync("Filter: foundation-prompt-log").ConfigureAwait(false);
+                await auto.WaitUntilTextAsync("[ ] foundation-prompt-log").ConfigureAwait(false);
                 await auto.SpaceAsync().ConfigureAwait(false);
+                await auto.WaitUntilTextAsync("[x] foundation-prompt-log").ConfigureAwait(false);
                 await auto.EscapeAsync().ConfigureAwait(false);
                 // The unfiltered selector is paged; bring the dependency back into view.
                 await auto.TypeAsync("InnoWvate.Agentic").ConfigureAwait(false);

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Hex1b;
 using Hex1b.Automation;
+using Hex1b.Input;
 using Xunit.Abstractions;
 
 namespace Agentic.Check.LiveTests;
@@ -80,6 +81,8 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
             await auto.TypeAsync("InnoWvate.Agentic").ConfigureAwait(true);
             await auto.WaitUntilTextAsync("Filter: InnoWvate.Agentic").ConfigureAwait(true);
             await auto.SpaceAsync().ConfigureAwait(true);
+            // A deselected row leaves the selected view; F2 shows all rows so the unchecked row is visible.
+            await auto.KeyAsync(Hex1bKey.F2).ConfigureAwait(true);
             await auto.WaitUntilTextAsync("[ ] InnoWvate.Agentic").ConfigureAwait(true);
             await auto.EscapeAsync().ConfigureAwait(true);
             await auto.WaitUntilTextAsync("[ ] foundation-prompt-log").ConfigureAwait(true);
@@ -136,6 +139,8 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
             await auto.TypeAsync("shorthand").ConfigureAwait(true);
             await auto.WaitUntilTextAsync("Filter: shorthand").ConfigureAwait(true);
             await auto.SpaceAsync().ConfigureAwait(true);
+            // A deselected row leaves the selected view; F2 shows all rows so the unchecked row is visible.
+            await auto.KeyAsync(Hex1bKey.F2).ConfigureAwait(true);
             await auto.WaitUntilTextAsync("[ ] `dna`").ConfigureAwait(true);
             await auto.EscapeAsync().ConfigureAwait(true);
             await auto.WaitUntilTextAsync("[x] InnoWvate.Agentic").ConfigureAwait(true);
@@ -656,6 +661,10 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
                 await auto.WaitUntilTextAsync("Target directory specialization: ON", timeout: TimeSpan.FromSeconds(20)).ConfigureAwait(true);
                 await auto.WaitUntilTextAsync("Tab to toggle", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
                 await auto.WaitUntilTextAsync("already present above or below", timeout: TimeSpan.FromSeconds(20)).ConfigureAwait(true);
+                // The deselected duplicates and their locations are hidden in the selected view; F2 shows all rows.
+                await auto.WaitUntilTextAsync("Show: selected", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
+                await auto.KeyAsync(Hex1bKey.F2).ConfigureAwait(true);
+                await auto.WaitUntilTextAsync("Show: all", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
                 await auto.WaitUntilTextAsync("Duplicate(s) that prevent specialization:", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
                 await auto.WaitUntilTextAsync("../AGENTS.md", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
                 await auto.WaitUntilTextAsync(Path.Combine("api", "AGENTS.md"), timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
@@ -1110,7 +1119,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
         string path = workspace.BinPath + Path.PathSeparator + (Environment.GetEnvironmentVariable("PATH") ?? string.Empty);
         // Hex1b 0.165.0 ignores the PTY environment overrides on Unix. Set TERM at the
         // actual command boundary so a headless parent's TERM=dumb cannot disable redraws.
-        return $"TERM=xterm-256color GH_TOKEN= GITHUB_TOKEN= GH_CONFIG_DIR={Quote(Path.Combine(workspace.RootPath, "gh"))} AGENTIC_CHECK_CACHE_SECONDS=3600 AGENTIC_CHECK_CACHE_DIR={Quote(Path.Combine(workspace.RootPath, "cache"))} AGENTIC_CHECK_GH_LOG={Quote(workspace.GhLogPath)} PATH={Quote(path)} {Quote(Path.ChangeExtension(ToolAssemblyPath, null))} {arguments}";
+        return $"TERM=xterm-256color HOME={Quote(workspace.HomePath)} XDG_CONFIG_HOME={Quote(Path.Combine(workspace.HomePath, ".config"))} GH_TOKEN= GITHUB_TOKEN= GH_CONFIG_DIR={Quote(Path.Combine(workspace.RootPath, "gh"))} AGENTIC_CHECK_CACHE_SECONDS=3600 AGENTIC_CHECK_CACHE_DIR={Quote(Path.Combine(workspace.RootPath, "cache"))} AGENTIC_CHECK_GH_LOG={Quote(workspace.GhLogPath)} PATH={Quote(path)} {Quote(Path.ChangeExtension(ToolAssemblyPath, null))} {arguments}";
     }
 
     static Hex1bTerminal CreateTerminal(TestWorkspace workspace)
@@ -1127,6 +1136,8 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
                 options.Environment = new Dictionary<string, string>
                 {
                     ["AGENTIC_CHECK_GH_LOG"] = workspace.GhLogPath,
+                    ["HOME"] = workspace.HomePath,
+                    ["XDG_CONFIG_HOME"] = Path.Combine(workspace.HomePath, ".config"),
                     ["GH_PAGER"] = "cat",
                     ["PATH"] = path,
                     ["TERM"] = "xterm-256color"
@@ -1178,6 +1189,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
             RootPath = rootPath;
             RepoPath = Path.Combine(rootPath, "repo");
             BinPath = Path.Combine(rootPath, "bin");
+            HomePath = Path.Combine(rootPath, "home");
             GhLogPath = Path.Combine(rootPath, "gh.log");
             RecordingPath = CreateRecordingPath(testName);
         }
@@ -1187,6 +1199,10 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
         public string RepoPath { get; }
 
         public string BinPath { get; }
+
+        // An empty home keeps the agent detection from finding this machine's desktop-app footprints,
+        // so the fake CLI probes in BinPath stay the only signal and the default agents are fixed.
+        public string HomePath { get; }
 
         public string GhLogPath { get; }
 
@@ -1198,6 +1214,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
             _ = Directory.CreateDirectory(workspace.RootPath);
             _ = Directory.CreateDirectory(workspace.RepoPath);
             _ = Directory.CreateDirectory(workspace.BinPath);
+            _ = Directory.CreateDirectory(workspace.HomePath);
             await File.WriteAllTextAsync(workspace.GhLogPath, string.Empty).ConfigureAwait(true);
             if (writeDotnetProject)
             {
