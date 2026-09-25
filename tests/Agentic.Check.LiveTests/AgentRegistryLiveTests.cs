@@ -34,8 +34,8 @@ public sealed class AgentRegistryLiveTests(ITestOutputHelper output)
         }
 
         string path = await MaintenanceReport.WriteAsync("agent-registry.md", GhSkillAgentRegistry.Render(tag, url, upstream, drift, DateTimeOffset.Now)).ConfigureAwait(true);
-        output.WriteLine($"gh {tag}: {upstream.Count} agents; {drift.Count} difference(s). Report: {path}");
-        Assert.True(drift.Count == 0, $"{drift.Count} difference(s) with gh {tag} ({url}):{Environment.NewLine}{string.Join(Environment.NewLine, drift)}{Environment.NewLine}Report: {path}");
+        output.WriteLine($"Latest gh release {tag}: {upstream.Count} agents; {drift.Count} difference(s). Report: {path}");
+        Assert.True(drift.Count == 0, $"{drift.Count} difference(s) with the latest gh release, {tag} ({url}):{Environment.NewLine}{string.Join(Environment.NewLine, drift)}{Environment.NewLine}Report: {path}");
     }
 }
 
@@ -129,7 +129,7 @@ static partial class GhSkillAgentRegistry
         StringBuilder report = new();
         _ = report.AppendLine("# Agent registry versus gh skill")
             .AppendLine()
-            .AppendLine(CultureInfo.InvariantCulture, $"Generated {generatedAt:yyyy-MM-dd HH:mm zzz} from gh {tag}: {url}")
+            .AppendLine(CultureInfo.InvariantCulture, $"Generated {generatedAt:yyyy-MM-dd HH:mm zzz} from the latest gh release at that time, {tag}: {url}")
             .AppendLine()
             .AppendLine(drift.Count == 0 ? "No differences." : $"{drift.Count} difference(s):")
             .AppendLine();

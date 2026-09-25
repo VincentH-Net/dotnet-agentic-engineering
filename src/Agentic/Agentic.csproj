@@ -35,4 +35,5 @@
   <ItemGroup><Compile Include="../Shared/ToolVersion.cs" Link="ToolVersion.cs" /></ItemGroup>
   <ItemGroup><Compile Include="../Shared/ToolLauncher.cs" Link="ToolLauncher.cs" /></ItemGroup>
   <ItemGroup><Compile Include="../Shared/DnaLauncherContract.cs" Link="DnaLauncherContract.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="../Shared/HelpText.cs" Link="HelpText.cs" /></ItemGroup>
 </Project>

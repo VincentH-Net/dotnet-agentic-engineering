@@ -1,6 +1,6 @@
 # Agentic.Check
 
-`agentic.check` optimizes your repo for agentic engineering with .NET - based technologies. You run it as `dna check`.
+`agentic.check` optimizes your repo for [agentic engineering with .NET - based technologies](https://github.com/VincentH-Net/dotnet-agentic-engineering). You run it as `dna check`.
 
 - Detects which .NET based technologies and features you use
 - Recommends an optimal set of agentic directives, skills and tools for those
@@ -41,66 +41,6 @@ a handful of skills. When GitHub's anonymous rate limit is reached, `agentic.che
 you to run `gh auth login` and rerun; completed changes are kept. When you are logged in, the
 `gh` credential is reused for all GitHub requests. Automation can set `GH_TOKEN` or `GITHUB_TOKEN`.
 
-## Usage
+## Install, update and usage
 
-Install the `dna` shorthand once per machine, then run the check from the folder you want to set up:
-
-```bash
-dotnet tool install --global InnoWvate.Dna
-dna check
-```
-
-`dna check` runs the latest stable `agentic.check`; so does `dotnet agentic check` once the local
-tool exists. Without `dna`, run `dnx agentic.check` with the same options after `--`.
-
-```bash
-dna check --dry-run   # report recommended actions without applying them
-dna check --preview   # latest directives and skills from each source's default branch
-dna check --yes       # apply all recommended actions without prompting
-dna check -h          # all options
-```
-
-### Tools
-
-Directives and skills can depend on tools, which are installed before the content that needs them.
-Currently the **Prompt Log** directive (`foundation-prompt-log`) does; selecting it also selects:
-
-- **InnoWvate.Agentic**: the repo-local `dotnet agentic` tool that the directive invokes.
-  It is installed once per repository, in the repo root's `.config/dotnet-tools.json` (the target
-  folder outside a git repository), at the newest version compatible with the selected directives
-  and skills (`major.*`, or `major.*-*` with `--preview`); a check in a specialized subfolder reuses
-  and updates that pin, and reports any extra pin below the target. If the install fails, the
-  dependent directives and skills are skipped and reported.
-- **`dna` shorthand for `dotnet agentic`**: the global `InnoWvate.Dna` launcher, offered when
-  `agentic.check` is started with `dnx agentic.check` or `dotnet agentic check`. Deselect it to
-  opt out. If another `dna` command is already on your PATH, `agentic.check` shows where it is
-  and asks before installing. A run started with `dna check` never replaces the running `dna`;
-  it stops with an update command when `dna` is too old.
-
-Deselecting a directive or skill deselects the tools it pulled in, unless something else needs them.
-
-### Updating
-
-Run `dna check` regularly, and after adding a technology to your repo. Directives, skills and
-tools are updated together so they stay compatible. In a fresh clone, `dotnet tool restore`
-restores the recorded tool version; `dna check` offers this too.
-
-### Folder specializing
-
-`agentic.check` supports specializing folders in your repo, e.g. to have common directives and
-skills in the repo root, but additional and different ones in `backend` and `frontend` subfolders:
-
-1. Start `agentic.check` in the repo root and select the common set of directives and skills
-2. Start `agentic.check` in the `backend` subfolder and select the additional specialized set
-   for that subfolder. Directives and skills already installed above or below the target folder
-   are deselected automatically; "above" stops at the repo root, or else the drive root.
-3. Start `agentic.check` in the `frontend` subfolder and select the specialized set for that subfolder
-4. Start your agent in the (sub)folder whose instructions you want. Codex CLI composes
-   instructions from parent folders; Claude Code CLI does too, and also from child folders when
-   working on files below its working directory.
-
-## Development
-
-To test an unpublished `InnoWvate.Agentic` package, add its packed folder as a source in the
-target's `nuget.config`; see the
-[InnoWvate.Agentic README](https://github.com/VincentH-Net/dotnet-agentic-engineering/blob/main/src/Agentic/README.md).
+See [Get started](https://github.com/VincentH-Net/dotnet-agentic-engineering#get-started)

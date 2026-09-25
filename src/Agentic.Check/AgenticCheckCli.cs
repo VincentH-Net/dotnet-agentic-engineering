@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.CommandLine.Help;
 using Spectre.Console;
 
 namespace Agentic.Check;
@@ -108,21 +109,20 @@ static class AgenticCheckCli
             Description = "Include detailed command and scan information."
         };
 
-        RootCommand rootCommand = new("""
+        RootCommand rootCommand = new($"""
         Optimizes your repo for agentic engineering with .NET - based technologies.
 
         - Detects which .NET based technologies and features you use
         - Recommends an optimal set of agentic directives and skills for those
         - You select which to apply
-        - Directives are installed / updated in AGENTS.md, directly from the
+        - Directives are installed / updated in AGENTS.md / CLAUDE.md, directly from the
           dotnet-agentic-engineering GitHub repo
         - For Codex, rules that run dotnet outside its sandbox are installed in
           .codex/rules, so dotnet has network access without approval prompts
         - Skills are installed / updated directly from source GitHub skill repo's with 
           'gh skill'
-        - Required InnoWvate.Agentic tools are installed locally before dependent content.
-          Stable uses major.*; preview uses major.*-*. The resolved manifest version
-          must satisfy the source project's major/minor requirement.
+        - Tools that directives and skills depend on are installed / updated with 'dotnet tool',
+          pinned once per repository in the repo root's .config/dotnet-tools.json
 
         The skills available for composition are carefully selected and tested from 
         best-in-class GitHub repo's. The composition minimizes context usage and avoids
@@ -138,22 +138,24 @@ static class AgenticCheckCli
 
         Folder Specializing
         
-        agentic-check supports specializing folders in your repo, e.g. to have common
+        agentic.check supports specializing folders in your repo, e.g. to have common
         directives and skills in the repo root, but additional and different ones in
         backend and frontend subfolders:
-        1. Start agentic-check in the repo root and select the common set of directives
+        1. Start agentic.check in the repo root and select the common set of directives
            and skills to install there
-        2. Start agentic-check in the backend subfolder and select the additional
-           specialized set of directives and skills for that subfolder - agentic-check
+        2. Start agentic.check in the backend subfolder and select the additional
+           specialized set of directives and skills for that subfolder - agentic.check
            will automatically deselect any directives and skills that are already
-           installed above or below the target folder. For agentic-check, above
+           installed above or below the target folder. For agentic.check, above
            terminates at the repo root or else the drive root.
-        3. Start agentic-check in the frontend subfolder and select the specialized
+        3. Start agentic.check in the frontend subfolder and select the specialized
            set of directives and skills for that subfolder
         4. Start your agent in a (sub)folder of choice to use that specialized set of
            instructions. Multiple harnesses support this, including Codex CLI (composes 
            above) and Claude Code CLI (composes above, as well as below when working on
-           files below it's working dir).
+           files below its working dir).
+
+        Docs: {DnaLauncherContract.DocsUrl}
         """);
         rootCommand.Arguments.Add(targetDirectoryArgument);
         rootCommand.Options.Add(agentsOption);
@@ -218,7 +220,18 @@ static class AgenticCheckCli
                 }
             });
 
-        return await rootCommand.Parse(args).InvokeAsync(cancellationToken: CancellationToken.None).ConfigureAwait(false);
+        // Help shows the command the user typed: dna check when the shorthand launched us, otherwise dnx agentic.check.
+        string launcher = string.IsNullOrEmpty(Environment.GetEnvironmentVariable(DnaLauncherContract.VersionVariable)) ? "dnx agentic.check" : "dna check";
+        var parsed = rootCommand.Parse(args);
+        StringWriter? help = parsed.Action is HelpAction || parsed.Errors.Count > 0 ? new() : null;
+        InvocationConfiguration configuration = new() { Output = help ?? Console.Out, Error = Console.Error };
+        int code = await parsed.InvokeAsync(configuration, CancellationToken.None).ConfigureAwait(false);
+        if (help is not null)
+        {
+            await Console.Out.WriteAsync(HelpText.WithLauncherUsage(help.ToString(), launcher)).ConfigureAwait(false);
+        }
+
+        return code;
     }
 
     internal static bool IsHelpRequested(string[] args)

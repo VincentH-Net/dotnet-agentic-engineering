@@ -46,10 +46,10 @@ static class AgenticCli
         });
         // Help shows the command the user actually typed: dna when the shorthand launched us, otherwise dotnet agentic.
         string launcher = string.IsNullOrEmpty((readEnvironment ?? Environment.GetEnvironmentVariable)(DnaLauncherContract.VersionVariable)) ? "dotnet agentic" : "dna";
-        RootCommand root = new("Repo-local agentic tool for directives, skills and humans. dna is the shorthand for dotnet agentic. Prompt-log Git operations are read-only.");
+        RootCommand root = new($"{DnaLauncherContract.Description} Exit codes: 0 success, 1 failure, 2 invalid arguments; diagnostics go to stderr. Docs: {DnaLauncherContract.DocsUrl}");
         root.Options.OfType<VersionOption>().Single().Validators.Clear();
         root.Options.Add(minimum);
-        root.Subcommands.Add(new Command("check", "Run the latest stable Agentic.Check; all following arguments are forwarded."));
+        root.Subcommands.Add(new Command("check", $"{DnaLauncherContract.CheckDescription} Use {launcher} check -h for its options."));
         Command prompt = new("prompt-log", "Wrap, display, and validate prompt logs. Defaults to show (latest 20 logs).");
         root.Subcommands.Add(prompt);
         Option<string> inputFile = new("--input") { Required = true, Description = "Complete sanitized raw log file, or - for stdin. No per-entry encoding." };
@@ -87,7 +87,7 @@ static class AgenticCli
                     result.AddError("--limit and --all cannot be used together.");
             });
         }
-        Option<string> commit = new("--commit") { DefaultValueFactory = _ => "HEAD" };
+        Option<string> commit = new("--commit") { DefaultValueFactory = _ => "HEAD", Description = "Commit whose prompt log to validate." };
         Command check = new("check", "Validate structure of a commit's prompt log.");
         check.Options.Add(commit);
         GitHistory history = new(git ?? new GitCommandRunner(), directory ?? Environment.CurrentDirectory, output, error);
@@ -133,20 +133,7 @@ static class AgenticCli
         InvocationConfiguration configuration = new() { Output = help ?? output, Error = error, EnableDefaultExceptionHandler = false };
         int code = await parsed.InvokeAsync(configuration, cancellationToken).ConfigureAwait(false);
         if (help is not null)
-            await output.WriteAsync(WithLauncherUsage(help.ToString(), launcher)).ConfigureAwait(false);
+            await output.WriteAsync(HelpText.WithLauncherUsage(help.ToString(), launcher)).ConfigureAwait(false);
         return parsed.Errors.Count > 0 ? 2 : code;
-    }
-
-    internal static string WithLauncherUsage(string helpText, string launcher)
-    {
-        string usage = "  " + RootCommand.ExecutableName;
-        string[] lines = helpText.Split('\n');
-        for (int i = 0; i < lines.Length; i++)
-        {
-            string line = lines[i].TrimEnd('\r');
-            if (line == usage || line.StartsWith(usage + " ", StringComparison.Ordinal))
-                lines[i] = "  " + launcher + lines[i][usage.Length..];
-        }
-        return string.Join('\n', lines);
     }
 }

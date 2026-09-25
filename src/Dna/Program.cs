@@ -12,6 +12,25 @@ if (args is ["check", .. var arguments])
 
 if (await LocalCompanion.IsMissingAsync(Environment.CurrentDirectory).ConfigureAwait(false))
 {
+    if (args is ["-h"] or ["--help"] or ["-?"] or ["help"])
+    {
+        // The same page the tool prints, reduced to what works before it is installed.
+        await Console.Out.WriteAsync($"""
+            Description:
+              {DnaLauncherContract.Description} Docs: {DnaLauncherContract.DocsUrl}
+
+            Usage:
+              dna [command] [options]
+
+            Commands:
+              check  {DnaLauncherContract.CheckDescription} Use dna check -h for its options.
+
+            Other commands, such as prompt-log, appear here once dna check has installed the repo-local dotnet agentic tool.
+
+            """).ConfigureAwait(false);
+        return 0;
+    }
+
     await Console.Error.WriteLineAsync("`dotnet agentic` is not installed in the scope of the current working folder.").ConfigureAwait(false);
     await Console.Error.WriteLineAsync("Please run `dna check` to install it.").ConfigureAwait(false);
     return 1;

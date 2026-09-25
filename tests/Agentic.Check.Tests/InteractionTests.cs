@@ -165,6 +165,18 @@ public sealed class InteractionTests
     }
 
     [Fact]
+    public void UsageLinesAreRewrittenToTheLaunchCommand()
+    {
+        string executable = System.CommandLine.RootCommand.ExecutableName;
+        string help = $"Usage:\n  {executable} [<target-dir>] [options]\n\nOptions:\n  --agents <agents>  Values for {executable}.\n";
+
+        string rewritten = HelpText.WithLauncherUsage(help, "dna check");
+
+        Assert.Contains("\n  dna check [<target-dir>] [options]\n", rewritten, StringComparison.Ordinal);
+        Assert.Contains($"Values for {executable}.", rewritten, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void RecommendationListHeadersUseRequestedColors()
     {
         Assert.Equal(
