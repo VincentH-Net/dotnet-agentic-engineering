@@ -24,6 +24,43 @@ sealed record ScopeDuplicateScanResult
     public int ActionCount => LocationsByKey.Count;
 }
 
+// Recommended items that are missing in the target but installed in a folder above or below it. The
+// summary table, the prompt heading and the non-interactive default all describe them with these words.
+sealed record PresentElsewhere(int Directives, int Skills, string Where)
+{
+    internal const string Above = "above";
+    internal const string Below = "below";
+    internal const string AboveOrBelow = "above or below";
+
+    public int Count => Directives + Skills;
+
+    public string Status => "present " + Where;
+
+    internal static PresentElsewhere From(
+        ScopeDuplicateScanResult duplicates,
+        IEnumerable<string> missingDirectiveKeys,
+        IEnumerable<string> missingSkillKeys)
+    {
+        string[] directiveKeys = [.. missingDirectiveKeys.Where(duplicates.LocationsByKey.ContainsKey)];
+        string[] skillKeys = [.. missingSkillKeys.Where(duplicates.LocationsByKey.ContainsKey)];
+        bool above = false;
+        bool below = false;
+        foreach (string location in directiveKeys.Concat(skillKeys).SelectMany(key => duplicates.LocationsByKey[key]))
+        {
+            if (location.StartsWith("..", StringComparison.Ordinal))
+            {
+                above = true;
+            }
+            else
+            {
+                below = true;
+            }
+        }
+
+        return new(directiveKeys.Length, skillKeys.Length, above && below ? AboveOrBelow : below ? Below : Above);
+    }
+}
+
 static class ScopeDuplicateScanner
 {
     static readonly HashSet<string> IgnoredDirectoryNames = new(StringComparer.OrdinalIgnoreCase)

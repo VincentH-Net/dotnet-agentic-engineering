@@ -655,7 +655,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
                 await auto.WaitUntilTextAsync("Recommend ", timeout: TimeSpan.FromSeconds(45)).ConfigureAwait(true);
                 await auto.WaitUntilTextAsync("Target directory specialization: ON", timeout: TimeSpan.FromSeconds(20)).ConfigureAwait(true);
                 await auto.WaitUntilTextAsync("Tab to toggle", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
-                await auto.WaitUntilTextAsync("actions already present above / below", timeout: TimeSpan.FromSeconds(20)).ConfigureAwait(true);
+                await auto.WaitUntilTextAsync("already present above or below", timeout: TimeSpan.FromSeconds(20)).ConfigureAwait(true);
                 await auto.WaitUntilTextAsync("Duplicate(s) that prevent specialization:", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
                 await auto.WaitUntilTextAsync("../AGENTS.md", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
                 await auto.WaitUntilTextAsync(Path.Combine("api", "AGENTS.md"), timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
@@ -666,7 +666,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
 
         Assert.Equal(0, result.ExitCode);
         Assert.Contains("Target directory specialization: ON", result.Screen, StringComparison.Ordinal);
-        Assert.Contains("actions already present above / below", result.Screen, StringComparison.Ordinal);
+        Assert.Contains("already present above or below", result.Screen, StringComparison.Ordinal);
         Assert.Contains("Duplicate(s) that prevent specialization:", result.Screen, StringComparison.Ordinal);
         string ghLog = await workspace.ReadGhLogAsync().ConfigureAwait(true);
         Assert.DoesNotContain("dotnet-livecharts2", ghLog, StringComparison.Ordinal);

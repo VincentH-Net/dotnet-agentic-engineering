@@ -282,6 +282,214 @@ public sealed class SkillSelectionStateTests
         Assert.Equal(["repair-skill"], state.SelectedSkills.Select(skill => skill.LocalFolder));
     }
 
+    [Fact]
+    public void PromptHeadingStatesTheDefaultRecommendationWhenItDiffersFromTheList()
+    {
+        Assert.Equal(
+            "Recommend 87 action(s), select which to apply:",
+            RecommendationSelectionPrompt.FormatRecommendationPromptHeading(87, 87, new PresentElsewhere(0, 0, PresentElsewhere.Above)));
+        Assert.Equal(
+            "Recommend 4 of 87 action(s), 83 already present above, select which to apply:",
+            RecommendationSelectionPrompt.FormatRecommendationPromptHeading(4, 87, new PresentElsewhere(5, 78, PresentElsewhere.Above)));
+        Assert.Equal(
+            "Recommend 85 of 87 action(s), select which to apply:",
+            RecommendationSelectionPrompt.FormatRecommendationPromptHeading(85, 87, new PresentElsewhere(0, 0, PresentElsewhere.Above)));
+    }
+
+    [Fact]
+    public void DefaultSelectionSkipsDuplicatesButKeepsTargetLocalRepairs()
+    {
+        var missingDirective = new DirectivePlanItem("foundation-prompt-log", DirectiveStatuses.Missing, "content");
+        var outdatedDirective = new DirectivePlanItem("dotnet-cli-run", DirectiveStatuses.Outdated, "content");
+        SkillManifestEntry duplicateSkill = new("owner/repo", "alpha", "alpha", TechnologyNames.Dotnet, []);
+        SkillManifestEntry newSkill = new("owner/repo", "beta", "beta", TechnologyNames.Dotnet, []);
+        ScopeDuplicateScanResult duplicates = new(new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
+        {
+            [RecommendationSelectionState.FormatDirectiveKey("foundation-prompt-log")] = ["../AGENTS.md"],
+            [RecommendationSelectionState.FormatDirectiveKey("dotnet-cli-run")] = ["../AGENTS.md"],
+            [RecommendationSelectionState.FormatSkillKey("owner/repo", "alpha")] = ["../.agents/skills/alpha/SKILL.md"]
+        });
+
+        var selection = RecommendationSelectionPrompt.DefaultSelection([missingDirective, outdatedDirective], [duplicateSkill, newSkill], duplicates);
+
+        Assert.Equal(["dotnet-cli-run"], selection.SelectedDirectives.Select(directive => directive.Name));
+        Assert.Equal(["beta"], selection.SelectedSkills.Select(skill => skill.LocalFolder));
+    }
+
+    [Fact]
+    public void StartsInTheSelectedViewAndToggleViewShowsAll()
+    {
+        RecommendationSelectionState state = new(CreateItems(["foundation-prompt-log"], ["alpha", "beta"]));
+
+        Assert.True(state.ShowSelectedOnly);
+        Assert.True(state.CanToggleView);
+        Assert.Equal(3, state.FilteredItems.Count);
+
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.ToggleView));
+
+        Assert.False(state.ShowSelectedOnly);
+        Assert.Equal(3, state.FilteredItems.Count);
+
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.ToggleView));
+
+        Assert.True(state.ShowSelectedOnly);
+    }
+
+    [Fact]
+    public void SelectedViewHidesADeselectedRowAndMovesTheCursorToTheNextRow()
+    {
+        RecommendationSelectionState state = new(CreateItems([], ["alpha", "beta", "gamma"]));
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Down));
+
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Toggle));
+
+        Assert.Equal(["alpha", "gamma"], state.FilteredItems.Select(item => item.Display));
+        Assert.Equal("gamma", state.FilteredItems[state.CursorIndex].Display);
+
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.ToggleView));
+
+        Assert.Equal(["alpha", "beta", "gamma"], state.FilteredItems.Select(item => item.Display));
+        Assert.Equal("gamma", state.FilteredItems[state.CursorIndex].Display);
+
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Home));
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Toggle));
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.ToggleView));
+
+        var row = Assert.Single(state.FilteredItems);
+        Assert.Equal("gamma", row.Display);
+        Assert.Equal(0, state.CursorIndex);
+    }
+
+    [Fact]
+    public void EmptySelectionShowsAllRowsUntilTheViewIsToggledAgain()
+    {
+        RecommendationSelectionState state = new(CreateItems([], ["alpha", "beta"]));
+
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.SelectNone));
+
+        Assert.False(state.ShowSelectedOnly);
+        Assert.False(state.CanToggleView);
+        Assert.Equal(2, state.FilteredItems.Count);
+
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.ToggleView));
+
+        Assert.False(state.ShowSelectedOnly);
+
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Toggle));
+
+        Assert.False(state.ShowSelectedOnly);
+        Assert.True(state.CanToggleView);
+        Assert.Equal(2, state.FilteredItems.Count);
+
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.ToggleView));
+
+        Assert.True(state.ShowSelectedOnly);
+        Assert.Equal(["alpha"], state.FilteredItems.Select(item => item.Display));
+    }
+
+    [Fact]
+    public void DeselectingTheLastSelectedRowSwitchesToTheAllView()
+    {
+        RecommendationSelectionState state = new(CreateItems([], ["alpha", "beta"]));
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Toggle));
+
+        Assert.True(state.ShowSelectedOnly);
+        Assert.Equal(["beta"], state.FilteredItems.Select(item => item.Display));
+
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Toggle));
+
+        Assert.False(state.ShowSelectedOnly);
+        Assert.Equal(["alpha", "beta"], state.FilteredItems.Select(item => item.Display));
+        Assert.Equal("beta", state.FilteredItems[state.CursorIndex].Display);
+    }
+
+    [Fact]
+    public void TextFilterNarrowsWithinTheCurrentView()
+    {
+        RecommendationSelectionState state = new(CreateItems([], ["uno-mvvm", "uno-xaml", "dotnet-livecharts2"]));
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Down));
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Toggle));
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Character, 'u'));
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Character, 'n'));
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Character, 'o'));
+
+        var row = Assert.Single(state.FilteredItems);
+        Assert.Equal("uno-mvvm", row.Display);
+
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.ToggleView));
+
+        Assert.Equal(["uno-mvvm", "uno-xaml"], state.FilteredItems.Select(item => item.Display));
+
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.ClearFilter));
+
+        Assert.False(state.ShowSelectedOnly);
+        Assert.Equal(3, state.FilteredItems.Count);
+    }
+
+    [Fact]
+    public void SpecializationScanRemovesDuplicatesFromTheSelectedView()
+    {
+        RecommendationSelectionState state = new(CreateItems([], ["alpha", "beta"]));
+
+        state.ApplySpecializationScanResult(new ScopeDuplicateScanResult(
+            new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
+            {
+                [RecommendationSelectionState.FormatSkillKey("owner/repo", "alpha")] = ["../.agents/skills/alpha/SKILL.md"]
+            }));
+
+        Assert.True(state.ShowSelectedOnly);
+        Assert.Equal(["beta"], state.FilteredItems.Select(item => item.Display));
+
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.SelectAll));
+
+        Assert.Equal(["alpha", "beta"], state.FilteredItems.Select(item => item.Display));
+
+        state.ToggleCachedSpecialization();
+        state.ToggleCachedSpecialization();
+
+        Assert.Equal(["beta"], state.FilteredItems.Select(item => item.Display));
+    }
+
+    [Fact]
+    public void PageHomeAndEndKeysJumpThroughTheList()
+    {
+        RecommendationSelectionState state = new(CreateItems([], [.. Enumerable.Range(1, 60)
+            .Select(index => string.Create(System.Globalization.CultureInfo.InvariantCulture, $"skill-{index:00}"))]));
+
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.PageDown));
+        Assert.Equal(RecommendationSelectionPrompt.MaxVisibleItems, state.CursorIndex);
+
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.End));
+        Assert.Equal(59, state.CursorIndex);
+
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.PageUp));
+        Assert.Equal(59 - RecommendationSelectionPrompt.MaxVisibleItems, state.CursorIndex);
+
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Home));
+        Assert.Equal(0, state.CursorIndex);
+    }
+
+    [Fact]
+    public void ViewHelpLineShowsCountsAndOffersTheToggleOnlyWithASelection()
+    {
+        RecommendationSelectionState state = new(CreateItems([], ["alpha", "beta", "gamma"]));
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Toggle));
+
+        string selectedView = RecommendationSelectionPrompt.FormatViewHelpLine(state);
+        Assert.Contains("[bold]selected[/] (2 of 3)", selectedView, StringComparison.Ordinal);
+        Assert.Contains("to show all", selectedView, StringComparison.Ordinal);
+
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.ToggleView));
+        string allView = RecommendationSelectionPrompt.FormatViewHelpLine(state);
+        Assert.Contains("[bold]all[/] (2 of 3 selected)", allView, StringComparison.Ordinal);
+        Assert.Contains("to show selected", allView, StringComparison.Ordinal);
+
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.SelectNone));
+        string emptySelection = RecommendationSelectionPrompt.FormatViewHelpLine(state);
+        Assert.Contains("[bold]all[/] (0 of 3 selected)", emptySelection, StringComparison.Ordinal);
+        Assert.DoesNotContain("F2", emptySelection, StringComparison.Ordinal);
+    }
+
     static IReadOnlyList<RecommendationSelectionItem> CreateItems(string[] directiveNames, string[] skillNames)
         => [.. directiveNames
             .Select(name => new RecommendationSelectionItem(

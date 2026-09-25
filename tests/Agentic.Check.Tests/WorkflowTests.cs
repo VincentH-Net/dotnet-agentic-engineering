@@ -86,7 +86,7 @@ public sealed class WorkflowTests
         Assert.DoesNotContain(reporter.Infos, IsLegacyDirectiveStatusMessage);
         Assert.Equal("claude-code,codex", reporter.TargetAgents);
         Assert.Contains("Scanning target directory", reporter.ProgressDescriptions);
-        Assert.Equal(3, reporter.ProgressTicksByDescription["Scanning target directory"]);
+        Assert.Equal(4, reporter.ProgressTicksByDescription["Scanning target directory"]);
     }
 
     [Fact]
@@ -772,7 +772,7 @@ public sealed class WorkflowTests
         Assert.DoesNotContain(reporter.Infos, message => message.Contains("1 update(s) available", StringComparison.Ordinal));
         Assert.Empty(reporter.Warnings);
         Assert.Contains("Scanning target directory", reporter.ProgressDescriptions);
-        Assert.Equal(3, reporter.ProgressTicksByDescription["Scanning target directory"]);
+        Assert.Equal(4, reporter.ProgressTicksByDescription["Scanning target directory"]);
         Assert.Contains("Updating skills", reporter.ProgressDescriptions);
         Assert.Equal(2, reporter.ProgressTicksByDescription["Updating skills"]);
         Assert.Contains("Updated 1 skill(s) successfully.", reporter.Successes);
@@ -1015,6 +1015,75 @@ public sealed class WorkflowTests
         Assert.Contains(ActionOutputFormatter.ProgressIndent, reporter.ProgressDescriptions);
         Assert.DoesNotContain("Installing skills", reporter.ProgressDescriptions);
         Assert.Equal(2, reporter.ProgressTicksByDescription[ActionOutputFormatter.ProgressIndent]);
+    }
+
+    [Fact]
+    public async Task NonInteractiveRunInASubfolderSkipsWhatTheRootAlreadyHasAndSaysSoInTheSummary()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
+        tempDirectory.Write(
+            "AGENTS.md",
+            """
+            <!-- dotnet-agentic-engineering:foundation-prompt-log:start -->
+            ## foundation-prompt-log
+            <!-- dotnet-agentic-engineering:foundation-prompt-log:end -->
+            """);
+        tempDirectory.Write(".agents/skills/dotnet-livecharts2/SKILL.md", "# root skill");
+        string backend = tempDirectory.CreateDirectory("backend");
+        tempDirectory.Write("backend/App.csproj", "<Project />");
+        FakeCommandRunner commandRunner = new();
+        commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "No updates available.", string.Empty));
+        RecordingReporter reporter = new();
+        FakePrompts prompts = new();
+        CheckWorkflow workflow = new(commandRunner, prompts, reporter, new FakeDirectiveSource(), new FakeSourceVersionResolver());
+
+        var result = await workflow.RunAsync(
+            new AgenticCheckOptions(backend, true, false, null, null, "codex", false),
+            CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Equal(new PresentElsewhere(1, 1, PresentElsewhere.Above), reporter.PresentElsewhere);
+        Assert.Null(prompts.PresentElsewhere);
+        Assert.Contains("  dotnet-cli-run", reporter.Infos);
+        Assert.DoesNotContain("  foundation-prompt-log", reporter.Infos);
+        Assert.Contains("      dotnet-modern-csharp-editorconfig", reporter.Infos);
+        Assert.DoesNotContain("      dotnet-livecharts2", reporter.Infos);
+        Assert.DoesNotContain(result.Report.Actions, action => action.Contains("dotnet-livecharts2", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task InteractiveRunReceivesTheScanThatTheSummaryUsed()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
+        tempDirectory.Write(".agents/skills/dotnet-livecharts2/SKILL.md", "# root skill");
+        string backend = tempDirectory.CreateDirectory("backend");
+        tempDirectory.Write("backend/App.csproj", "<Project />");
+        FakeCommandRunner commandRunner = new();
+        commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "No updates available.", string.Empty));
+        RecordingReporter reporter = new();
+        FakePrompts prompts = new()
+        {
+            SelectedDirectiveNames = [],
+            SelectedSkillInstallArgs = []
+        };
+        CheckWorkflow workflow = new(commandRunner, prompts, reporter, new FakeDirectiveSource(), new FakeSourceVersionResolver());
+
+        var result = await workflow.RunAsync(
+            new AgenticCheckOptions(backend, false, false, null, null, "codex", false),
+            CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Equal(new PresentElsewhere(0, 1, PresentElsewhere.Above), reporter.PresentElsewhere);
+        Assert.Equal(reporter.PresentElsewhere, prompts.PresentElsewhere);
+        var location = Assert.Single(prompts.Duplicates!.LocationsByKey);
+        Assert.Equal(RecommendationSelectionState.FormatSkillKey("VincentH-Net/dotnet-agentic-engineering", "dotnet-livecharts2"), location.Key);
+        Assert.Equal([Path.Combine("..", ".agents", "skills", "dotnet-livecharts2", "SKILL.md")], location.Value);
     }
 
     static void AssertExactlyOneBlankLineBefore(List<string> messages, string header)

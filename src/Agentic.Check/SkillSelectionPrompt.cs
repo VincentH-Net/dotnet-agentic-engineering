@@ -14,7 +14,12 @@ enum SkillSelectionCommand
     Confirm,
     Specialize,
     OpenHelp,
-    Character
+    Character,
+    PageUp,
+    PageDown,
+    Home,
+    End,
+    ToggleView
 }
 
 enum RecommendationSelectionKind
@@ -40,6 +45,7 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
     readonly Dictionary<string, IReadOnlyList<string>> dependencyKeysByKey = BuildDependencyKeysByKey(items);
     readonly Dictionary<string, IReadOnlyList<string>> dependentKeysByKey = BuildDependentKeysByKey(items);
     readonly HashSet<string> selectedKeys = items.Select(item => item.Key).ToHashSet(StringComparer.Ordinal);
+    readonly Dictionary<string, int> ordinalByKey = BuildOrdinalByKey(items);
     readonly HashSet<string> automaticallySelectedToolKeys = new(StringComparer.Ordinal);
     HashSet<string>? specializedDefaultSelectedKeys;
     HashSet<string> specializedDefaultAutomaticToolKeys = new(StringComparer.Ordinal);
@@ -48,15 +54,19 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
 
     public string Filter { get; private set; } = string.Empty;
 
+    // The selected view hides unselected rows. An empty selection always shows every row, so the
+    // view is never empty and the toggle is offered only while there is something to show.
+    public bool ShowSelectedOnly { get; private set; } = items.Count > 0;
+
+    public bool CanToggleView => selectedKeys.Count > 0;
+
+    public int SelectedCount => selectedKeys.Count;
+
+    public int ItemCount => items.Count;
+
     public int CursorIndex { get; private set; }
 
     public bool IsSpecialized { get; private set; }
-
-    public bool IsSpecializationScanning { get; private set; }
-
-    public int SpecializationScanCurrent { get; private set; }
-
-    public int SpecializationScanTotal { get; private set; }
 
     public IReadOnlyDictionary<string, IReadOnlyList<string>> DuplicateLocationsByKey { get; private set; }
         = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal);
@@ -85,30 +95,13 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
     public int GetDuplicateScopeCount(RecommendationSelectionItem item)
         => DuplicateScopeCountsByKey.GetValueOrDefault(item.Key);
 
-    public bool HasSpecializationScanResult { get; private set; }
-
-    public void BeginSpecializationScan()
-    {
-        IsSpecializationScanning = true;
-        IsSpecialized = true;
-        SpecializationScanCurrent = 0;
-        SpecializationScanTotal = 0;
-    }
-
-    public void UpdateSpecializationScanProgress(int current, int total)
-    {
-        SpecializationScanCurrent = current;
-        SpecializationScanTotal = total;
-    }
-
     public void ApplySpecializationScanResult(ScopeDuplicateScanResult result)
     {
-        IsSpecializationScanning = false;
-        HasSpecializationScanResult = true;
         DuplicateLocationsByKey = result.LocationsByKey;
         DuplicateScopeCountsByKey = result.ScopeCountsByKey;
         specializedDefaultSelectedKeys = BuildSpecializedDefaultSelection();
         EnableSpecialization();
+        Refresh();
     }
 
     public void ToggleCachedSpecialization()
@@ -116,10 +109,13 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
         if (IsSpecialized)
         {
             DisableSpecialization();
-            return;
+        }
+        else
+        {
+            EnableSpecialization();
         }
 
-        EnableSpecialization();
+        Refresh();
     }
 
     public void Apply(SkillSelectionInput input)
@@ -150,6 +146,25 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
             case SkillSelectionCommand.Character:
                 AddFilterCharacter(input.Character);
                 break;
+            case SkillSelectionCommand.PageUp:
+                Move(-RecommendationSelectionPrompt.MaxVisibleItems);
+                break;
+            case SkillSelectionCommand.PageDown:
+                Move(RecommendationSelectionPrompt.MaxVisibleItems);
+                break;
+            case SkillSelectionCommand.Home:
+                MoveTo(0);
+                break;
+            case SkillSelectionCommand.End:
+                MoveTo(FilteredItems.Count - 1);
+                break;
+            case SkillSelectionCommand.ToggleView:
+                if (CanToggleView)
+                {
+                    ShowSelectedOnly = !ShowSelectedOnly;
+                }
+
+                break;
             case SkillSelectionCommand.Confirm:
             case SkillSelectionCommand.Specialize:
             case SkillSelectionCommand.OpenHelp:
@@ -157,18 +172,15 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
             default:
                 throw new ArgumentOutOfRangeException(nameof(input), input.Command, "Unsupported selection input.");
         }
+
+        Refresh();
     }
 
     void Move(int delta)
-    {
-        if (FilteredItems.Count == 0)
-        {
-            CursorIndex = 0;
-            return;
-        }
+        => MoveTo(CursorIndex + delta);
 
-        CursorIndex = Math.Clamp(CursorIndex + delta, 0, FilteredItems.Count - 1);
-    }
+    void MoveTo(int index)
+        => CursorIndex = FilteredItems.Count == 0 ? 0 : Math.Clamp(index, 0, FilteredItems.Count - 1);
 
     void ToggleCurrent()
     {
@@ -326,19 +338,54 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
     }
 
     void SetFilter(string filter)
+        => Filter = filter;
+
+    // Recomputes the rows for the current view and text filter. The cursor stays on its row while
+    // that row is shown and otherwise moves to the next shown row, so a row that disappears under
+    // the cursor is replaced by the one after it.
+    void Refresh()
     {
-        Filter = filter;
-        FilteredItems = string.IsNullOrWhiteSpace(Filter)
-            ? items
-            : [.. items.Where(item => MatchesFilter(item, Filter))];
-        CursorIndex = Math.Min(CursorIndex, Math.Max(FilteredItems.Count - 1, 0));
+        if (selectedKeys.Count == 0)
+        {
+            ShowSelectedOnly = false;
+        }
+
+        var cursorItem = CursorIndex < FilteredItems.Count ? FilteredItems[CursorIndex] : null;
+        FilteredItems = [.. items.Where(IsShown)];
+        int ordinal = cursorItem is null ? 0 : ordinalByKey[cursorItem.Key];
+        int index = FilteredItems.Count - 1;
+        for (int candidate = 0; candidate < FilteredItems.Count; candidate++)
+        {
+            if (ordinalByKey[FilteredItems[candidate].Key] >= ordinal)
+            {
+                index = candidate;
+                break;
+            }
+        }
+
+        MoveTo(index);
     }
+
+    bool IsShown(RecommendationSelectionItem item)
+        => (!ShowSelectedOnly || selectedKeys.Contains(item.Key))
+            && (string.IsNullOrWhiteSpace(Filter) || MatchesFilter(item, Filter));
 
     static bool MatchesFilter(RecommendationSelectionItem item, string filter)
         => item.Display.Contains(filter, StringComparison.OrdinalIgnoreCase)
             || item.Version.Contains(filter, StringComparison.OrdinalIgnoreCase)
             || item.Skill?.SourceRepo.Contains(filter, StringComparison.OrdinalIgnoreCase) == true
             || item.Skill?.Plugin.Contains(filter, StringComparison.OrdinalIgnoreCase) == true;
+
+    static Dictionary<string, int> BuildOrdinalByKey(IReadOnlyList<RecommendationSelectionItem> items)
+    {
+        Dictionary<string, int> ordinalByKey = new(StringComparer.Ordinal);
+        for (int index = 0; index < items.Count; index++)
+        {
+            _ = ordinalByKey.TryAdd(items[index].Key, index);
+        }
+
+        return ordinalByKey;
+    }
 
     static Dictionary<string, IReadOnlyList<string>> BuildDependencyKeysByKey(IReadOnlyList<RecommendationSelectionItem> items)
     {
@@ -384,6 +431,9 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
         => sourceRepo.Length == 0 && installArg == CompanionDependency.PackageId
             ? "tool:" + CompanionDependency.PackageId
             : $"skill:{SkillDependency.CreateKey(sourceRepo, installArg)}";
+
+    internal static string FormatDirectiveKey(string name)
+        => $"directive:{name}";
 }
 
 sealed class RecommendationSelectionPrompt(IAnsiConsole console)
@@ -395,18 +445,18 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
     public async Task<RecommendationSelectionResult> PromptAsync(
         IReadOnlyList<DirectivePlanItem> recommendedDirectives,
         IReadOnlyList<SkillManifestEntry> missingSkills,
-        string targetDirectory,
-        IReadOnlyList<string> skillsDirectories,
+        ScopeDuplicateScanResult duplicates,
+        PresentElsewhere presentElsewhere,
         CancellationToken cancellationToken)
     {
         var items = BuildItems(recommendedDirectives, missingSkills);
         RecommendationSelectionState state = new(items);
-        await ScanSpecializationAsync(items, state, targetDirectory, skillsDirectories, cancellationToken)
-            .ConfigureAwait(false);
+        state.ApplySpecializationScanResult(duplicates);
+        string heading = FormatRecommendationPromptHeading(state.SelectedCount, items.Count, presentElsewhere);
 
         while (true)
         {
-            Render(items.Count, state);
+            Render(heading, state);
             var key = await console.Input.ReadKeyAsync(true, cancellationToken).ConfigureAwait(false);
             if (key is null)
             {
@@ -421,14 +471,7 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
 
             if (input.Command == SkillSelectionCommand.Specialize)
             {
-                if (state.HasSpecializationScanResult)
-                {
-                    state.ToggleCachedSpecialization();
-                    continue;
-                }
-
-                await ScanSpecializationAsync(items, state, targetDirectory, skillsDirectories, cancellationToken)
-                    .ConfigureAwait(false);
+                state.ToggleCachedSpecialization();
                 continue;
             }
 
@@ -442,28 +485,16 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
         }
     }
 
-    async Task ScanSpecializationAsync(
-        List<RecommendationSelectionItem> items,
-        RecommendationSelectionState state,
-        string targetDirectory,
-        IReadOnlyList<string> skillsDirectories,
-        CancellationToken cancellationToken)
+    // The selection a run starts from: everything except what the duplicate scan found above or below the
+    // target. Non-interactive runs apply exactly this, so --yes never installs a second copy in a subfolder.
+    internal static RecommendationSelectionResult DefaultSelection(
+        IReadOnlyList<DirectivePlanItem> recommendedDirectives,
+        IReadOnlyList<SkillManifestEntry> recommendedSkills,
+        ScopeDuplicateScanResult duplicates)
     {
-        state.BeginSpecializationScan();
-        Render(items.Count, state);
-        var result = await ScopeDuplicateScanner
-            .ScanAsync(
-                items,
-                targetDirectory,
-                skillsDirectories,
-                (current, total) =>
-                {
-                    state.UpdateSpecializationScanProgress(current, total);
-                    Render(items.Count, state);
-                },
-                cancellationToken)
-            .ConfigureAwait(false);
-        state.ApplySpecializationScanResult(result);
+        RecommendationSelectionState state = new(BuildItems(recommendedDirectives, recommendedSkills));
+        state.ApplySpecializationScanResult(duplicates);
+        return new(state.SelectedDirectives, state.SelectedSkills);
     }
 
     internal static List<RecommendationSelectionItem> BuildItems(
@@ -472,7 +503,7 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
     {
         List<RecommendationSelectionItem> items = [];
         items.AddRange(recommendedDirectives.Select(directive => new RecommendationSelectionItem(
-            $"directive:{directive.Name}",
+            RecommendationSelectionState.FormatDirectiveKey(directive.Name),
             FormatDirectiveListItem(directive),
             RecommendationSelectionKind.Directive,
             directive,
@@ -517,6 +548,20 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
     internal static string FormatRecommendationPromptHeading(int itemCount)
         => string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Recommend {itemCount} action(s), select which to apply:");
 
+    // States the default recommendation with the same counts and words as the summary table.
+    internal static string FormatRecommendationPromptHeading(int recommendedCount, int itemCount, PresentElsewhere presentElsewhere)
+    {
+        if (recommendedCount == itemCount && presentElsewhere.Count == 0)
+        {
+            return FormatRecommendationPromptHeading(itemCount);
+        }
+
+        string elsewhere = presentElsewhere.Count == 0
+            ? string.Empty
+            : string.Create(System.Globalization.CultureInfo.InvariantCulture, $", {presentElsewhere.Count} already {presentElsewhere.Status}");
+        return string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Recommend {recommendedCount} of {itemCount} action(s){elsewhere}, select which to apply:");
+    }
+
     internal static string FormatRecommendationKindHeaderMarkup(RecommendationSelectionKind kind)
         => $"[bold {ToolHeader.CheckColor}]{(kind == RecommendationSelectionKind.Directive ? "Directives" : kind == RecommendationSelectionKind.Tool ? "Tools" : "Skills")}[/]";
 
@@ -539,10 +584,15 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
             ConsoleKey.Enter => new(SkillSelectionCommand.Confirm),
             ConsoleKey.Tab => new(SkillSelectionCommand.Specialize),
             ConsoleKey.F1 => new(SkillSelectionCommand.OpenHelp),
+            ConsoleKey.F2 => new(SkillSelectionCommand.ToggleView),
+            ConsoleKey.PageUp => new(SkillSelectionCommand.PageUp),
+            ConsoleKey.PageDown => new(SkillSelectionCommand.PageDown),
+            ConsoleKey.Home => new(SkillSelectionCommand.Home),
+            ConsoleKey.End => new(SkillSelectionCommand.End),
             _ => new(SkillSelectionCommand.Character, key.KeyChar)
         };
 
-    void Render(int itemCount, RecommendationSelectionState state)
+    void Render(string heading, RecommendationSelectionState state)
     {
         if (previousRenderLineCount > 0 && !Console.IsOutputRedirected)
         {
@@ -560,9 +610,11 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
         ClearCurrentLine();
         console.WriteLine();
         lineCount++;
-        MarkupLine($"[bold]{Markup.Escape(FormatRecommendationPromptHeading(itemCount))}[/]");
+        MarkupLine($"[bold]{Markup.Escape(heading)}[/]");
         MarkupLine(FormatSpecializationHelpLine(state));
-        MarkupLine(FormatKeyHelpLine());
+        MarkupLine(FormatViewHelpLine(state));
+        MarkupLine(FormatMoveHelpLine());
+        MarkupLine(FormatFilterHelpLine());
 
         if (state.Filter.Length > 0)
         {
@@ -709,48 +761,53 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
 
     static string FormatSpecializationHelpLine(RecommendationSelectionState state)
     {
-        string suffix = string.Empty;
-        if (state.IsSpecializationScanning)
-        {
-            suffix = " " + FormatSpecializationProgress(state.SpecializationScanCurrent, state.SpecializationScanTotal);
-        }
-        else if (state.IsSpecialized)
-        {
-            suffix = string.Create(
-                System.Globalization.CultureInfo.InvariantCulture,
-                $" ({state.DuplicateLocationsByKey.Count} actions already present above / below)");
-        }
-
         string status = state.IsSpecialized ? "ON" : "OFF";
         return $"Target directory specialization: [bold]{status}[/] "
             + ToolHeader.KeyMarkup("Tab")
-            + InfoText($" to toggle{suffix}");
+            + InfoText(" to toggle");
     }
 
-    static string FormatKeyHelpLine()
+    internal static string FormatViewHelpLine(RecommendationSelectionState state)
+    {
+        string counts = state.ShowSelectedOnly
+            ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $" ({state.SelectedCount} of {state.ItemCount})")
+            : string.Create(System.Globalization.CultureInfo.InvariantCulture, $" ({state.SelectedCount} of {state.ItemCount} selected)");
+        string line = $"Show: [bold]{(state.ShowSelectedOnly ? "selected" : "all")}[/]{counts}";
+        return state.CanToggleView
+            ? line + " " + ToolHeader.KeyMarkup("F2") + InfoText(state.ShowSelectedOnly ? " to show all" : " to show selected")
+            : line;
+    }
+
+    static string FormatMoveHelpLine()
         => InfoText("Use ")
             + ToolHeader.KeyMarkup("↑")
             + InfoText(" ")
             + ToolHeader.KeyMarkup("↓")
+            + InfoText(" ")
+            + ToolHeader.KeyMarkup("PgUp")
+            + InfoText(" ")
+            + ToolHeader.KeyMarkup("PgDn")
+            + InfoText(" ")
+            + ToolHeader.KeyMarkup("Home")
+            + InfoText(" ")
+            + ToolHeader.KeyMarkup("End")
             + InfoText(" to move, ")
             + ToolHeader.KeyMarkup("space")
             + InfoText(" to select, ")
             + ToolHeader.KeyMarkup("←")
             + InfoText(" to none, ")
             + ToolHeader.KeyMarkup("→")
-            + InfoText(" to all, type to filter, ")
+            + InfoText(" to all");
+
+    static string FormatFilterHelpLine()
+        => InfoText("Type to filter, ")
+            + ToolHeader.KeyMarkup("Esc")
+            + InfoText(" to clear, ")
             + ToolHeader.KeyMarkup("Enter")
             + InfoText(" to confirm");
 
     static string InfoText(string value)
         => $"[{SpectreReporter.InfoColor}]{Markup.Escape(value)}[/]";
-
-    static string FormatSpecializationProgress(int current, int total)
-    {
-        const int width = 12;
-        int completed = total <= 0 ? 0 : Math.Clamp((int)Math.Round((double)current / total * width), 0, width);
-        return $"[{new string('━', completed)}{new string('─', width - completed)}]";
-    }
 
     internal static (int StartIndex, IReadOnlyList<RecommendationSelectionItem> Items) GetVisibleItems(
         IReadOnlyList<RecommendationSelectionItem> items,

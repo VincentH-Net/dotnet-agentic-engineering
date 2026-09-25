@@ -12,8 +12,8 @@ interface IUserPrompts
     Task<RecommendationSelectionResult> SelectRecommendationsAsync(
         IReadOnlyList<DirectivePlanItem> recommendedDirectives,
         IReadOnlyList<SkillManifestEntry> missingSkills,
-        string targetDirectory,
-        IReadOnlyList<string> skillsDirectories,
+        ScopeDuplicateScanResult duplicates,
+        PresentElsewhere presentElsewhere,
         CancellationToken cancellationToken);
 
     Task WaitForHelpKeyAsync(string url, string purpose, CancellationToken cancellationToken);
@@ -40,16 +40,16 @@ sealed class SpectreUserPrompts(IAnsiConsole console) : IUserPrompts
     public Task<RecommendationSelectionResult> SelectRecommendationsAsync(
         IReadOnlyList<DirectivePlanItem> recommendedDirectives,
         IReadOnlyList<SkillManifestEntry> missingSkills,
-        string targetDirectory,
-        IReadOnlyList<string> skillsDirectories,
+        ScopeDuplicateScanResult duplicates,
+        PresentElsewhere presentElsewhere,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         return new RecommendationSelectionPrompt(console).PromptAsync(
             recommendedDirectives,
             missingSkills,
-            targetDirectory,
-            skillsDirectories,
+            duplicates,
+            presentElsewhere,
             cancellationToken);
     }
 
@@ -115,7 +115,8 @@ interface IReporter
         int outdatedCount,
         SourceVersionMode sourceMode = SourceVersionMode.Stable,
         string? sourcePin = null,
-        string? codexRules = null);
+        string? codexRules = null,
+        PresentElsewhere? presentElsewhere = null);
 
     Task RunProgressAsync(
         string description,
@@ -201,7 +202,8 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
         int outdatedCount,
         SourceVersionMode sourceMode = SourceVersionMode.Stable,
         string? sourcePin = null,
-        string? codexRules = null)
+        string? codexRules = null,
+        PresentElsewhere? presentElsewhere = null)
         => console.Write(CreateSummaryTable(
             targetDirectory,
             technologies,
@@ -214,7 +216,8 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
             outdatedCount,
             sourceMode,
             sourcePin,
-            codexRules));
+            codexRules,
+            presentElsewhere));
 
     internal static Table CreateSummaryTable(
         string targetDirectory,
@@ -228,7 +231,8 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
         int outdatedCount,
         SourceVersionMode sourceMode = SourceVersionMode.Stable,
         string? sourcePin = null,
-        string? codexRules = null)
+        string? codexRules = null,
+        PresentElsewhere? presentElsewhere = null)
     {
         Table table = new()
         {
@@ -252,8 +256,8 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
         _ = table.AddRow("Source channel", sourceMode == SourceVersionMode.Preview
             ? Markup.Escape($"Preview{(sourcePin is null ? string.Empty : $"\n* pinned to {sourcePin}")}\n* no skills update check - always (re)installs")
             : "Stable");
-        _ = table.AddRow("Recommended directives", Markup.Escape(FormatDirectiveSummary(directiveSummary)));
-        _ = table.AddRow("Recommended skills", Markup.Escape(FormatSkillSummary(recommendedCount, missingCount, outdatedCount, sourceMode)));
+        _ = table.AddRow("Recommended directives", Markup.Escape(FormatDirectiveSummary(directiveSummary, presentElsewhere)));
+        _ = table.AddRow("Recommended skills", Markup.Escape(FormatSkillSummary(recommendedCount, missingCount, outdatedCount, sourceMode, presentElsewhere)));
         return table;
     }
 
@@ -297,17 +301,19 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
             => text.Length;
     }
 
-    internal static string FormatDirectiveSummary(DirectiveSummary directiveSummary)
+    internal static string FormatDirectiveSummary(DirectiveSummary directiveSummary, PresentElsewhere? presentElsewhere = null)
         => FormatRecommendationStatus(
             directiveSummary.RecommendedCount,
             directiveSummary.MissingCount,
-            directiveSummary.OutdatedCount);
+            directiveSummary.OutdatedCount,
+            elsewhereCount: presentElsewhere?.Directives ?? 0,
+            elsewhereStatus: presentElsewhere?.Status);
 
     internal static string FormatSkillSummary(int recommendedCount, int missingCount, int outdatedCount,
-        SourceVersionMode sourceMode = SourceVersionMode.Stable)
+        SourceVersionMode sourceMode = SourceVersionMode.Stable, PresentElsewhere? presentElsewhere = null)
         => sourceMode == SourceVersionMode.Preview
-            ? recommendedCount == 0 ? "none" : FormatRecommendationStatus(recommendedCount, missingCount, 0, "installed")
-            : FormatRecommendationStatus(recommendedCount, missingCount, outdatedCount);
+            ? recommendedCount == 0 ? "none" : FormatRecommendationStatus(recommendedCount, missingCount, 0, "installed", presentElsewhere?.Skills ?? 0, presentElsewhere?.Status)
+            : FormatRecommendationStatus(recommendedCount, missingCount, outdatedCount, elsewhereCount: presentElsewhere?.Skills ?? 0, elsewhereStatus: presentElsewhere?.Status);
 
     internal static string FormatStack(IReadOnlySet<string> technologies, IReadOnlyList<InstallGateReport> installGates)
     {
@@ -362,14 +368,21 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
             .Where(report => report.Technology.Equals(technology, StringComparison.OrdinalIgnoreCase))
             .Any(report => report.GetValues(gate).Count > 0);
 
+    // Items missing in the target split into those missing everywhere and those installed above or below it.
     internal static string FormatRecommendationStatus(int recommendedCount, int missingCount, int outdatedCount,
-        string presentStatus = "up to date")
+        string presentStatus = "up to date", int elsewhereCount = 0, string? elsewhereStatus = null)
     {
         int upToDateCount = Math.Max(0, recommendedCount - missingCount - outdatedCount);
+        int missingEverywhereCount = Math.Max(0, missingCount - elsewhereCount);
         List<string> parts = [];
-        if (missingCount > 0)
+        if (missingEverywhereCount > 0)
         {
-            parts.Add(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{missingCount} missing"));
+            parts.Add(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{missingEverywhereCount} missing"));
+        }
+
+        if (elsewhereCount > 0)
+        {
+            parts.Add(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{elsewhereCount} {elsewhereStatus ?? "present " + PresentElsewhere.AboveOrBelow}"));
         }
 
         if (outdatedCount > 0)
@@ -445,7 +458,8 @@ sealed class NullReporter : IReporter
         int outdatedCount,
         SourceVersionMode sourceMode = SourceVersionMode.Stable,
         string? sourcePin = null,
-        string? codexRules = null)
+        string? codexRules = null,
+        PresentElsewhere? presentElsewhere = null)
     {
     }
 

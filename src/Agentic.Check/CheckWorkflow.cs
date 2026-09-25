@@ -194,6 +194,8 @@ sealed class CheckWorkflow(
         IReadOnlyList<SkillManifestEntry> recommended = [];
         IReadOnlyList<SkillManifestEntry> missing = [];
         IReadOnlyList<SkillUpdateCandidate> skillUpdates = [];
+        ScopeDuplicateScanResult? duplicates = null;
+        PresentElsewhere? presentElsewhere = null;
         var directiveCacheSettings = DirectiveCacheSettings.FromEnvironment();
         report.Warnings.AddRange(directiveCacheSettings.ConfigurationWarnings);
         var sourceMode = options.Preview ? SourceVersionMode.Preview : SourceVersionMode.Stable;
@@ -278,7 +280,7 @@ sealed class CheckWorkflow(
 
         await reporter.RunProgressAsync(
             "Scanning target directory",
-            3,
+            4,
             async advance =>
             {
                 var detectedStack = StackDetector.Detect(targetDirectory);
@@ -307,11 +309,24 @@ sealed class CheckWorkflow(
                 }
 
                 advance();
+
+                // One duplicate scan feeds the summary table, the prompt heading and the non-interactive
+                // default, so every place that mentions what is present above or below agrees.
+                duplicates = await ScopeDuplicateScanner
+                    .ScanAsync(RecommendationSelectionPrompt.BuildItems(directivePlan.SelectableDirectives, recommended), targetDirectory, skillsDirectories, null, cancellationToken)
+                    .ConfigureAwait(false);
+                presentElsewhere = PresentElsewhere.From(
+                    duplicates,
+                    directivePlan.Directives.Where(directive => directive.Status == DirectiveStatuses.Missing).Select(directive => RecommendationSelectionState.FormatDirectiveKey(directive.Name)),
+                    missing.Select(skill => RecommendationSelectionState.FormatSkillKey(skill.SourceRepo, skill.InstallArg)));
+                advance();
             },
             cancellationToken).ConfigureAwait(false);
 
         stack = stack ?? throw new InvalidOperationException("Target directory scan did not detect a stack.");
         directivePlan = directivePlan ?? throw new InvalidOperationException("Target directory scan did not plan directives.");
+        duplicates = duplicates ?? throw new InvalidOperationException("Target directory scan did not look above and below.");
+        presentElsewhere = presentElsewhere ?? throw new InvalidOperationException("Target directory scan did not summarize what is present above and below.");
 
         // Offered like any other item: only when the dna-owned rules file is absent or outdated on the path to the git root.
         var codexRulesPlan = installCodexRules && stack.Technologies.Contains(TechnologyNames.Dotnet, StringComparer.OrdinalIgnoreCase)
@@ -336,7 +351,7 @@ sealed class CheckWorkflow(
         report.DirectiveSummary = directiveSummary;
 
         reporter.Summary(targetDirectory, stack.Technologies, stack.InstallGates, targetAgents, skillsDirectories, directiveSummary, recommended.Count, missing.Count, report.OutdatedSkills, sourceMode,
-            sourcePin is null ? null : $"{options.PreviewSourceRef} ({sourcePin})", codexRulesPlan?.Status);
+            sourcePin is null ? null : $"{options.PreviewSourceRef} ({sourcePin})", codexRulesPlan?.Status, presentElsewhere);
         reporter.Info($"GitHub cache duration: {directiveCacheSettings.DurationDescription}");
 
         foreach (string warning in report.Warnings)
@@ -466,19 +481,15 @@ sealed class CheckWorkflow(
 
         if (recommendedDirectives.Count > 0 || recommendedSkillActions.Count > 0)
         {
-            if (options.DryRun || options.Yes)
-            {
-                selectedDirectives = recommendedDirectives;
-                selectedSkills = recommendedSkillActions;
-            }
-            else
-            {
-                var selection = await prompts
-                    .SelectRecommendationsAsync(recommendedDirectives, recommendedSkillActions, targetDirectory, skillsDirectories, cancellationToken)
+            // Non-interactive runs start from the same specialization default as the prompt, so a folder
+            // below an installed root never gets a second copy of what it already inherits.
+            var selection = options.DryRun || options.Yes
+                ? RecommendationSelectionPrompt.DefaultSelection(recommendedDirectives, recommendedSkillActions, duplicates)
+                : await prompts
+                    .SelectRecommendationsAsync(recommendedDirectives, recommendedSkillActions, duplicates, presentElsewhere, cancellationToken)
                     .ConfigureAwait(false);
-                selectedDirectives = selection.SelectedDirectives;
-                selectedSkills = selection.SelectedSkills;
-            }
+            selectedDirectives = selection.SelectedDirectives;
+            selectedSkills = selection.SelectedSkills;
         }
 
         // The same selection graph closes dependencies for interactive, --yes, dry-run, and updates.

@@ -401,6 +401,18 @@ public sealed class InteractionTests
             SpectreReporter.FormatRecommendationStatus(2, 2, 0));
 
     [Fact]
+    public void RecommendationStatusSplitsMissingItemsIntoMissingEverywhereAndPresentElsewhere()
+    {
+        PresentElsewhere elsewhere = new(5, 78, PresentElsewhere.Above);
+
+        Assert.Equal("all 5 present above", SpectreReporter.FormatDirectiveSummary(new DirectiveSummary(false, false, 5, 5, 0), elsewhere));
+        Assert.Equal("2 missing, 78 present above", SpectreReporter.FormatSkillSummary(80, 80, 0, SourceVersionMode.Stable, elsewhere));
+        Assert.Equal("2 missing, 78 present above, 5 installed", SpectreReporter.FormatSkillSummary(85, 80, 0, SourceVersionMode.Preview, elsewhere));
+        Assert.Equal("1 missing, 1 present below, 1 update(s) available", SpectreReporter.FormatRecommendationStatus(3, 2, 1, elsewhereCount: 1, elsewhereStatus: "present below"));
+        Assert.Equal("3 missing, 82 installed", SpectreReporter.FormatSkillSummary(85, 3, 0, SourceVersionMode.Preview, new PresentElsewhere(0, 0, PresentElsewhere.Above)));
+    }
+
+    [Fact]
     public void SkillsDirectoriesAreRenderedRelativeToTargetDirectory()
     {
         string repoRoot = Path.Combine(Path.GetTempPath(), "repo");

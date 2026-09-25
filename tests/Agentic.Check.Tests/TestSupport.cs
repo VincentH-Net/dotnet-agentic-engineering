@@ -134,6 +134,10 @@ sealed class FakePrompts : IUserPrompts
 
     public IReadOnlyList<SkillManifestEntry> RecommendedSkillActions { get; private set; } = [];
 
+    public ScopeDuplicateScanResult? Duplicates { get; private set; }
+
+    public PresentElsewhere? PresentElsewhere { get; private set; }
+
     public Task<bool> ConfirmAsync(string prompt, bool defaultValue, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -144,12 +148,14 @@ sealed class FakePrompts : IUserPrompts
     public Task<RecommendationSelectionResult> SelectRecommendationsAsync(
         IReadOnlyList<DirectivePlanItem> recommendedDirectives,
         IReadOnlyList<SkillManifestEntry> missingSkills,
-        string targetDirectory,
-        IReadOnlyList<string> skillsDirectories,
+        ScopeDuplicateScanResult duplicates,
+        PresentElsewhere presentElsewhere,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         RecommendedSkillActions = missingSkills;
+        Duplicates = duplicates;
+        PresentElsewhere = presentElsewhere;
         var selectedDirectives = SelectedDirectiveNames is null
             ? recommendedDirectives
             : [.. recommendedDirectives.Where(directive => SelectedDirectiveNames.Contains(directive.Name, StringComparer.Ordinal))];
@@ -198,6 +204,8 @@ sealed class RecordingReporter : IReporter
 
     public string? CodexRules { get; private set; }
 
+    public PresentElsewhere? PresentElsewhere { get; private set; }
+
     public void Plain(string message)
     {
         PlainMessages.Add(message);
@@ -244,12 +252,14 @@ sealed class RecordingReporter : IReporter
         int outdatedCount,
         SourceVersionMode sourceMode = SourceVersionMode.Stable,
         string? sourcePin = null,
-        string? codexRules = null)
+        string? codexRules = null,
+        PresentElsewhere? presentElsewhere = null)
     {
         TargetAgents = targetAgents;
         OutdatedSkillCount = outdatedCount;
         SourcePin = sourcePin;
         CodexRules = codexRules;
+        PresentElsewhere = presentElsewhere;
     }
 
     public async Task RunProgressAsync(
