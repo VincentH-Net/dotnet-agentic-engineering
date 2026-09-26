@@ -7,7 +7,7 @@ Battle-tested agentic engineering for [.NET](https://dotnet.microsoft.com), [Asp
 Agentic engineering `directives`, `skills` and `tools` that I use for building real-world .NET applications, plus the [dev environment setup](docs/dev-environment-setup.md) I use them with. Everything here has been used with real-world codebases - not generated with prompts and published untested.
 
 > [!NOTE]
-> [Directives](#directives-catalog) are small markdown snippets with key agent instructions. They are included in `AGENTS.md`to ensure that agents consistently apply key habits, skills and tools.
+> [Directives](#directives-catalog) are small markdown snippets with agent instructions. They are included in `AGENTS.md`to ensure that agents consistently apply key habits, skills and tools.
 
 Install `dna` once per machine, then one command does everything:
 
