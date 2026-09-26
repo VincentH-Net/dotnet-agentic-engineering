@@ -7,13 +7,16 @@ Battle-tested agentic engineering for [.NET](https://dotnet.microsoft.com), [Asp
 Agentic engineering `directives`, `skills` and `tools` that I use for building real-world .NET applications, plus the [dev environment setup](docs/dev-environment-setup.md) I use them with. Everything here has been used with real-world codebases - not generated with prompts and published untested.
 
 > [!NOTE]
-> `dna`: [dotnet-agentic-engineering](https://github.com/VincentH-Net/dotnet-agentic-engineering) in one command
+> [Directives](#directives-catalog) are small markdown snippets with key agent instructions. They are included in `AGENTS.md`to ensure that agents consistently apply key habits, skills and tools.
 
 Install `dna` once per machine, then one command does everything:
 
 - **`dna check`** scans your repo, detects your tech stack, and composes, installs and updates an optimized set of directives and skills, directly from best-in-class GitHub skills repo's. Where a directive or skill needs deterministic tooling, it installs that tool too, pinned once per repository. Run it again any time: directives, skills and tools are updated together, so they stay compatible.
 - **`dotnet agentic`** is the repo-local tool that directives and skills call for their deterministic steps; `dna check` installs it and keeps it versioned with them, and then `dna` acts as a shortcut for the `dotnet agentic` commands so you have less to remember and type.
 - **`dna prompt-log`** shows the prompts and answers that produced your commits.
+
+> [!NOTE]
+> `dna`: [dotnet-agentic-engineering](https://github.com/VincentH-Net/dotnet-agentic-engineering) in one command
 
 <!-- TODO screenshot: replace with a 2.3 capture of `dna check` showing the action list with directives, skills, and the InnoWvate.Agentic and dna tool actions. -->
 ![Terminal window on macOS running dnx agentic.check in the Api3 project folder, showing large cyan and green agentic-check ASCII art. The terminal text reads ~/Projects/Api3, dnx agentic.check, .NET Agentic Engineering Check 0.3.1, Optimizes your repo for agentic engineering with .NET - based technologies. The surrounding environment is a dark terminal window with standard macOS window controls. The tone is technical, polished, and reassuring.](docs/images/agentic-check.png)
@@ -53,48 +56,50 @@ Prerequisites:
 - [`gh` CLI](https://cli.github.com/). Skills are installed with `gh skill`, which uses GitHub's API quota. Anonymous access is enough for a handful of skills; `gh auth login` gives you a much higher quota, and `agentic.check` tells you when you need it.
 - Recommended: check the [Agentic Development Environment Setup](docs/dev-environment-setup.md) for models, harnesses and MCPs
 
-### 1. Install `dna` once per machine
+### 1. Install or update in a repo
+
+From a repo root folder, run:
 
 ```bash
-dotnet tool install --global InnoWvate.Dna
+dnx agentic.check
 ```
 
-`dna` is the shorthand for `agentic.check` and `dotnet agentic`- the repo setup tool and the repo-local tool that directives and skills call
+This detects .NET, ASP.NET Core, Orleans and Uno Platform usage, lists the recommended directives, skills and tools, and lets you select which to install or update.
 
-> [!TIP]
-> The `dna`shorthand is not _required_; if you cannot install a global tool, or another `dna` command is on your PATH, use `dnx agentic.check` instead of `dna check` and use `dotnet agentic <command>`for any other `dna <command>`.
-
-### 2. Set up your repo, and keep it current
-
-From a folder in your repo, run:
-
-```bash
-dna check
-```
-
-It runs the latest `agentic.check`: it detects .NET, ASP.NET Core, Orleans and Uno Platform usage, lists the recommended directives, skills and tools, and lets you select which to apply.
-
-Uno Platform skills are selected depending on detected:
+For Uno Platform, the offered skills are further refined depending on detected:
 
 - MVVM or MVUX update pattern
 - Pure XAML markup or XAML combined with either Uno C# Markup or C# Markup 2
 - Fluent / Material / Cupertino design system
 
-Target agents default to the ones found on this machine; `--agents` overrides that and decides the
-skills directories, such as `.claude/skills` and `.agents/skills`
 
-Directives are installed in `AGENTS.md` (which is included in `CLAUDE.md`), skills with `gh skill`, tools with `dotnet tool`; for Codex, rules to run `dotnet` with network access go in `.codex/rules`. Run `dna check -h` for options such as `--dry-run` and `--preview`.
+By default skills come from the latest stable release in each source repo; `--preview` switches that to each source repo's default branch. Target agents default to the ones found on your machine; `--agents` overrides that and decides the skills directories, such as `.claude/skills` and `.agents/skills`. For more options such as `--dry-run` and `--preview`, run:
+
+```bash
+dnx agentic.check -- -h
+```
+
+Directives are installed in `AGENTS.md` (which is included in `CLAUDE.md`), skills with `gh skill`, tools with `dotnet tool`; for Codex, rules to run `dotnet` with network access go in `.codex/rules`.
 
 GitHub login is optional. Without it, public sources are read anonymously, which is enough for
 a handful of skills. If GitHub's anonymous rate limit is reached, `agentic.check` stops and asks
-you to run `gh auth login` and rerun; completed changes are kept. When you are logged in, the
+you to run `gh auth login`or wait, and then rerun; completed changes are kept. When you are logged in, the
 `gh` credential is reused for all GitHub requests. Automation can set `GH_TOKEN` or `GITHUB_TOKEN`.
 
-`agentic.check` also offers to install or update `dotnet agentic` in your repo when a selected directive or skill depends on it.
+`agentic.check` offers to install or update `dotnet agentic` in your repo when a selected directive or skill depends on it.
+
+It also offers to install the global `dna`shorthand command for `agentic.check` and `dotnet agentic` (the repo setup tool and the repo-local tool that directives and skills call). After this, you can also install or update repo's with:
+
+```bash
+dna check
+```
+
+> [!TIP]
+> The `dna`shorthand is not _required_; if you cannot install a global tool, or another `dna` command is on your PATH, use `dnx agentic.check` instead of `dna check` and use `dotnet agentic <command>`for any other `dna <command>`.
 
 #### Specialize folders
 
-`dna check` lets you specialize folders within your repo with subsets of directives and skills local to that context, e.g. frontend or backend folders. This reduces your agent context size as compared to installing all directives and skills in the repo root. For details:
+You can specialize folders within your repo with subsets of directives and skills local to that context, e.g. frontend or backend folders. This reduces your agent context size as compared to installing all directives and skills in the repo root. For details on this:
 ```bash
 dna check -h
 ```
@@ -105,14 +110,24 @@ Run `dna check` again after adding a technology, and regularly to pick up skill 
 
 Alternatively, you can [manually compose and install directives and skills](docs/manual-install.md).
 
-### 3. Work with your agent
+### 2. Work with your agent
 
-Agents follow the installed directives and skills. With the [Prompt Log directive](directives/foundation-prompt-log.md), every code commit an agent creates carries the prompts and answers that produced it - the most important part of your source : your input. This preserves intent across sessions and agents. Read it back any time:
+Agents follow the installed directives and skills. Directives may use skills; directives and skills may use `dotnet agentic`. Humans use `dna`; to see the available commands, run:
 
 ```bash
+dna -h
+```
+
+#### The prompt log
+
+With the [Prompt Log directive](directives/foundation-prompt-log.md), every code commit an agent creates carries the prompts and answers that produced it - the most important part of your source : your input.
+
+This preserves intent across sessions and agents; it enables reusing intent for context in later sessions, or even replaying intent when more capable models appear. Read it back any time:
+
+```bash
+dna prompt-log -h
 dna prompt-log
 dna prompt-log --since 2026-09-01
-dna prompt-log -h
 ```
 
 ## The tools
