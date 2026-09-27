@@ -43,7 +43,7 @@ Demos:
   (post with steps to get started)
 - [LiveCharts2 with Uno Platform](https://x.com/vincenth_net/status/2033966275324444819)
   (post with app video)
-- [GPT 5.4 vs Opus 4.6 for UI with Uno Platform](TODO-replace-with-public-article-url)
+- [GPT 5.4 vs Opus 4.6 for UI with Uno Platform](https://x.com/vincenth_net/status/2031408477344587799)
   (article with side-by-side apps video)
 
 👁️/⭐ this repo if this includes what you are looking for!
