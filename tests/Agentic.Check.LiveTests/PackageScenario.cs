@@ -141,6 +141,7 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
             operationPhase = phase;
         }
         testRun.UseCache(workspace, candidate.Check.Sha256, preview, log);
+        ProgressLog.Append($"{fixtureName} {scenario}: {phase} ({(interactive ? "interactive" : dryRun ? "dry run" : "unattended")}) started");
         string reportPath = Path.Combine(FixtureFiles.Reports, runId + "-" + phase + ".json");
         _ = Directory.CreateDirectory(FixtureFiles.Reports);
         string[] arguments = [workspace.Target, "--agents", definition.Agents, "--report", reportPath, "--verbose",
@@ -158,6 +159,7 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
             await File.WriteAllTextAsync(Path.Combine(FixtureFiles.Reports, runId + "-" + phase + ".txt"), result.Output + result.Error).ConfigureAwait(false);
             result.RequireSuccess($"{fixtureName}/{scenario}/{phase}");
         }
+        ProgressLog.Append($"{fixtureName} {scenario}: {phase} done");
         using var document = JsonDocument.Parse(await File.ReadAllTextAsync(reportPath).ConfigureAwait(false));
         report = document.RootElement.Clone();
         BaselinePreparation.VerifyReport(report, definition);
@@ -191,7 +193,10 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
                 // A deselected row leaves the selected view; F2 shows all rows so the unchecked row is visible.
                 await auto.KeyAsync(Hex1bKey.F2).ConfigureAwait(false);
                 await auto.WaitUntilTextAsync("[ ] InnoWvate.Agentic").ConfigureAwait(false);
+                // An Escape sent right before another key can merge with it into an Alt chord and be lost, and
+                // Enter is refused while a filter is typed, so wait until the prompt shows the filter is cleared.
                 await auto.EscapeAsync().ConfigureAwait(false);
+                await auto.WaitUntilTextAsync("Type to filter").ConfigureAwait(false);
                 // The cursor stays on the companion row at the bottom of this long list, so check the
                 // deselected dependent under its own filter instead of expecting it in view.
                 await auto.TypeAsync("foundation-prompt-log").ConfigureAwait(false);
@@ -200,11 +205,13 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
                 await auto.SpaceAsync().ConfigureAwait(false);
                 await auto.WaitUntilTextAsync("[x] foundation-prompt-log").ConfigureAwait(false);
                 await auto.EscapeAsync().ConfigureAwait(false);
+                await auto.WaitUntilTextAsync("Type to filter").ConfigureAwait(false);
                 // The unfiltered selector is paged; bring the dependency back into view.
                 await auto.TypeAsync("InnoWvate.Agentic").ConfigureAwait(false);
                 await auto.WaitUntilTextAsync("Filter: InnoWvate.Agentic").ConfigureAwait(false);
                 await auto.WaitUntilTextAsync("[x] InnoWvate.Agentic").ConfigureAwait(false);
                 await auto.EscapeAsync().ConfigureAwait(false);
+                await auto.WaitUntilTextAsync("Enter confirm").ConfigureAwait(false);
                 await auto.RightAsync().ConfigureAwait(false);
             }
             await auto.EnterAsync().ConfigureAwait(false);
@@ -219,6 +226,7 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
 
     internal async Task VerifyAsync()
     {
+        ProgressLog.Append($"{fixtureName} {scenario}: verifying");
         var after = FixtureFiles.Inventory(workspace.Target);
         foreach (var (path, hash) in before.Where(file => file.Key is not "AGENTS.md" and not "CLAUDE.md" and not ".config/dotnet-tools.json"
             && !file.Key.StartsWith(".agents/skills/", StringComparison.Ordinal) && !file.Key.StartsWith(".claude/skills/", StringComparison.Ordinal)

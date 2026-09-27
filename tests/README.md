@@ -50,7 +50,8 @@ dotnet run --file tests/run-full-suite.cs
 ```
 
 The runner resolves the checkout from its own file location, so an absolute script path also works
-from another directory. `--help` describes usage. The C# runner uses .NET 10 file-based app
+from another directory. Both scripts turn the SDK terminal logger off for the `dotnet` processes they start, so
+their output is plain sequential lines rather than a live-redrawn node that floods a scrolling terminal. `--help` describes usage. The C# runner uses .NET 10 file-based app
 support and only the standard library.
 
 It follows this fixed sequence:
@@ -95,6 +96,11 @@ Each invocation creates a new ignored `tests/TestResults/full-suite/<run-id>/` d
 - `candidates/`: exact packages and `candidate-build.json` provenance.
 - `<test-project>/results.trx`: one results file per test project.
 - `pack/` and `network/`: existing source, fixture, gateway, and GitHub budget reports.
+- `network/progress.log`: one line per phase of each package scenario, plus a heartbeat every 30 seconds
+  while a recorded terminal waits for the packaged CLI to exit. The runner prints the newest line while a
+  test project runs, so a long run shows where it is. A recorded CLI whose screen stops changing for
+  90 seconds fails at once instead of at the 15-minute ceiling; that is what a prompt waiting for a key
+  looks like.
 - `maintenance/`: upstream skill maintenance reports.
 
 Existing terminal tests continue preserving recordings in their own `TestResults/recordings/`

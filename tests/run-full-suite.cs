@@ -43,7 +43,10 @@ Dictionary<string, string?> settings = new(StringComparer.Ordinal)
     ["AGENTIC_E2E_REPORTS"] = Path.Combine(reports, "pack"),
     ["AGENTIC_E2E_CACHE"] = Path.Combine(reports, "cache"),
     ["AGENTIC_CHECK_MAINTENANCE_REPORT_DIR"] = Path.Combine(reports, "maintenance"),
-    ["AGENTIC_CHECK_MAINTENANCE_CACHE_SECONDS"] = "1800"
+    ["AGENTIC_CHECK_MAINTENANCE_CACHE_SECONDS"] = "1800",
+    // Plain sequential lines instead of the SDK's live-redrawn node, which floods a scrolling terminal
+    // over a long run and buries the per-test result lines.
+    ["MSBUILDTERMINALLOGGER"] = "off"
 };
 
 int result = 1;
@@ -120,7 +123,18 @@ int Run(params string[] arguments)
     try
     {
         using var process = Process.Start(start) ?? throw new InvalidOperationException("Could not start dotnet.");
-        process.WaitForExit();
+        // While a long command runs, show the newest line the package scenarios wrote, so progress is visible.
+        string? shown = null;
+        while (!process.WaitForExit(30_000))
+        {
+            string? latest = LatestProgress();
+            if (latest is not null && latest != shown)
+            {
+                Console.WriteLine("  … " + latest);
+                shown = latest;
+            }
+        }
+
         code = process.ExitCode;
     }
     catch (Win32Exception exception)
@@ -132,6 +146,19 @@ int Run(params string[] arguments)
     if (code != 0)
         failedCommands.Add($"Exit {code}: {command}");
     return code;
+}
+
+string? LatestProgress()
+{
+    string path = Path.Combine(settings["AGENTIC_E2E_REPORTS"]!, "progress.log");
+    try
+    {
+        return File.Exists(path) ? File.ReadLines(path).LastOrDefault(line => line.Length > 0) : null;
+    }
+    catch (IOException)
+    {
+        return null;
+    }
 }
 
 string Summarize(int exitCode)

@@ -1,4 +1,5 @@
-﻿using System.Text.RegularExpressions;
+﻿using System.Globalization;
+using System.Text.RegularExpressions;
 using Hex1b;
 using Hex1b.Automation;
 
@@ -49,16 +50,16 @@ static class RecordedTerminal
             var run = terminal.RunAsync(timeout.Token);
             var auto = new Hex1bTerminalAutomator(terminal, defaultTimeout: TimeSpan.FromMinutes(5));
             string sentinel = "__PACKAGE_DONE_" + Guid.NewGuid().ToString("N");
+            string name = Path.GetFileNameWithoutExtension(recordingPath);
             try
             {
+                ProgressLog.Append($"{name}: terminal started");
                 await auto.TypeAsync($"unset {string.Join(' ', RealProcess.GitStateVariables)}; {Quote(executable)} {string.Join(' ', arguments.Select(Quote))}; printf '\\n{sentinel}:%s__\\n' \"$?\"").ConfigureAwait(false);
                 await auto.EnterAsync().ConfigureAwait(false);
                 await interact(auto).ConfigureAwait(false);
+                ProgressLog.Append($"{name}: keys sent, waiting for the CLI to exit");
                 string completionPattern = Regex.Escape(sentinel) + @":([0-9]+)__";
-                await auto.WaitUntilAsync(snapshot => Regex.IsMatch(snapshot.GetScreenText(), completionPattern, RegexOptions.CultureInvariant),
-                    timeout: TimeSpan.FromMinutes(15), description: "packaged CLI to exit").ConfigureAwait(false);
-                using var snapshot = auto.CreateSnapshot();
-                string screen = snapshot.GetScreenText();
+                string screen = await WaitForExitAsync(auto, completionPattern, name, timeout.Token).ConfigureAwait(false);
                 string exitCode = Regex.Match(screen, completionPattern, RegexOptions.CultureInvariant).Groups[1].Value;
                 FixtureFiles.Require(exitCode == "0", $"Recorded packaged CLI exited {exitCode}:\n{screen}");
             }
@@ -83,6 +84,66 @@ static class RecordedTerminal
         FixtureFiles.Require(new FileInfo(recordingPath).Length > 0, "Missing terminal recording.");
         return await File.ReadAllTextAsync(recordingPath).ConfigureAwait(false);
     }
+
+    // A real apply keeps redrawing its progress, so a screen that stops changing means the CLI waits for
+    // input that will never come. Failing after IdleLimit instead of the ceiling saves most of a long
+    // timeout, and a heartbeat every HeartbeatInterval shows that a slow install is still moving.
+    static readonly TimeSpan IdleLimit = TimeSpan.FromSeconds(90);
+    static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(30);
+    static readonly TimeSpan ExitCeiling = TimeSpan.FromMinutes(15);
+
+    static async Task<string> WaitForExitAsync(Hex1bTerminalAutomator auto, string completionPattern, string name, CancellationToken cancellationToken)
+    {
+        var started = DateTimeOffset.UtcNow;
+        var lastChange = started;
+        var lastHeartbeat = started;
+        string lastScreen = string.Empty;
+        while (true)
+        {
+            string screen;
+            using (var snapshot = auto.CreateSnapshot())
+            {
+                screen = snapshot.GetScreenText();
+            }
+
+            if (Regex.IsMatch(screen, completionPattern, RegexOptions.CultureInvariant))
+            {
+                ProgressLog.Append($"{name}: CLI exited after {Elapsed(started)}");
+                return screen;
+            }
+
+            var now = DateTimeOffset.UtcNow;
+            if (screen != lastScreen)
+            {
+                lastScreen = screen;
+                lastChange = now;
+            }
+            else if (now - lastChange > IdleLimit)
+            {
+                ProgressLog.Append($"{name}: no screen change for {Elapsed(lastChange)}, giving up");
+                throw new TimeoutException(string.Create(CultureInfo.InvariantCulture,
+                    $"The packaged CLI produced no output for {IdleLimit.TotalSeconds:0} seconds and did not exit; it is probably waiting for input.\n{screen}"));
+            }
+
+            if (now - started > ExitCeiling)
+            {
+                ProgressLog.Append($"{name}: still running after {Elapsed(started)}, giving up");
+                throw new TimeoutException(string.Create(CultureInfo.InvariantCulture,
+                    $"The packaged CLI did not exit within {ExitCeiling.TotalMinutes:0} minutes.\n{screen}"));
+            }
+
+            if (now - lastHeartbeat >= HeartbeatInterval)
+            {
+                lastHeartbeat = now;
+                ProgressLog.Append($"{name}: running for {Elapsed(started)}, screen last changed {Elapsed(lastChange)} ago");
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    static string Elapsed(DateTimeOffset since)
+        => (DateTimeOffset.UtcNow - since).ToString(@"m\:ss", CultureInfo.InvariantCulture);
 
     internal static string Quote(string value) => "'" + value.Replace("'", "'\\''", StringComparison.Ordinal) + "'";
 }

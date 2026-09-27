@@ -67,6 +67,8 @@ if (published && !release)
     return 2;
 }
 
+// Plain sequential lines instead of the SDK's live-redrawn node, which floods a scrolling terminal.
+Environment.SetEnvironmentVariable("MSBUILDTERMINALLOGGER", "off");
 string checkout = Checkout();
 string baselinesRoot = Path.Combine(checkout, "tests", "fixtures", "baselines");
 string definitionsRoot = Path.Combine(checkout, "tests", "fixtures", "definitions");
