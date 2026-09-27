@@ -23,10 +23,10 @@ static class ToolHeader
         new(@"       |___/                       ", @"      ", @"                           ")
     ];
 
-    public static string Description => """
+    public static string Description => $"""
         Optimizes your repo for agentic engineering with .NET - based technologies
 
-        Use 'agentic-check -h' for full tool description and parameter usage
+        Use '{DnaLauncherContract.CurrentCheckLauncher} -h' for full tool description and parameter usage
 
         """;
 

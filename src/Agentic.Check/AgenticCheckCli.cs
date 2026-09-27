@@ -151,8 +151,8 @@ static class AgenticCheckCli
         3. Start agentic.check in the frontend subfolder and select the specialized
            set of directives and skills for that subfolder
         4. Start your agent in a (sub)folder of choice to use that specialized set of
-           instructions. Multiple harnesses support this, including Codex CLI (composes 
-           above) and Claude Code CLI (composes above, as well as below when working on
+           instructions. Multiple harnesses support this, including Codex (composes
+           above) and Claude Code (composes above, as well as below when working on
            files below its working dir).
 
         Docs: {DnaLauncherContract.DocsUrl}
@@ -220,8 +220,8 @@ static class AgenticCheckCli
                 }
             });
 
-        // Help shows the command the user typed: dna check when the shorthand launched us, otherwise dnx agentic.check.
-        string launcher = string.IsNullOrEmpty(Environment.GetEnvironmentVariable(DnaLauncherContract.VersionVariable)) ? "dnx agentic.check" : "dna check";
+        // Help shows the command the user typed: dna check when the shorthand launched us, otherwise dnx agentic.check --.
+        string launcher = DnaLauncherContract.CurrentCheckLauncher;
         var parsed = rootCommand.Parse(args);
         StringWriter? help = parsed.Action is HelpAction || parsed.Errors.Count > 0 ? new() : null;
         InvocationConfiguration configuration = new() { Output = help ?? Console.Out, Error = Console.Error };

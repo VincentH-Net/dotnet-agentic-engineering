@@ -45,7 +45,7 @@ static class AgenticCli
             }
         });
         // Help shows the command the user actually typed: dna when the shorthand launched us, otherwise dotnet agentic.
-        string launcher = string.IsNullOrEmpty((readEnvironment ?? Environment.GetEnvironmentVariable)(DnaLauncherContract.VersionVariable)) ? "dotnet agentic" : "dna";
+        string launcher = DnaLauncherContract.IsLaunchedByDna(readEnvironment) ? "dna" : "dotnet agentic";
         RootCommand root = new($"{DnaLauncherContract.Description} Exit codes: 0 success, 1 failure, 2 invalid arguments; diagnostics go to stderr. Docs: {DnaLauncherContract.DocsUrl}");
         root.Options.OfType<VersionOption>().Single().Validators.Clear();
         root.Options.Add(minimum);

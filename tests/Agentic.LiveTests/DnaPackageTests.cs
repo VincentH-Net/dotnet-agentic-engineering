@@ -122,7 +122,7 @@ public sealed class DnaPackageTests
             var help = await workspace.Runner.RunAsync(command, [.. prefix, "--help"], workspace.Target, CancellationToken.None).ConfigureAwait(true);
             Assert.True(help.Success, help.StandardError);
             Assert.Contains("--skills-dir", help.StandardOutput, StringComparison.Ordinal);
-            Assert.Contains(command == "dotnet" ? "\n  dnx agentic.check [<target-dir>]" : "\n  dna check [<target-dir>]", help.StandardOutput, StringComparison.Ordinal);
+            Assert.Contains(command == "dotnet" ? "\n  dnx agentic.check -- [<target-dir>]" : "\n  dna check [<target-dir>]", help.StandardOutput, StringComparison.Ordinal);
             var failure = await workspace.Runner.RunAsync(command, [.. prefix, "--agents", "not an agent"], workspace.Target, CancellationToken.None).ConfigureAwait(true);
             // Agentic.Check's parser returns 1; the prompt-log CLI returns 2 for invalid arguments.
             Assert.Equal(1, failure.ExitCode);

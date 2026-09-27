@@ -29,6 +29,7 @@ public sealed class InteractionTests
         Assert.StartsWith("Optimizes your repo for agentic engineering with .NET - based technologies\n", ToolHeader.Description, StringComparison.Ordinal);
         Assert.DoesNotContain("technologies.", ToolHeader.Description, StringComparison.Ordinal);
         Assert.DoesNotContain(ToolHeader.RepositoryUrl, ToolHeader.Description, StringComparison.Ordinal);
+        Assert.Contains($"Use '{DnaLauncherContract.CurrentCheckLauncher} -h' for full tool description and parameter usage", ToolHeader.Description, StringComparison.Ordinal);
         Assert.StartsWith("F1 to learn more at ", ToolHeader.RepositoryHelp, StringComparison.Ordinal);
         Assert.Contains(ToolHeader.KeyMarkup("F1"), ToolHeader.RepositoryHelpMarkup, StringComparison.Ordinal);
         Assert.Contains(" to learn more at ", ToolHeader.RepositoryHelpMarkup, StringComparison.Ordinal);
@@ -174,6 +175,18 @@ public sealed class InteractionTests
 
         Assert.Contains("\n  dna check [<target-dir>] [options]\n", rewritten, StringComparison.Ordinal);
         Assert.Contains($"Values for {executable}.", rewritten, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StandaloneLauncherKeepsTheSeparatorThatDnxNeedsBeforeToolArguments()
+    {
+        string help = $"Usage:\n  {System.CommandLine.RootCommand.ExecutableName} [<target-dir>] [options]\n";
+
+        Assert.Equal("dnx agentic.check --", DnaLauncherContract.StandaloneCheckLauncher);
+        Assert.Contains("\n  dnx agentic.check -- [<target-dir>] [options]\n", HelpText.WithLauncherUsage(help, DnaLauncherContract.StandaloneCheckLauncher), StringComparison.Ordinal);
+        Assert.False(DnaLauncherContract.IsLaunchedByDna(_ => null));
+        Assert.False(DnaLauncherContract.IsLaunchedByDna(_ => string.Empty));
+        Assert.True(DnaLauncherContract.IsLaunchedByDna(name => name == DnaLauncherContract.VersionVariable ? "1.0.0" : null));
     }
 
     [Fact]
