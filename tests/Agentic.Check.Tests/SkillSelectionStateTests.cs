@@ -232,7 +232,7 @@ public sealed class SkillSelectionStateTests
     }
 
     [Fact]
-    public void SpecializationToggleOffKeepsCurrentSelectionAndToggleOnRestoresSpecializedDefault()
+    public void SpecializationToggleActsOnlyOnRowsPresentAboveOrBelow()
     {
         var directive = new DirectivePlanItem("foundation-prompt-log", DirectiveStatuses.Missing, "content");
         var outdatedDirective = new DirectivePlanItem("dotnet-cli-run", DirectiveStatuses.Outdated, "content");
@@ -245,11 +245,13 @@ public sealed class SkillSelectionStateTests
             [],
             recommendationAction: "switch to stable",
             forceInstall: true);
+        SkillManifestEntry localSkill = new("owner/repo", "local-skill", "local-skill", TechnologyNames.Dotnet, []);
         RecommendationSelectionState state = new([
             new RecommendationSelectionItem("directive:foundation-prompt-log", "foundation-prompt-log (install)", RecommendationSelectionKind.Directive, directive, null),
             new RecommendationSelectionItem("directive:dotnet-cli-run", "dotnet-cli-run (update)", RecommendationSelectionKind.Directive, outdatedDirective, null),
             CreateSkillItem(missingSkill),
-            CreateSkillItem(repairSkill)
+            CreateSkillItem(repairSkill),
+            CreateSkillItem(localSkill)
         ]);
 
         state.ApplySpecializationScanResult(new ScopeDuplicateScanResult(
@@ -261,25 +263,72 @@ public sealed class SkillSelectionStateTests
                 [RecommendationSelectionState.FormatSkillKey(repairSkill.SourceRepo, repairSkill.InstallArg)] = ["../.agents/skills/repair-skill/SKILL.md"]
             }));
 
+        Assert.True(state.IsSpecialized);
+        Assert.True(state.HasSpecializationRows);
         Assert.Equal(["dotnet-cli-run"], state.SelectedDirectives.Select(directive => directive.Name));
-        Assert.Equal(["repair-skill"], state.SelectedSkills.Select(skill => skill.LocalFolder));
+        Assert.Equal(["repair-skill", "local-skill"], state.SelectedSkills.Select(skill => skill.LocalFolder));
 
+        state.DeselectWithDependents(RecommendationSelectionState.FormatSkillKey(localSkill.SourceRepo, localSkill.InstallArg));
         state.ToggleCachedSpecialization();
 
         Assert.False(state.IsSpecialized);
-        Assert.Equal(["dotnet-cli-run"], state.SelectedDirectives.Select(directive => directive.Name));
-        Assert.Equal(["repair-skill"], state.SelectedSkills.Select(skill => skill.LocalFolder));
-
-        state.Apply(new SkillSelectionInput(SkillSelectionCommand.SelectNone));
-
-        Assert.Empty(state.SelectedDirectives);
-        Assert.Empty(state.SelectedSkills);
+        Assert.Equal(["foundation-prompt-log", "dotnet-cli-run"], state.SelectedDirectives.Select(directive => directive.Name));
+        Assert.Equal(["missing-skill", "repair-skill"], state.SelectedSkills.Select(skill => skill.LocalFolder));
 
         state.ToggleCachedSpecialization();
 
         Assert.True(state.IsSpecialized);
         Assert.Equal(["dotnet-cli-run"], state.SelectedDirectives.Select(directive => directive.Name));
         Assert.Equal(["repair-skill"], state.SelectedSkills.Select(skill => skill.LocalFolder));
+    }
+
+    [Fact]
+    public void SpecializationRoundTripLeavesDependenciesAsTheUserLeftThem()
+    {
+        SkillManifestEntry dependency = new("owner/repo", "test-analysis-extensions", "test-analysis-extensions", TechnologyNames.Dotnet, []);
+        SkillManifestEntry dependent = new("owner/repo", "test-anti-patterns", "test-anti-patterns", TechnologyNames.Dotnet, [],
+            dependencies: [new SkillDependency("owner/repo", "test-analysis-extensions")]);
+        SkillManifestEntry other = new("owner/repo", "other", "other", TechnologyNames.Dotnet, []);
+        ScopeDuplicateScanResult dependentAtRoot = new(new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
+        {
+            [RecommendationSelectionState.FormatSkillKey(dependent.SourceRepo, dependent.InstallArg)] = ["../.agents/skills/test-anti-patterns/SKILL.md"]
+        });
+
+        RecommendationSelectionState deselected = new([CreateSkillItem(dependency), CreateSkillItem(dependent), CreateSkillItem(other)]);
+        deselected.ApplySpecializationScanResult(dependentAtRoot);
+        Assert.Equal(["test-analysis-extensions", "other"], deselected.SelectedSkills.Select(skill => skill.LocalFolder));
+
+        deselected.Apply(new SkillSelectionInput(SkillSelectionCommand.Toggle));
+        Assert.Equal(["other"], deselected.SelectedSkills.Select(skill => skill.LocalFolder));
+
+        deselected.ToggleCachedSpecialization();
+        Assert.Equal(["test-analysis-extensions", "test-anti-patterns", "other"], deselected.SelectedSkills.Select(skill => skill.LocalFolder));
+
+        deselected.ToggleCachedSpecialization();
+        Assert.Equal(["other"], deselected.SelectedSkills.Select(skill => skill.LocalFolder));
+
+        RecommendationSelectionState kept = new([CreateSkillItem(dependency), CreateSkillItem(dependent), CreateSkillItem(other)]);
+        kept.ApplySpecializationScanResult(dependentAtRoot);
+        kept.ToggleCachedSpecialization();
+        kept.ToggleCachedSpecialization();
+        Assert.Equal(["test-analysis-extensions", "other"], kept.SelectedSkills.Select(skill => skill.LocalFolder));
+    }
+
+    [Fact]
+    public void SpecializationToggleDoesNothingWithoutRowsAboveOrBelow()
+    {
+        RecommendationSelectionState state = new(CreateItems([], ["alpha", "beta"]));
+        state.ApplySpecializationScanResult(new ScopeDuplicateScanResult(new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)));
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Toggle));
+
+        state.ToggleCachedSpecialization();
+
+        Assert.False(state.HasSpecializationRows);
+        Assert.Equal(["beta"], state.SelectedSkills.Select(skill => skill.LocalFolder));
+        string[] rows = PlainRows(state);
+        Assert.StartsWith("Filters  Target directory specialization: n/a", rows[0], StringComparison.Ordinal);
+        Assert.EndsWith("(none above or below)", rows[0].TrimEnd(), StringComparison.Ordinal);
+        Assert.DoesNotContain("Tab", rows[0], StringComparison.Ordinal);
     }
 
     [Fact]
@@ -317,13 +366,22 @@ public sealed class SkillSelectionStateTests
     }
 
     [Fact]
-    public void StartsInTheSelectedViewAndToggleViewShowsAll()
+    public void StartsInTheSelectedViewAndOffersTheToggleOnlyWhileTheViewsDiffer()
     {
         RecommendationSelectionState state = new(CreateItems(["foundation-prompt-log"], ["alpha", "beta"]));
 
         Assert.True(state.ShowSelectedOnly);
-        Assert.True(state.CanToggleView);
+        Assert.False(state.CanToggleView);
         Assert.Equal(3, state.FilteredItems.Count);
+
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.ToggleView));
+
+        Assert.True(state.ShowSelectedOnly);
+
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Toggle));
+
+        Assert.True(state.CanToggleView);
+        Assert.Equal(2, state.FilteredItems.Count);
 
         state.Apply(new SkillSelectionInput(SkillSelectionCommand.ToggleView));
 
@@ -333,6 +391,7 @@ public sealed class SkillSelectionStateTests
         state.Apply(new SkillSelectionInput(SkillSelectionCommand.ToggleView));
 
         Assert.True(state.ShowSelectedOnly);
+        Assert.Equal(2, state.FilteredItems.Count);
     }
 
     [Fact]
@@ -351,7 +410,8 @@ public sealed class SkillSelectionStateTests
         Assert.Equal(["alpha", "beta", "gamma"], state.FilteredItems.Select(item => item.Display));
         Assert.Equal("gamma", state.FilteredItems[state.CursorIndex].Display);
 
-        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Home));
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Up));
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Up));
         state.Apply(new SkillSelectionInput(SkillSelectionCommand.Toggle));
         state.Apply(new SkillSelectionInput(SkillSelectionCommand.ToggleView));
 
@@ -451,44 +511,91 @@ public sealed class SkillSelectionStateTests
     }
 
     [Fact]
-    public void PageHomeAndEndKeysJumpThroughTheList()
+    public void FilterRowsShareOneKeyColumnAcrossEveryState()
     {
-        RecommendationSelectionState state = new(CreateItems([], [.. Enumerable.Range(1, 60)
-            .Select(index => string.Create(System.Globalization.CultureInfo.InvariantCulture, $"skill-{index:00}"))]));
+        RecommendationSelectionState state = new(CreateItems([], ["alpha", "beta", "gamma"]));
+        state.ApplySpecializationScanResult(new ScopeDuplicateScanResult(new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
+        {
+            [RecommendationSelectionState.FormatSkillKey("owner/repo", "alpha")] = ["../.agents/skills/alpha/SKILL.md"]
+        }));
 
-        state.Apply(new SkillSelectionInput(SkillSelectionCommand.PageDown));
-        Assert.Equal(RecommendationSelectionPrompt.MaxVisibleItems, state.CursorIndex);
+        string[] specialized = PlainRows(state);
+        Assert.StartsWith("Filters  Target directory specialization: ON", specialized[0], StringComparison.Ordinal);
+        Assert.Contains("Show: selected (2 of 3)", specialized[1], StringComparison.Ordinal);
+        Assert.Contains("Type to filter", specialized[2], StringComparison.Ordinal);
+        Assert.DoesNotContain("Esc", specialized[2], StringComparison.Ordinal);
+        int keyColumn = specialized[0].IndexOf("Tab OFF", StringComparison.Ordinal);
+        Assert.True(keyColumn > 0);
+        Assert.Equal(keyColumn, specialized[1].IndexOf("F2 show all", StringComparison.Ordinal));
 
-        state.Apply(new SkillSelectionInput(SkillSelectionCommand.End));
-        Assert.Equal(59, state.CursorIndex);
+        state.ToggleCachedSpecialization();
 
-        state.Apply(new SkillSelectionInput(SkillSelectionCommand.PageUp));
-        Assert.Equal(59 - RecommendationSelectionPrompt.MaxVisibleItems, state.CursorIndex);
+        string[] everythingSelected = PlainRows(state);
+        Assert.StartsWith("Filters  Target directory specialization: OFF", everythingSelected[0], StringComparison.Ordinal);
+        Assert.Equal(keyColumn, everythingSelected[0].IndexOf("Tab ON", StringComparison.Ordinal));
+        Assert.Contains("Show: selected (3 of 3)", everythingSelected[1], StringComparison.Ordinal);
+        Assert.DoesNotContain("F2", everythingSelected[1], StringComparison.Ordinal);
 
-        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Home));
-        Assert.Equal(0, state.CursorIndex);
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Toggle));
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.ToggleView));
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Character, 'a'));
+
+        string[] allView = PlainRows(state);
+        Assert.Contains("Show: all (2 of 3 selected)", allView[1], StringComparison.Ordinal);
+        Assert.Contains("Filter: a", allView[2], StringComparison.Ordinal);
+        Assert.Equal(keyColumn, allView[0].IndexOf("Tab ON", StringComparison.Ordinal));
+        Assert.Equal(keyColumn, allView[1].IndexOf("F2 show selected", StringComparison.Ordinal));
+        Assert.Equal(keyColumn, allView[2].IndexOf("Esc clear", StringComparison.Ordinal));
+
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.SelectNone));
+
+        string[] emptySelection = PlainRows(state);
+        Assert.Contains("Show: all (0 of 3 selected)", emptySelection[1], StringComparison.Ordinal);
+        Assert.DoesNotContain("F2", emptySelection[1], StringComparison.Ordinal);
+        Assert.Equal(keyColumn, emptySelection[2].IndexOf("Esc clear", StringComparison.Ordinal));
+
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.ClearFilter));
+
+        Assert.DoesNotContain("Esc", PlainRows(state)[2], StringComparison.Ordinal);
     }
 
     [Fact]
-    public void ViewHelpLineShowsCountsAndOffersTheToggleOnlyWithASelection()
+    public void FilterMatchesSwapTheRowColour()
     {
-        RecommendationSelectionState state = new(CreateItems([], ["alpha", "beta", "gamma"]));
-        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Toggle));
-
-        string selectedView = RecommendationSelectionPrompt.FormatViewHelpLine(state);
-        Assert.Contains("[bold]selected[/] (2 of 3)", selectedView, StringComparison.Ordinal);
-        Assert.Contains("to show all", selectedView, StringComparison.Ordinal);
-
-        state.Apply(new SkillSelectionInput(SkillSelectionCommand.ToggleView));
-        string allView = RecommendationSelectionPrompt.FormatViewHelpLine(state);
-        Assert.Contains("[bold]all[/] (2 of 3 selected)", allView, StringComparison.Ordinal);
-        Assert.Contains("to show selected", allView, StringComparison.Ordinal);
-
-        state.Apply(new SkillSelectionInput(SkillSelectionCommand.SelectNone));
-        string emptySelection = RecommendationSelectionPrompt.FormatViewHelpLine(state);
-        Assert.Contains("[bold]all[/] (0 of 3 selected)", emptySelection, StringComparison.Ordinal);
-        Assert.DoesNotContain("F2", emptySelection, StringComparison.Ordinal);
+        Assert.Equal("uno-[yellow]mvvm[/] (install)", RecommendationSelectionPrompt.HighlightMatches("uno-mvvm (install)", "MVVM", "yellow"));
+        Assert.Equal("[yellow]uno-[/]mvvm[yellow] (install)[/]", RecommendationSelectionPrompt.HighlightMatches("uno-mvvm (install)", "mvvm", null, "yellow"));
+        Assert.Equal("[yellow]a[/]b[yellow]a[/]", RecommendationSelectionPrompt.HighlightMatches("aba", "a", "yellow"));
+        Assert.Equal("x [[y]] z", RecommendationSelectionPrompt.HighlightMatches("x [y] z", " ", "yellow"));
+        Assert.Equal("[yellow]x [[y]] z[/]", RecommendationSelectionPrompt.HighlightMatches("x [y] z", "", null, "yellow"));
+        Assert.Equal("x [yellow][[y]][/] z", RecommendationSelectionPrompt.HighlightMatches("x [y] z", "[y]", "yellow"));
+        Assert.Equal("  [bold cyan]owner/repo repo[/]", RecommendationSelectionPrompt.FormatRecommendationSourceHeaderMarkup("owner/repo"));
+        Assert.Equal("  [bold cyan][yellow]owner[/]/repo repo[/]", RecommendationSelectionPrompt.FormatRecommendationSourceHeaderMarkup("owner/repo", "owner"));
+        _ = new Spectre.Console.Markup(RecommendationSelectionPrompt.FormatRecommendationSourceHeaderMarkup("owner/repo", "owner"));
+        _ = new Spectre.Console.Markup(RecommendationSelectionPrompt.HighlightMatches("x [y] z", "[y]", null, "yellow"));
     }
+
+    [Fact]
+    public void ConfirmingWaitsUntilATypedFilterIsCleared()
+    {
+        RecommendationSelectionState state = new(CreateItems([], ["alpha", "beta"]));
+
+        Assert.True(state.CanConfirm);
+        Assert.EndsWith("Enter confirm", Spectre.Console.Markup.Remove(RecommendationSelectionPrompt.FormatKeyHelpLine(state)), StringComparison.Ordinal);
+
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Character, 'a'));
+
+        Assert.False(state.CanConfirm);
+        string filtered = Spectre.Console.Markup.Remove(RecommendationSelectionPrompt.FormatKeyHelpLine(state));
+        Assert.EndsWith("→ all, clear the filter to confirm", filtered, StringComparison.Ordinal);
+        Assert.DoesNotContain("Enter", filtered, StringComparison.Ordinal);
+
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.ClearFilter));
+
+        Assert.True(state.CanConfirm);
+    }
+
+    static string[] PlainRows(RecommendationSelectionState state)
+        => [.. RecommendationSelectionPrompt.FormatFilterRows(state).Select(Spectre.Console.Markup.Remove)];
 
     static IReadOnlyList<RecommendationSelectionItem> CreateItems(string[] directiveNames, string[] skillNames)
         => [.. directiveNames

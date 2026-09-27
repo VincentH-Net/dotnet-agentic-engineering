@@ -105,14 +105,21 @@ public sealed class ToolSelectionTests
     }
 
     [Fact]
-    public void RestoredSpecializationRetainsAutomaticSelectionOrigins()
+    public void SpecializationOffRestoresRowsWithTheirAutomaticTools()
     {
         var state = CreateState();
         Toggle(state, "foundation-prompt-log");
-        state.ApplySpecializationScanResult(new(new Dictionary<string, IReadOnlyList<string>>()));
+        Assert.Equal(2, state.SelectedSkills.Count);
+
+        state.ApplySpecializationScanResult(new(new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
+        {
+            [RecommendationSelectionState.FormatDirectiveKey("foundation-prompt-log")] = ["../AGENTS.md"]
+        }));
+        Assert.Empty(state.SelectedDirectives);
+        Assert.Empty(state.SelectedSkills);
+
         state.ToggleCachedSpecialization();
-        state.Apply(new(SkillSelectionCommand.SelectNone));
-        state.ToggleCachedSpecialization();
+        _ = Assert.Single(state.SelectedDirectives);
         Assert.Equal(2, state.SelectedSkills.Count);
 
         Toggle(state, "foundation-prompt-log");

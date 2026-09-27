@@ -659,7 +659,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
             {
                 await auto.WaitUntilTextAsync("Recommend ", timeout: TimeSpan.FromSeconds(45)).ConfigureAwait(true);
                 await auto.WaitUntilTextAsync("Target directory specialization: ON", timeout: TimeSpan.FromSeconds(20)).ConfigureAwait(true);
-                await auto.WaitUntilTextAsync("Tab to toggle", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
+                await auto.WaitUntilTextAsync("Tab OFF", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
                 await auto.WaitUntilTextAsync("already present above or below", timeout: TimeSpan.FromSeconds(20)).ConfigureAwait(true);
                 // The deselected duplicates and their locations are hidden in the selected view; F2 shows all rows.
                 await auto.WaitUntilTextAsync("Show: selected", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
@@ -798,6 +798,10 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
                 await auto.WaitUntilTextAsync("[ ] run-tests (install)", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
                 await auto.SpaceAsync().ConfigureAwait(true);
                 await auto.WaitUntilTextAsync("[x] run-tests (install)", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
+                // Enter confirms only once the filter is cleared and the whole selection is in view again.
+                await auto.WaitUntilTextAsync(RecommendationSelectionPrompt.ClearFilterToConfirm, timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
+                await auto.EscapeAsync().ConfigureAwait(true);
+                await auto.WaitUntilTextAsync("Enter confirm", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
                 await auto.EnterAsync().ConfigureAwait(true);
             }).ConfigureAwait(true);
 

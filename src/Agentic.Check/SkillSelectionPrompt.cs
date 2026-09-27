@@ -1,3 +1,4 @@
+using System.Text;
 using Spectre.Console;
 
 namespace Agentic.Check;
@@ -15,10 +16,6 @@ enum SkillSelectionCommand
     Specialize,
     OpenHelp,
     Character,
-    PageUp,
-    PageDown,
-    Home,
-    End,
     ToggleView
 }
 
@@ -46,19 +43,24 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
     readonly Dictionary<string, IReadOnlyList<string>> dependentKeysByKey = BuildDependentKeysByKey(items);
     readonly HashSet<string> selectedKeys = items.Select(item => item.Key).ToHashSet(StringComparer.Ordinal);
     readonly Dictionary<string, int> ordinalByKey = BuildOrdinalByKey(items);
-    readonly HashSet<string> automaticallySelectedToolKeys = new(StringComparer.Ordinal);
-    HashSet<string>? specializedDefaultSelectedKeys;
-    HashSet<string> specializedDefaultAutomaticToolKeys = new(StringComparer.Ordinal);
+    readonly HashSet<string> automaticallySelectedKeys = new(StringComparer.Ordinal);
+    // Rows present above or below the target that specialization deselects; target-local repairs stay.
+    readonly HashSet<string> specializationKeys = new(StringComparer.Ordinal);
 
     public IReadOnlyList<RecommendationSelectionItem> FilteredItems { get; private set; } = items;
 
     public string Filter { get; private set; } = string.Empty;
 
     // The selected view hides unselected rows. An empty selection always shows every row, so the
-    // view is never empty and the toggle is offered only while there is something to show.
+    // view is never empty. The toggle is offered only while the two views differ: with nothing or
+    // everything selected they show the same rows, and F2 does nothing.
     public bool ShowSelectedOnly { get; private set; } = items.Count > 0;
 
-    public bool CanToggleView => selectedKeys.Count > 0;
+    public bool CanToggleView => selectedKeys.Count > 0 && selectedKeys.Count < items.Count;
+
+    // A typed filter hides part of the selection, so confirming waits until it is cleared and the
+    // full selection is back in view. Enter does nothing while a filter is typed.
+    public bool CanConfirm => Filter.Length == 0;
 
     public int SelectedCount => selectedKeys.Count;
 
@@ -95,17 +97,29 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
     public int GetDuplicateScopeCount(RecommendationSelectionItem item)
         => DuplicateScopeCountsByKey.GetValueOrDefault(item.Key);
 
+    public bool HasSpecializationRows => specializationKeys.Count > 0;
+
     public void ApplySpecializationScanResult(ScopeDuplicateScanResult result)
     {
         DuplicateLocationsByKey = result.LocationsByKey;
         DuplicateScopeCountsByKey = result.ScopeCountsByKey;
-        specializedDefaultSelectedKeys = BuildSpecializedDefaultSelection();
+        specializationKeys.Clear();
+        specializationKeys.UnionWith(items
+            .Where(item => DuplicateLocationsByKey.ContainsKey(item.Key) && !IsTargetLocalRepair(item))
+            .Select(item => item.Key));
         EnableSpecialization();
         Refresh();
     }
 
+    // Tab acts only on the rows present above or below: ON deselects them, OFF selects them back.
+    // Every other row keeps the choice the user made, and without such rows Tab does nothing.
     public void ToggleCachedSpecialization()
     {
+        if (!HasSpecializationRows)
+        {
+            return;
+        }
+
         if (IsSpecialized)
         {
             DisableSpecialization();
@@ -146,18 +160,6 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
             case SkillSelectionCommand.Character:
                 AddFilterCharacter(input.Character);
                 break;
-            case SkillSelectionCommand.PageUp:
-                Move(-RecommendationSelectionPrompt.MaxVisibleItems);
-                break;
-            case SkillSelectionCommand.PageDown:
-                Move(RecommendationSelectionPrompt.MaxVisibleItems);
-                break;
-            case SkillSelectionCommand.Home:
-                MoveTo(0);
-                break;
-            case SkillSelectionCommand.End:
-                MoveTo(FilteredItems.Count - 1);
-                break;
             case SkillSelectionCommand.ToggleView:
                 if (CanToggleView)
                 {
@@ -196,28 +198,37 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
         }
         else
         {
-            var previouslySelectedKeys = selectedKeys.ToHashSet(StringComparer.Ordinal);
-            bool companionSelected = SelectedSkills.Any(skill => skill.IsCompanion);
-            SelectWithDependencies(key);
-            // Default the optional shorthand on when the companion becomes selected. This is
-            // a UI default, not a reverse dependency; later dependency closure preserves opt-out.
-            if (!companionSelected && SelectedSkills.Any(skill => skill.IsCompanion))
-            {
-                var dna = items.FirstOrDefault(item => item.Skill?.IsDna == true);
-                if (dna is not null)
-                    SelectWithDependencies(dna.Key);
-            }
-
-            automaticallySelectedToolKeys.UnionWith(items
-                .Where(item => item.Kind == RecommendationSelectionKind.Tool && item.Skill?.IsRequiredToolRepair != true
-                    && item.Key != key && selectedKeys.Contains(item.Key) && !previouslySelectedKeys.Contains(item.Key))
-                .Select(item => item.Key));
+            SelectRow(key);
         }
+    }
+
+    // Selects a row as the space bar does: with its dependencies, the shorthand when the companion
+    // comes along, and the tools it pulled in remembered as automatic so they leave with it again.
+    void SelectRow(string key)
+    {
+        // A row the user selects on purpose is no longer an automatic one.
+        _ = automaticallySelectedKeys.Remove(key);
+        var previouslySelectedKeys = selectedKeys.ToHashSet(StringComparer.Ordinal);
+        bool companionSelected = SelectedSkills.Any(skill => skill.IsCompanion);
+        SelectWithDependencies(key);
+        // Default the optional shorthand on when the companion becomes selected. This is
+        // a UI default, not a reverse dependency; later dependency closure preserves opt-out.
+        if (!companionSelected && SelectedSkills.Any(skill => skill.IsCompanion))
+        {
+            var dna = items.FirstOrDefault(item => item.Skill?.IsDna == true);
+            if (dna is not null)
+                SelectWithDependencies(dna.Key);
+        }
+
+        automaticallySelectedKeys.UnionWith(items
+            .Where(item => item.Kind == RecommendationSelectionKind.Tool && item.Skill?.IsRequiredToolRepair != true
+                && item.Key != key && selectedKeys.Contains(item.Key) && !previouslySelectedKeys.Contains(item.Key))
+            .Select(item => item.Key));
     }
 
     void SetAllSelection(bool selected)
     {
-        automaticallySelectedToolKeys.Clear();
+        automaticallySelectedKeys.Clear();
         if (!selected)
         {
             selectedKeys.Clear();
@@ -232,40 +243,32 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
 
     void EnableSpecialization()
     {
-        specializedDefaultSelectedKeys ??= BuildSpecializedDefaultSelection();
-        selectedKeys.Clear();
-        foreach (string key in specializedDefaultSelectedKeys)
+        foreach (string key in specializationKeys)
         {
-            _ = selectedKeys.Add(key);
+            DeselectWithDependents(key);
         }
-
-        automaticallySelectedToolKeys.Clear();
-        automaticallySelectedToolKeys.UnionWith(specializedDefaultAutomaticToolKeys);
 
         IsSpecialized = true;
     }
 
     void DisableSpecialization()
-        => IsSpecialized = false;
+    {
+        var previouslySelectedKeys = selectedKeys.ToHashSet(StringComparer.Ordinal);
+        foreach (string key in specializationKeys)
+        {
+            SelectRow(key);
+        }
+
+        // Dependencies these rows pulled in are remembered like automatic tools, so the next ON drops
+        // them again unless something else still needs them, and a round trip leaves other rows as they were.
+        automaticallySelectedKeys.UnionWith(selectedKeys.Except(previouslySelectedKeys).Except(specializationKeys));
+        IsSpecialized = false;
+    }
 
     static bool IsTargetLocalRepair(RecommendationSelectionItem item)
         => item.Skill is { IsCompanion: true } or { IsDna: true } or { IsCodexRules: true }
             || item.Directive?.Status == DirectiveStatuses.Outdated
             || item.Skill?.ForceInstall == true;
-
-    HashSet<string> BuildSpecializedDefaultSelection()
-    {
-        var specializedSelection = selectedKeys.ToHashSet(StringComparer.Ordinal);
-        foreach (var item in items.Where(item => DuplicateLocationsByKey.ContainsKey(item.Key) && !IsTargetLocalRepair(item)))
-        {
-            RemoveWithDependents(specializedSelection, item.Key);
-        }
-
-        PruneAutomaticTools(specializedSelection);
-        specializedDefaultAutomaticToolKeys = automaticallySelectedToolKeys.Intersect(specializedSelection).ToHashSet(StringComparer.Ordinal);
-
-        return specializedSelection;
-    }
 
     void RemoveWithDependents(HashSet<string> selection, string key)
     {
@@ -296,13 +299,13 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
     internal void DeselectWithDependents(string key)
     {
         RemoveWithDependents(selectedKeys, key);
-        PruneAutomaticTools(selectedKeys);
-        automaticallySelectedToolKeys.IntersectWith(selectedKeys);
+        PruneAutomaticSelections(selectedKeys);
+        automaticallySelectedKeys.IntersectWith(selectedKeys);
     }
 
-    void PruneAutomaticTools(HashSet<string> selection)
+    void PruneAutomaticSelections(HashSet<string> selection)
     {
-        var retained = selection.Except(automaticallySelectedToolKeys).ToHashSet(StringComparer.Ordinal);
+        var retained = selection.Except(automaticallySelectedKeys).ToHashSet(StringComparer.Ordinal);
         Queue<string> pending = new(retained);
         while (pending.TryDequeue(out string? key))
         {
@@ -318,7 +321,7 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
         if (items.Any(item => item.Skill?.IsCompanion == true && retained.Contains(item.Key)))
             retained.UnionWith(items.Where(item => item.Skill?.IsDna == true && selection.Contains(item.Key)).Select(item => item.Key));
 
-        selection.ExceptWith(automaticallySelectedToolKeys.Except(retained));
+        selection.ExceptWith(automaticallySelectedKeys.Except(retained));
     }
 
     void AddFilterCharacter(char character)
@@ -466,6 +469,11 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
             var input = MapKey(key.Value);
             if (input.Command == SkillSelectionCommand.Confirm)
             {
+                if (!state.CanConfirm)
+                {
+                    continue;
+                }
+
                 return new RecommendationSelectionResult(state.SelectedDirectives, state.SelectedSkills);
             }
 
@@ -565,11 +573,46 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
     internal static string FormatRecommendationKindHeaderMarkup(RecommendationSelectionKind kind)
         => $"[bold {ToolHeader.CheckColor}]{(kind == RecommendationSelectionKind.Directive ? "Directives" : kind == RecommendationSelectionKind.Tool ? "Tools" : "Skills")}[/]";
 
-    internal static string FormatRecommendationSourceHeaderMarkup(string sourceRepo)
-        => $"  [bold {ToolHeader.AgenticColor}]{Markup.Escape(FormatSkillSourceHeader(sourceRepo))}[/]";
+    internal static string FormatRecommendationSourceHeaderMarkup(string sourceRepo, string filter = "")
+        => $"  [bold {ToolHeader.AgenticColor}]{HighlightMatches(FormatSkillSourceHeader(sourceRepo), filter, MatchColor)}[/]";
 
-    internal static string FormatRecommendationPluginHeaderMarkup(string plugin)
-        => $"    [bold {ToolHeader.AgenticColor}]{Markup.Escape(FormatSkillPluginHeader(plugin))}[/]";
+    internal static string FormatRecommendationPluginHeaderMarkup(string plugin, string filter = "")
+        => $"    [bold {ToolHeader.AgenticColor}]{HighlightMatches(FormatSkillPluginHeader(plugin), filter, MatchColor)}[/]";
+
+    // The typed filter and its matches share one colour, which is also the colour of warning rows.
+    const string MatchColor = "yellow";
+
+    // Shows where a typed filter matched by swapping the row's own colour: on plain rows and headers
+    // the matches take the filter colour, on warning rows the rest of the text keeps the warning
+    // colour and the matches keep the default text colour. The inverted style stays reserved for keys.
+    internal static string HighlightMatches(string text, string filter, string? matchStyle, string? restStyle = null)
+    {
+        if (string.IsNullOrWhiteSpace(filter))
+        {
+            return StyleSegment(Markup.Escape(text), restStyle);
+        }
+
+        StringBuilder markup = new();
+        int index = 0;
+        while (index < text.Length)
+        {
+            int match = text.IndexOf(filter, index, StringComparison.OrdinalIgnoreCase);
+            if (match < 0)
+            {
+                _ = markup.Append(StyleSegment(Markup.Escape(text[index..]), restStyle));
+                break;
+            }
+
+            _ = markup.Append(StyleSegment(Markup.Escape(text[index..match]), restStyle));
+            _ = markup.Append(StyleSegment(Markup.Escape(text[match..(match + filter.Length)]), matchStyle));
+            index = match + filter.Length;
+        }
+
+        return markup.ToString();
+    }
+
+    static string StyleSegment(string markup, string? style)
+        => markup.Length == 0 || style is null ? markup : $"[{style}]{markup}[/]";
 
     static SkillSelectionInput MapKey(ConsoleKeyInfo key)
         => key.Key switch
@@ -585,10 +628,6 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
             ConsoleKey.Tab => new(SkillSelectionCommand.Specialize),
             ConsoleKey.F1 => new(SkillSelectionCommand.OpenHelp),
             ConsoleKey.F2 => new(SkillSelectionCommand.ToggleView),
-            ConsoleKey.PageUp => new(SkillSelectionCommand.PageUp),
-            ConsoleKey.PageDown => new(SkillSelectionCommand.PageDown),
-            ConsoleKey.Home => new(SkillSelectionCommand.Home),
-            ConsoleKey.End => new(SkillSelectionCommand.End),
             _ => new(SkillSelectionCommand.Character, key.KeyChar)
         };
 
@@ -611,15 +650,12 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
         console.WriteLine();
         lineCount++;
         MarkupLine($"[bold]{Markup.Escape(heading)}[/]");
-        MarkupLine(FormatSpecializationHelpLine(state));
-        MarkupLine(FormatViewHelpLine(state));
-        MarkupLine(FormatMoveHelpLine());
-        MarkupLine(FormatFilterHelpLine());
-
-        if (state.Filter.Length > 0)
+        foreach (string row in FormatFilterRows(state))
         {
-            MarkupLine($"Filter: [yellow]{Markup.Escape(state.Filter)}[/]");
+            MarkupLine(row);
         }
+
+        MarkupLine(FormatKeyHelpLine(state));
 
         if (state.FilteredItems.Count == 0)
         {
@@ -678,7 +714,7 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
                 bool showPluginHeaders = !visibleSkillSourceReposWithoutPluginHeaders.Contains(skillSourceRepo, StringComparer.OrdinalIgnoreCase);
                 if (!skillSourceRepo.Equals(lastSkillSourceRepo, StringComparison.OrdinalIgnoreCase))
                 {
-                    MarkupLine(FormatRecommendationSourceHeaderMarkup(skillSourceRepo));
+                    MarkupLine(FormatRecommendationSourceHeaderMarkup(skillSourceRepo, state.Filter));
                     lastSkillSourceRepo = skillSourceRepo;
                     lastSkillPlugin = null;
                 }
@@ -686,27 +722,28 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
                 string skillPlugin = item.Skill.Plugin;
                 if (showPluginHeaders && !skillPlugin.Equals(lastSkillPlugin, StringComparison.OrdinalIgnoreCase))
                 {
-                    MarkupLine(FormatRecommendationPluginHeaderMarkup(skillPlugin));
+                    MarkupLine(FormatRecommendationPluginHeaderMarkup(skillPlugin, state.Filter));
                     lastSkillPlugin = skillPlugin;
                 }
             }
 
             string cursor = itemIndex == state.CursorIndex ? ">" : " ";
             string checkText = state.IsSelected(item) ? "[x]" : "[ ]";
-            string check = Markup.Escape(checkText);
             string indent = showVersionColumn || item.Skill is not null ? "    " : string.Empty;
             string rowPrefix = $"{indent}{cursor} {checkText} ";
-            string display = Markup.Escape(item.Display);
+            bool warning = ShouldShowDuplicateWarning(state, item);
+            string? matchStyle = warning ? null : MatchColor;
+            string? restStyle = warning ? MatchColor : null;
+            string prefix = StyleSegment(Markup.Escape(rowPrefix), restStyle);
+            string display = HighlightMatches(item.Display, state.Filter, matchStyle, restStyle);
             if (showVersionColumn)
             {
                 int padding = Math.Max(1, versionColumnStart - (rowPrefix.Length + item.Display.Length));
-                MarkupLine(FormatItemLine(
-                    $"{indent}{cursor} {check} {display}{new string(' ', padding)}{Markup.Escape(item.Version)}",
-                    ShouldShowDuplicateWarning(state, item)));
+                MarkupLine(prefix + display + new string(' ', padding) + HighlightMatches(item.Version, state.Filter, matchStyle, restStyle));
             }
             else
             {
-                MarkupLine(FormatItemLine($"{indent}{cursor} {check} {display}", ShouldShowDuplicateWarning(state, item)));
+                MarkupLine(prefix + display);
             }
 
             var duplicateLocations = state.GetDuplicateLocations(item);
@@ -748,9 +785,6 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
         return $"{prefix}[bold]Name[/]{new string(' ', padding)}[bold]Version[/]";
     }
 
-    static string FormatItemLine(string markup, bool warning)
-        => warning ? $"[yellow]{markup}[/]" : markup;
-
     static bool ShouldShowDuplicateWarning(RecommendationSelectionState state, RecommendationSelectionItem item)
         => state.IsSpecialized && state.GetDuplicateLocations(item).Count > 0;
 
@@ -759,52 +793,68 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
             && state.GetDuplicateLocations(item).Count > 0
             && (state.IsSelected(item) || state.GetDuplicateScopeCount(item) > 1);
 
-    static string FormatSpecializationHelpLine(RecommendationSelectionState state)
+    const string FiltersLabel = "Filters";
+
+    // The three filter rows share a label column and a key column. The widest text any state can
+    // produce sets the key column, so toggling specialization or the view never shifts the keys;
+    // only a typed filter longer than that moves them. A key that would do nothing is not offered:
+    // Tab without rows above or below, F2 while nothing or everything is selected, Esc while no
+    // filter is typed.
+    internal static IReadOnlyList<string> FormatFilterRows(RecommendationSelectionState state)
     {
-        string status = state.IsSpecialized ? "ON" : "OFF";
-        return $"Target directory specialization: [bold]{status}[/] "
-            + ToolHeader.KeyMarkup("Tab")
-            + InfoText(" to toggle");
+        string specializationState = !state.HasSpecializationRows ? "n/a" : state.IsSpecialized ? "ON" : "OFF";
+        string specialization = $"Target directory specialization: {specializationState}";
+        string specializationMarkup = $"Target directory specialization: [bold]{specializationState}[/]";
+        string specializationHint = state.HasSpecializationRows
+            ? ToolHeader.KeyMarkup("Tab") + InfoText(state.IsSpecialized ? " OFF" : " ON")
+            : InfoText("(none above or below)");
+        string view = FormatViewText(state, state.ShowSelectedOnly);
+        string viewWord = state.ShowSelectedOnly ? "selected" : "all";
+        string viewMarkup = $"Show: [bold]{viewWord}[/]" + Markup.Escape(view[("Show: " + viewWord).Length..]);
+        string filter = state.Filter.Length == 0 ? "Type to filter" : $"Filter: {state.Filter}";
+        string filterMarkup = state.Filter.Length == 0 ? filter : $"Filter: [yellow]{Markup.Escape(state.Filter)}[/]";
+        int textWidth = new[]
+        {
+            "Target directory specialization: OFF".Length,
+            FormatViewText(state, selectedOnly: true).Length,
+            FormatViewText(state, selectedOnly: false).Length,
+            filter.Length
+        }.Max() + 3;
+        string label = $"[bold {ToolHeader.CheckColor}]{FiltersLabel}[/]  ";
+        string indent = new(' ', FiltersLabel.Length + 2);
+        return
+        [
+            label + PadPlain(specializationMarkup, specialization.Length, textWidth) + specializationHint,
+            indent + PadPlain(viewMarkup, view.Length, textWidth)
+                + (state.CanToggleView ? ToolHeader.KeyMarkup("F2") + InfoText(state.ShowSelectedOnly ? " show all" : " show selected") : string.Empty),
+            indent + PadPlain(filterMarkup, filter.Length, textWidth)
+                + (state.Filter.Length == 0 ? string.Empty : ToolHeader.KeyMarkup("Esc") + InfoText(" clear"))
+        ];
     }
 
-    internal static string FormatViewHelpLine(RecommendationSelectionState state)
-    {
-        string counts = state.ShowSelectedOnly
-            ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $" ({state.SelectedCount} of {state.ItemCount})")
-            : string.Create(System.Globalization.CultureInfo.InvariantCulture, $" ({state.SelectedCount} of {state.ItemCount} selected)");
-        string line = $"Show: [bold]{(state.ShowSelectedOnly ? "selected" : "all")}[/]{counts}";
-        return state.CanToggleView
-            ? line + " " + ToolHeader.KeyMarkup("F2") + InfoText(state.ShowSelectedOnly ? " to show all" : " to show selected")
-            : line;
-    }
+    static string FormatViewText(RecommendationSelectionState state, bool selectedOnly)
+        => selectedOnly
+            ? string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Show: selected ({state.SelectedCount} of {state.ItemCount})")
+            : string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Show: all ({state.SelectedCount} of {state.ItemCount} selected)");
 
-    static string FormatMoveHelpLine()
-        => InfoText("Use ")
-            + ToolHeader.KeyMarkup("↑")
+    // Pads by the visible length, since markup tags take no columns.
+    static string PadPlain(string markup, int plainLength, int width)
+        => markup + new string(' ', Math.Max(1, width - plainLength));
+
+    internal const string ClearFilterToConfirm = "clear the filter to confirm";
+
+    internal static string FormatKeyHelpLine(RecommendationSelectionState state)
+        => ToolHeader.KeyMarkup("↑")
             + InfoText(" ")
             + ToolHeader.KeyMarkup("↓")
-            + InfoText(" ")
-            + ToolHeader.KeyMarkup("PgUp")
-            + InfoText(" ")
-            + ToolHeader.KeyMarkup("PgDn")
-            + InfoText(" ")
-            + ToolHeader.KeyMarkup("Home")
-            + InfoText(" ")
-            + ToolHeader.KeyMarkup("End")
-            + InfoText(" to move, ")
+            + InfoText(" move, ")
             + ToolHeader.KeyMarkup("space")
-            + InfoText(" to select, ")
+            + InfoText(" toggle, ")
             + ToolHeader.KeyMarkup("←")
-            + InfoText(" to none, ")
+            + InfoText(" none, ")
             + ToolHeader.KeyMarkup("→")
-            + InfoText(" to all");
-
-    static string FormatFilterHelpLine()
-        => InfoText("Type to filter, ")
-            + ToolHeader.KeyMarkup("Esc")
-            + InfoText(" to clear, ")
-            + ToolHeader.KeyMarkup("Enter")
-            + InfoText(" to confirm");
+            + InfoText(" all, ")
+            + (state.CanConfirm ? ToolHeader.KeyMarkup("Enter") + InfoText(" confirm") : InfoText(ClearFilterToConfirm));
 
     static string InfoText(string value)
         => $"[{SpectreReporter.InfoColor}]{Markup.Escape(value)}[/]";
