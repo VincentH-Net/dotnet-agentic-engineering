@@ -841,7 +841,7 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
     static string PadPlain(string markup, int plainLength, int width)
         => markup + new string(' ', Math.Max(1, width - plainLength));
 
-    internal const string ClearFilterToConfirm = "clear the filter to confirm";
+    internal const string ClearFilterToConfirm = "clear the filter before confirming";
 
     internal static string FormatKeyHelpLine(RecommendationSelectionState state)
         => ToolHeader.KeyMarkup("↑")

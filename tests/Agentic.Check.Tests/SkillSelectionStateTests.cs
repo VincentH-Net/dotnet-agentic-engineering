@@ -586,7 +586,7 @@ public sealed class SkillSelectionStateTests
 
         Assert.False(state.CanConfirm);
         string filtered = Spectre.Console.Markup.Remove(RecommendationSelectionPrompt.FormatKeyHelpLine(state));
-        Assert.EndsWith("→ all, clear the filter to confirm", filtered, StringComparison.Ordinal);
+        Assert.EndsWith("→ all, clear the filter before confirming", filtered, StringComparison.Ordinal);
         Assert.DoesNotContain("Enter", filtered, StringComparison.Ordinal);
 
         state.Apply(new SkillSelectionInput(SkillSelectionCommand.ClearFilter));
