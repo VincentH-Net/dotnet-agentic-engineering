@@ -127,6 +127,7 @@ public sealed class CompanionTests
     [InlineData("prompt-log-format: raw-v1\n\"JSON-looking raw text\"")]
     [InlineData("\\\n\\text\n\\\\text\n\\\\\\text")]
     [InlineData(" prompt-log:\nprompt-log-end: \ninline prompt-log:")]
+    [InlineData("prompt-log-v2:\nprompt-log-v3: \nprompt-log-v:\nprompt-log-vx:")]
     [InlineData(" \t \n")]
     [InlineData("\n")]
     [InlineData("\n\n")]
@@ -139,7 +140,7 @@ public sealed class CompanionTests
         await PromptLogWrapper.WrapAsync("-", block, input, CancellationToken.None).ConfigureAwait(true);
         string content = await File.ReadAllTextAsync(block).ConfigureAwait(true);
         Assert.Equal(PromptBlock.Normalize(text), PromptLogReader.Parse(content, blockOnly: true)!.Text);
-        Assert.StartsWith("prompt-log:\nprompt-log-format: raw-v1\n", content, StringComparison.Ordinal);
+        Assert.StartsWith("prompt-log-v2:\n", content, StringComparison.Ordinal);
         Assert.EndsWith("\nprompt-log-end:\n", content, StringComparison.Ordinal);
         Assert.DoesNotContain('\r', content);
         Assert.DoesNotContain("old output", content, StringComparison.Ordinal);
@@ -148,25 +149,28 @@ public sealed class CompanionTests
     [Fact]
     public void DelimiterEscapingHasAnExactReversibleRepresentation()
     {
-        const string text = "literal\n\"prompt-log-end:\"\nprompt-log:\nprompt-log-end:\n\\prompt-log-end:\n\\\\server\n\n";
-        const string block = "prompt-log:\nprompt-log-format: raw-v1\nliteral\n\"prompt-log-end:\"\n\\prompt-log:\n\\prompt-log-end:\n\\\\prompt-log-end:\n\\\\\\server\n\n\nprompt-log-end:\n";
+        const string text = "literal\n\"prompt-log-end:\"\nprompt-log:\nprompt-log-v2:\nprompt-log-v3:\nprompt-log-end:\n\\prompt-log-end:\n\\\\server\n\n";
+        const string block = "prompt-log-v2:\nliteral\n\"prompt-log-end:\"\n\\prompt-log:\n\\prompt-log-v2:\n\\prompt-log-v3:\n\\prompt-log-end:\n\\\\prompt-log-end:\n\\\\\\server\n\n\nprompt-log-end:\n";
         Assert.Equal(block, PromptBlock.Format(text));
         Assert.Equal(text, PromptLogReader.Parse(block, true)!.Text);
-        Assert.Equal(1, block.Split('\n').Count(line => line == "prompt-log:"));
+        Assert.Equal(0, block.Split('\n').Count(line => line == "prompt-log:"));
+        Assert.Equal(1, block.Split('\n').Count(line => line == "prompt-log-v2:"));
         Assert.Equal(1, block.Split('\n').Count(line => line == "prompt-log-end:"));
         Assert.Equal("valid prompt log", PromptLogReader.Parse(PromptBlock.Format("\"JSON-looking raw text\""))!.Description);
     }
 
     [Theory]
-    [InlineData("prompt-log:\nprompt-log-format: raw-v1\nbody\n", "delimiters")]
-    [InlineData("prompt-log-end:\nprompt-log:\nprompt-log-format: raw-v1\nbody\n", "delimiters")]
-    [InlineData("prompt-log:\nprompt-log-format: raw-v1\nbody\nprompt-log:\nprompt-log-end:\n", "delimiters")]
-    [InlineData("prompt-log:\nprompt-log-format: raw-v1\nbody\nprompt-log-end:\nprompt-log-end:\n", "delimiters")]
-    [InlineData("outside\nprompt-log:\nprompt-log-format: raw-v1\nbody\nprompt-log-end:\n", "delimiters")]
-    [InlineData("prompt-log:\nprompt-log-format: raw-v1\nbody\nprompt-log-end:\noutside\n", "delimiters")]
-    [InlineData("prompt-log:\nprompt-log-format: raw-v1\nprompt-log-end:\n", "Regenerate")]
-    [InlineData("prompt-log:\nprompt-log-format: raw-v1\n\\oops\nprompt-log-end:\n", "do not escape it by hand")]
-    [InlineData("prompt-log:\nprompt-log-format: raw-v2\nbody\nprompt-log-end:\n", "Unsupported")]
+    [InlineData("prompt-log-v2:\nbody\n", "delimiters")]
+    [InlineData("prompt-log-end:\nprompt-log-v2:\nbody\n", "delimiters")]
+    [InlineData("prompt-log-v2:\nbody\nprompt-log-v2:\nprompt-log-end:\n", "delimiters")]
+    [InlineData("prompt-log-v2:\nbody\nprompt-log-v3:\nprompt-log-end:\n", "delimiters")]
+    [InlineData("prompt-log-v2:\nbody\nprompt-log-end:\nprompt-log-end:\n", "delimiters")]
+    [InlineData("prompt-log-v2:\nbody\nprompt-log:\nprompt-log-end:\n", "delimiters")]
+    [InlineData("outside\nprompt-log-v2:\nbody\nprompt-log-end:\n", "delimiters")]
+    [InlineData("prompt-log-v2:\nbody\nprompt-log-end:\noutside\n", "delimiters")]
+    [InlineData("prompt-log-v2:\nprompt-log-end:\n", "Regenerate")]
+    [InlineData("prompt-log-v2:\n\\oops\nprompt-log-end:\n", "do not escape it by hand")]
+    [InlineData("prompt-log-v3:\nbody\nprompt-log-end:\n", "Unsupported")]
     public void MalformedRawBlocksReportActionableErrors(string block, string diagnostic)
     {
         var error = Assert.Throws<FormatException>(() => PromptLogReader.Parse(block, blockOnly: true));
@@ -216,7 +220,7 @@ public sealed class CompanionTests
         using StringWriter output = new(CultureInfo.InvariantCulture);
         using StringReader input = new("raw log");
         Assert.Equal(0, await AgenticCli.InvokeAsync(["prompt-log", "wrap", "--input", "-"], input, output).ConfigureAwait(true));
-        Assert.Equal("prompt-log:\nprompt-log-format: raw-v1\nraw log\nprompt-log-end:\n", output.ToString());
+        Assert.Equal("prompt-log-v2:\nraw log\nprompt-log-end:\n", output.ToString());
         _ = output.GetStringBuilder().Clear();
         Assert.Equal(0, await AgenticCli.InvokeAsync(["prompt-log", "wrap", "--input", "-"], TextReader.Null, output).ConfigureAwait(true));
         Assert.Empty(output.ToString());
@@ -386,6 +390,7 @@ public sealed class CompanionTests
         Assert.Equal(0, await InvokeAsync("check").ConfigureAwait(true));
         await CommitAsync("prompt-log:\n\n1. \"legacy text\"\n2. Q: \"question\" -> A: \"answer\"").ConfigureAwait(true);
         await CommitAsync("historical JSON\n\nprompt-log:\n\"original JSON text\"\n\"\"\n\"last line\"\n\nprompt-log-end:\n").ConfigureAwait(true);
+        await CommitAsync("raw-v1\n\nprompt-log:\nprompt-log-format: raw-v1\nraw-v1 text\nprompt-log-v2:\n\\prompt-log-end:\nprompt-log-end:\n").ConfigureAwait(true);
         await CommitAsync("broken\n\nprompt-log:\ntrue\nprompt-log-end:").ConfigureAwait(true);
         await CommitAsync("final\n\n" + PromptBlock.Format("last valid entry")).ConfigureAwait(true);
         using StringWriter output = new(CultureInfo.InvariantCulture);
@@ -395,7 +400,8 @@ public sealed class CompanionTests
         Assert.Contains("legacy text", output.ToString(), StringComparison.Ordinal);
         Assert.Contains("original JSON text\n\nlast line", output.ToString(), StringComparison.Ordinal);
         Assert.Contains("prompt-log-end:\n\\literal\n", output.ToString(), StringComparison.Ordinal);
-        Assert.DoesNotContain(PromptBlock.FormatHeader, output.ToString(), StringComparison.Ordinal);
+        Assert.Contains("legacy prompt log (raw-v1)\nraw-v1 text\nprompt-log-v2:\nprompt-log-end:\n", output.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain(LegacyPromptLogReader.RawV1Header, output.ToString(), StringComparison.Ordinal);
         Assert.DoesNotContain("Signed-off-by", output.ToString(), StringComparison.Ordinal);
         Assert.Contains("last valid entry", output.ToString(), StringComparison.Ordinal);
         Assert.Contains("malformed prompt log", error.ToString(), StringComparison.Ordinal);
@@ -421,7 +427,7 @@ public sealed class CompanionTests
 
     [Theory]
     [InlineData("first  \n\n\nlast\t", "first\n\nlast")]
-    [InlineData("prompt-log: \t\nprompt-log-end:\t \n\\prompt-log-end:  ", "prompt-log:\nprompt-log-end:\n\\prompt-log-end:")]
+    [InlineData("prompt-log: \t\nprompt-log-v2: \nprompt-log-end:\t \n\\prompt-log-end:  ", "prompt-log:\nprompt-log-v2:\nprompt-log-end:\n\\prompt-log-end:")]
     [InlineData(" \t\n\n", "")]
     public async Task NormalGitCleanupPreservesValidFraming(string body, string expected)
     {
@@ -432,8 +438,8 @@ public sealed class CompanionTests
         _ = await workspace.GitAsync("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "-c", "commit.cleanup=default", "commit", "--allow-empty", "-m", "Subject  \n\nBody  \n\n\n" + block + "\nReviewed-by: Fixture  \n").ConfigureAwait(true);
         string committed = await workspace.GitAsync("show", "-s", "--format=%B").ConfigureAwait(true);
         Assert.Equal(expected, PromptLogReader.Parse(committed)!.Text);
-        Assert.StartsWith("Subject\n\nBody\n\nprompt-log:", committed, StringComparison.Ordinal);
-        Assert.Equal(1, committed.Split('\n').Count(line => line == "prompt-log:"));
+        Assert.StartsWith("Subject\n\nBody\n\nprompt-log-v2:", committed, StringComparison.Ordinal);
+        Assert.Equal(1, committed.Split('\n').Count(line => line == "prompt-log-v2:"));
         Assert.Equal(1, committed.Split('\n').Count(line => line == "prompt-log-end:"));
         using StringWriter output = new(CultureInfo.InvariantCulture);
         Assert.Equal(0, await AgenticCli.InvokeAsync(["prompt-log", "check"], directory: workspace.Path, output: output).ConfigureAwait(true));

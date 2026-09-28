@@ -2,10 +2,20 @@ using System.Text.Json;
 
 namespace Agentic;
 
-// Read-only compatibility for the original Perl JSON-line blocks and numbered standalone
-// commits. No current-format wrapping, file handling, or Git operations belong here.
+// Read-only compatibility for the original Perl JSON-line blocks, numbered standalone
+// commits, and 2.3.0 raw-v1 blocks. No current-format wrapping, file handling, or Git
+// operations belong here.
 static class LegacyPromptLogReader
 {
+    internal const string RawV1Header = "prompt-log-format: raw-v1";
+
+    // Raw-v1 put its format in a header line and escaped only the unversioned delimiters.
+    internal static ParsedPromptLog ReadRawV1Block(IReadOnlyList<string> lines)
+        => lines.Count < 2
+            ? throw new FormatException("Raw prompt log requires its format header and content before prompt-log-end:. Regenerate the block with prompt-log wrap.")
+            : new(PromptBlock.Unescape([.. lines.Skip(1)], line => line.TrimEnd() is PromptBlock.UnversionedStart or PromptBlock.End || line.StartsWith('\\')),
+                "legacy prompt log (raw-v1)");
+
     internal static ParsedPromptLog? TryReadStandalone(IReadOnlyList<string> lines)
         => lines.Skip(1).FirstOrDefault(line => line.Length > 0)?.StartsWith("1. ", StringComparison.Ordinal) == true
             ? new(string.Join('\n', lines.Skip(1)).TrimStart('\n'), "legacy prompt log (raw text)")

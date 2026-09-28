@@ -17,6 +17,31 @@ public sealed class LegacyPromptLogReaderTests
         Assert.Equal(expected, log.Text);
     }
 
+    [Theory]
+    [InlineData("prompt-log:\nprompt-log-format: raw-v1\nentry\nprompt-log-end:\n", "entry")]
+    [InlineData("prompt-log:\nprompt-log-format: raw-v1\n\\prompt-log:\n\\prompt-log-end:\n\\\\server\nprompt-log-end:\n", "prompt-log:\nprompt-log-end:\n\\server")]
+    [InlineData("prompt-log:\nprompt-log-format: raw-v1\nprompt-log-v2:\nprompt-log-v3:\nprompt-log-end:\n", "prompt-log-v2:\nprompt-log-v3:")]
+    public void RawV1PreservesDecodedText(string block, string expected)
+    {
+        var log = PromptLogReader.Parse(block, blockOnly: true);
+        Assert.NotNull(log);
+        Assert.Equal("legacy prompt log (raw-v1)", log.Description);
+        Assert.Equal(expected, log.Text);
+    }
+
+    [Theory]
+    [InlineData("prompt-log:\nprompt-log-format: raw-v1\nbody\n", "delimiters")]
+    [InlineData("prompt-log:\nprompt-log-format: raw-v1\nbody\nprompt-log:\nprompt-log-end:\n", "delimiters")]
+    [InlineData("prompt-log:\nprompt-log-format: raw-v1\nprompt-log-end:\n", "Regenerate")]
+    [InlineData("prompt-log:\nprompt-log-format: raw-v1\n\\oops\nprompt-log-end:\n", "do not escape it by hand")]
+    [InlineData("prompt-log:\nprompt-log-format: raw-v1\n\\prompt-log-v2:\nprompt-log-end:\n", "do not escape it by hand")]
+    [InlineData("prompt-log:\nprompt-log-format: raw-v2\nbody\nprompt-log-end:\n", "Unsupported")]
+    public void MalformedRawV1BlocksReportActionableErrors(string block, string diagnostic)
+    {
+        var error = Assert.Throws<FormatException>(() => PromptLogReader.Parse(block, blockOnly: true));
+        Assert.Contains(diagnostic, error.Message, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void StandaloneNumberedLogRemainsRaw()
     {

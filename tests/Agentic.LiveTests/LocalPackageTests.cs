@@ -110,7 +110,7 @@ public sealed class LocalPackageTests(ITestOutputHelper output)
         string[] before = Directory.GetFiles(workspace.Target, "*", SearchOption.AllDirectories);
         string large = new('x', 150000);
         string body = "[red]literal[/] \"quotes\" 漢字 😀\n\nQ: preserve $(touch unexpected)?\nA: yes\n\n" + large + "\nprompt-log:\nprompt-log-end:\n\\prompt-log-end:\n\"prompt-log-end:\"\n\n";
-        string expected = "prompt-log:\nprompt-log-format: raw-v1\n[red]literal[/] \"quotes\" 漢字 😀\n\nQ: preserve $(touch unexpected)?\nA: yes\n\n" + large + "\n\\prompt-log:\n\\prompt-log-end:\n\\\\prompt-log-end:\n\"prompt-log-end:\"\n\n\nprompt-log-end:\n";
+        string expected = "prompt-log-v2:\n[red]literal[/] \"quotes\" 漢字 😀\n\nQ: preserve $(touch unexpected)?\nA: yes\n\n" + large + "\n\\prompt-log:\n\\prompt-log-end:\n\\\\prompt-log-end:\n\"prompt-log-end:\"\n\n\nprompt-log-end:\n";
         var wrapped = await workspace.Runner.RunWithInputAsync("dotnet", ["agentic", "prompt-log", "wrap", "--input", "-", "-m", "2.3"], child, body).ConfigureAwait(true);
         Assert.True(wrapped.Success, wrapped.StandardError);
         Assert.Empty(wrapped.StandardError);
@@ -198,10 +198,10 @@ public sealed class LocalPackageTests(ITestOutputHelper output)
                 Assert.Contains("--minver", help, StringComparison.Ordinal);
                 _ = await CommandAsync(command + " prompt-log wrap --input log.txt --prompt-log block.txt -m 2.3", 0).ConfigureAwait(true);
                 string wrapped = await CommandAsync(command + " prompt-log wrap --input - --minver 2.3 < log.txt", 0).ConfigureAwait(true);
-                Assert.Contains("prompt-log-format: raw-v1", wrapped, StringComparison.Ordinal);
+                Assert.Contains("prompt-log-v2:", wrapped, StringComparison.Ordinal);
                 Assert.Contains("\\prompt-log-end:", wrapped, StringComparison.Ordinal);
                 string block = await File.ReadAllTextAsync(Path.Combine(workspace.Target, "block.txt")).ConfigureAwait(true);
-                Assert.Equal("prompt-log:\nprompt-log-format: raw-v1\n[red]literal[/] quotes \" \\ 漢字\n\nQ: Keep raw text?\nA: Yes.\n\n\\prompt-log-end:\n\\\\prompt-log-end:\nlast\n\nprompt-log-end:\n", block);
+                Assert.Equal("prompt-log-v2:\n[red]literal[/] quotes \" \\ 漢字\n\nQ: Keep raw text?\nA: Yes.\n\n\\prompt-log-end:\n\\\\prompt-log-end:\nlast\n\nprompt-log-end:\n", block);
                 await File.WriteAllTextAsync(Path.Combine(workspace.Target, "message.txt"), "Fixture commit\n\n" + block + "\nReviewed-by: Fixture\n").ConfigureAwait(true);
                 _ = await CommandAsync("git -c user.name=Fixture -c user.email=fixture@example.invalid -c commit.cleanup=default commit --allow-empty -F message.txt", 0).ConfigureAwait(true);
                 string shown = await CommandAsync(command + " prompt-log show -m 2.3", 0).ConfigureAwait(true);

@@ -90,8 +90,8 @@ The directive must instruct agents to follow this failure guidance. The tool doe
 - `--input` contains the complete already-sanitized, human-readable raw log for one commit. Support `--input -` for stdin.
 - The agent chooses entries, pairs questions and answers, sanitizes sensitive content, and formats the body for readability. No internal entry schema, JSON serialization, marker insertion, or escaping is required of the agent.
 - `--prompt-log` is the output block file, or `-` for stdout (the default). File input and output work independently of stdin/stdout. Named output is replaced, never accumulated or appended to.
-- The tool adds exactly one full-line `prompt-log:` / `prompt-log-end:` pair and the immediately following format identifier `prompt-log-format: raw-v1`. It handles reversible escaping entirely internally.
-- In the body, prefix a delimiter line (including one with trailing whitespace) with one backslash so Git cleanup cannot turn content into a delimiter. Also prefix every line already beginning with a backslash with one additional backslash. Leave other lines unchanged. The reader reverses this transformation and rejects invalid escapes.
+- The tool adds exactly one full-line `prompt-log-v2:` / `prompt-log-end:` pair. The start delimiter carries the format version, so no separate format line is needed. It handles reversible escaping entirely internally.
+- In the body, prefix a delimiter line (including one with trailing whitespace) with one backslash so Git cleanup cannot turn content into a delimiter. Delimiter lines are `prompt-log-end:`, the unversioned `prompt-log:`, and any versioned `prompt-log-v<digits>:` start. Also prefix every line already beginning with a backslash with one additional backslash. Leave other lines unchanged. The reader reverses this transformation and rejects invalid escapes.
 - Preserve all text and meaningful whitespace, including repeated blank lines and final empty lines. Normalize CRLF, LF, and lone CR to logical LF. Use UTF-8 input/output.
 - Insert one framing LF before the closing delimiter independently of the body's existing final LF. This permits exact round trips after newline normalization before Git cleanup. Normal Git whitespace cleanup is acceptable; `show` preserves the resulting stored text. Accept a whitespace-only body that Git has reduced to one empty line.
 - Zero-byte input produces empty output, with no block. For a named output, clear it atomically so a previous log cannot be reused accidentally. Preserve whitespace-only input.
@@ -102,8 +102,7 @@ The directive must instruct agents to follow this failure guidance. The tool doe
 Example output:
 
 ```text
-prompt-log:
-prompt-log-format: raw-v1
+prompt-log-v2:
 First prompt, with "quotes" and raw multiline text.
 
 Q: Keep the setting?
@@ -115,10 +114,10 @@ The agent includes this block unchanged in its initial commit message, before Gi
 
 ### Historical format support
 
-- The raw format identifier is explicit; do not infer raw versus historical JSON from whether the body happens to look like JSON.
-- Retain reading and checking of the original JSON-string-line blocks, including the original Perl helper's final blank separator. Retain numbered standalone prompt-log commits as raw historical text.
-- Isolate both historical readers in `LegacyPromptLogReader.cs`, with documented dispatch points in `PromptLogReader.cs` and dedicated tests so support can be removed later.
-- Unknown format identifiers are errors, not a reason to guess or fall back silently.
+- The format is explicit; do not infer raw versus historical JSON from whether the body happens to look like JSON. A block with a versioned start delimiter and no unversioned `prompt-log:` line uses the current format. Otherwise the block is historical: raw-v1 when its first body line is `prompt-log-format: raw-v1`, else JSON. Historical bodies can contain unescaped versioned start lines.
+- Retain reading and checking of the original JSON-string-line blocks, including the original Perl helper's final blank separator. Retain numbered standalone prompt-log commits as raw historical text. Retain the 2.3.0 raw-v1 blocks, which use the unversioned start delimiter followed by `prompt-log-format: raw-v1` and escape only `prompt-log:` and `prompt-log-end:` lines.
+- Isolate the historical readers in `LegacyPromptLogReader.cs`, with documented dispatch points in `PromptLogReader.cs` and dedicated tests so support can be removed later.
+- Unknown format identifiers and start-delimiter versions are errors, not a reason to guess or fall back silently.
 - Escaping protects block framing and round-trip fidelity. It is not a prompt-injection security boundary. Retrieved logs are historical content, like repository files.
 
 ### prompt-log show
@@ -134,7 +133,7 @@ The agent includes this block unchanged in its initial commit message, before Gi
 ### prompt-log check
 
 - Use read-only Git to retrieve the specified commit; default to `HEAD`.
-- Validate embedded markers, the format identifier, and reversible escaping. Do not impose an internal entry or Q&A schema on raw logs. Apply the historical format rules when reading historical logs.
+- Validate embedded markers, the format version, and reversible escaping. Do not impose an internal entry or Q&A schema on raw logs. Apply the historical format rules when reading historical logs.
 - Missing prompt log is reported but succeeds: not every commit requires a log.
 - Recognized legacy standalone logs are reported as legacy, not rejected solely for using the old format.
 - Invalid revisions, malformed current-format logs, missing Git, or unavailable Git repositories are errors.

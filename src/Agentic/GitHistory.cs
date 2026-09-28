@@ -50,9 +50,9 @@ sealed class GitHistory(IGitCommandRunner runner, string directory, TextWriter o
     internal async Task<int> ShowAsync(string? since, string? until, int? limit, CancellationToken cancellationToken)
     {
         // Filter before limiting so ordinary commits never consume the prompt-log budget.
-        // Match either delimiter, including CR line endings, to retain malformed-log errors.
+        // Match any delimiter, including CR line endings, to retain malformed-log errors.
         List<string> args = ["log", "-z", "--format=%H%n%cI%n%B", "--no-notes", "--no-show-signature",
-            "--extended-regexp", "--grep=(^|\r)prompt-log(-end)?:(\r|$)"];
+            "--extended-regexp", "--grep=(^|\r)prompt-log(-end|-v[0-9]+)?:(\r|$)"];
         if (limit is not null)
             args.Add("--max-count=" + Math.Min((long)limit + 1, int.MaxValue).ToString(System.Globalization.CultureInfo.InvariantCulture));
         if (since is not null)

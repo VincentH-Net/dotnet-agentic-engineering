@@ -17,7 +17,9 @@ static class CompanionExercise
         string refsBefore = await workspace.Process.SuccessAsync("git", ["for-each-ref", "--format=%(refname) %(objectname)"], workspace.Target).ConfigureAwait(false);
         var wrapped = await workspace.Process.RunAsync("dotnet", ["agentic", "prompt-log", "wrap", "--input", "-", "-m", minimum], workspace.Target, body).ConfigureAwait(false);
         wrapped.RequireSuccess("packaged prompt-log wrap");
-        const string expected = "prompt-log:\nprompt-log-format: raw-v1\nLiteral [red] text, quotes \" 漢字 😀\n\n\\prompt-log-end:\n\\\\prompt-log-end:\n\nprompt-log-end:\n";
+        // Published 2.3.0 wrote a raw-v1 format line; later versions put the version in the start delimiter.
+        string start = Version.Parse(companion.Version.Split('-', '+')[0]) < new Version(2, 3, 1) ? "prompt-log:\nprompt-log-format: raw-v1\n" : "prompt-log-v2:\n";
+        string expected = start + "Literal [red] text, quotes \" 漢字 😀\n\n\\prompt-log-end:\n\\\\prompt-log-end:\n\nprompt-log-end:\n";
         FixtureFiles.Require(wrapped.Output == expected, "Companion raw framing/escaping differs from the exact stdin contract.");
         FixtureFiles.Require(FixtureFiles.EqualInventory(filesBefore, FixtureFiles.Inventory(workspace.Target)), "Wrap wrote target files.");
         FixtureFiles.Require(refsBefore == await workspace.Process.SuccessAsync("git", ["for-each-ref", "--format=%(refname) %(objectname)"], workspace.Target).ConfigureAwait(false), "Wrap mutated Git history.");
