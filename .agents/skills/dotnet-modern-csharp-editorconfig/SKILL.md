@@ -5,13 +5,13 @@ metadata:
     category: code-style
     framework: dotnet
     github-path: plugins/dotnet/skills/dotnet-modern-csharp-editorconfig
-    github-ref: refs/tags/1.2.0
+    github-ref: refs/tags/v2.3.0
     github-repo: https://github.com/vincenth-net/dotnet-agentic-engineering
-    github-tree-sha: 3fa2ae9ca1f0c3e39c5af315668456b03edbff81
+    github-tree-sha: 02299f492e3395ac314217468edc6dd971af06ee
     sources:
         - Modern.CSharp.Templates (mcs-editorconfig)
         - github.com/VincentH-Net/Modern.CSharp.Templates/blob/main/Editorconfig.md
-    version: 1.1.1
+    version: 1.1.2
 name: dotnet-modern-csharp-editorconfig
 ---
 # Modern C# 14 .editorconfig
@@ -119,10 +119,12 @@ dotnet new mcs-editorconfig -s
 
 ## 7. Build diagnostic handling
 
-Before building, check whether `AGENTS.md` or `AGENTS.MD` in the current working folder contains
-`<!-- dotnet-agentic-engineering:dotnet-build-errors-and-warnings:start -->` or
-`<!-- dotnet-agentic-engineering:dotnet-build-errors-and-warnings:skip -->`.
-If neither marker is present, use the `ensure-directives` skill first.
+Before building, check whether `AGENTS.md` (or `AGENTS.MD`) in the current working folder or any
+parent folder up to the repository root contains `<!-- dotnet-build-errors-and-warnings:start -->`.
+If the marker is absent, do not build. Ask the user to exit this agent session, run `dna check`
+(or `dnx agentic.check`) in the folder that holds the AGENTS.md to update (usually the repository
+root), and restart or resume the session, because the updated AGENTS.md only loads at session start.
+Stop until that is done.
 
 Use the installed `dotnet-build-errors-and-warnings` directive for build verification and diagnostic fixes.
 That directive governs when to run `dotnet format`, how to fix build errors and warnings, and when suppressions are allowed.

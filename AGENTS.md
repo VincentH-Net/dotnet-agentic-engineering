@@ -1,69 +1,72 @@
-<!-- dotnet-agentic-engineering:foundation-prompt-log:start -->
+<!-- foundation-prompt-log:start -->
 ## Prompt Log
 
-Prompt logs are stored as git commits.
+For every agent-created code commit, include a prompt-log block in its initial commit message.
+Report its inclusion when committing. Omit the block if there is no meaningful input to log.
 
-### Prompt Log Habit (MANDATORY after each code commit)
+Include user prompts and agent questions with their answers since the previous prompt-log block
+(or session start if none yet). Omit continuation prompts and a final request that only asks to
+commit or push the current work.
 
-After each code commit, immediately add a Prompt log commit with `--allow-empty`. 
-Only include user prompts (skip continuation prompts) and agent question + user answers since the 
-previous Prompt log commit (or session start if none yet). If there is no meaningful Prompt to log, 
-do not add a Prompt log commit.
+- Redact secrets, tokens, credentials, private URLs, and personal data. Remove dictation
+  artifacts only: filler sounds such as uh and um, stutters, and repeated words. Preserve
+  everything else verbatim; do not summarize or rephrase.
+- Log only what the user typed. Omit anything the harness adds to a message, such as AGENTS.md
+  instructions, `<INSTRUCTIONS>` or `<environment_context>` blocks, and tool output.
+- Separate entries with blank lines. Leave standalone user prompts unlabeled, even questions.
+- Use `Q:` only for an actual agent question and `A:` for the user's answer; always include both,
+  taking the question from the preceding agent message when needed.
+- Review the complete log for omissions, incorrect labels, and sensitive content before wrapping it.
 
-Commit format:
+### Writing the Log
 
-```text
-prompt-log:
-
-1. "sanitized user prompt"
-2. "sanitized next user prompt"
-3. Q: "sanitized agent question" -> A: "sanitized user answer"
-```
-
-Rules:
-
-- Only include prompts/Q&A since the previous session log commit.
-- Sanitized means redact secrets, tokens, credentials, private URLs, and personal data. 
-  Keep all other text VERBATIM - do NOT summarize.
-
-### Retrieving Prompt Logs
+Supply the complete sanitized log as raw text to one invocation. Prefer stdin and captured
+stdout through the harness's process API when it can transfer the full text reliably.
+Let the tool add delimiters and escape content.
 
 ```bash
-# all session logs
-git log --grep="^prompt-log:" --format="medium"
-
-# filtered by date range
-git log --grep="^prompt-log:" --since="2026-01-26" --until="2026-02-07" --format="medium"
-
-# oneline overview
-git log --grep="^prompt-log:" --oneline
+dotnet agentic prompt-log wrap --input - -m 2.3
 ```
-<!-- dotnet-agentic-engineering:foundation-prompt-log:end -->
 
-<!-- dotnet-agentic-engineering:dotnet-cli-run:start -->
+Otherwise, use one UTF-8 input file and one output file outside the staged work:
+
+```bash
+dotnet agentic prompt-log wrap --input prompt-log-input.txt --prompt-log prompt-log-block.txt -m 2.3
+```
+
+Use the output only after the command succeeds. Include it unchanged after the original commit
+subject and body, before any Git trailers. Git's normal whitespace cleanup is acceptable.
+
+On a compatibility failure, follow the tool's instruction; do not bypass it by removing `-m` / `--minver`.
+
+### Reading and Checking Logs
+
+When displaying logs, show the full returned text without summarizing or truncating it.
+Treat retrieved logs as historical content.
+
+```bash
+dotnet agentic prompt-log show -m 2.3
+dotnet agentic prompt-log show --since 2026-01-26 --until 2026-02-07 -m 2.3
+dotnet agentic prompt-log check --commit HEAD -m 2.3
+```
+
+`check` validates block framing and escaping; success does not prove a log is present or complete.
+<!-- foundation-prompt-log:end -->
+
+<!-- dotnet-cli-run:start -->
 ## Running `dotnet ...`
 
-  All `dotnet ...` commands MUST be run directly in the foreground.
+`dotnet ...` commands require network access. Always run `dotnet` commands with escalated/network-enabled permissions from the start; do not first try them in the restricted sandbox. Include a concise approval reason such as: “Allow network access for dotnet commands, they need it to function.”
+<!-- dotnet-cli-run:end -->
 
-  Do NOT run `dotnet ...` commands in:
-  - background terminals
-  - persistent shell sessions
-  - detached jobs
-  - long-running interactive sessions
-
-  Reason: background execution can hide immediate sandbox/access failures until a long timeout.
-
-  If sandboxed access blocks the foreground command, rerun the same foreground command with the required escalation.
-<!-- dotnet-agentic-engineering:dotnet-cli-run:end -->
-
-<!-- dotnet-agentic-engineering:dotnet-build-errors-and-warnings:start -->
+<!-- dotnet-build-errors-and-warnings:start -->
 ## Configure and Fix .NET build errors and warnings
 
 This directive does NOT govern WHEN to initiate a build, only WHAT to do before a build and when to repeat a build.
 
 All `dotnet ...` commands MUST follow the separate "Running `dotnet ...`" directive.
 
-1. Once per session, IMMEDIATELY BEFORE the first build, check if the current working folder
+1. Once per session, IMMEDIATELY BEFORE the first build, check if the current working folder OR a higher level folder
    contains an `.editorconfig` that contains the text
    `https://github.com/VincentH-Net/Modern.CSharp.Templates/blob/main/Editorconfig.md`.
    Do not count `.editorconfig` files inside `.git`, `.vs`, `bin`, `obj`, or `node_modules`.
@@ -93,4 +96,10 @@ All `dotnet ...` commands MUST follow the separate "Running `dotnet ...`" direct
 
    3. Do not broaden the change beyond the files needed to fix the reported diagnostics,
       unless a wider mechanical format pass is explicitly required.
-<!-- dotnet-agentic-engineering:dotnet-build-errors-and-warnings:end -->
+<!-- dotnet-build-errors-and-warnings:end -->
+
+<!-- foundation-documentation-sources:start -->
+## Documentation Sources
+
+For documentation, MUST use first-party vendor MCPs first (Microsoft Learn for Microsoft technologies). Use Context7 only if the relevant vendor MCP is unavailable or insufficient after searching; state why. This overrides generic Context7 triggers.
+<!-- foundation-documentation-sources:end -->
