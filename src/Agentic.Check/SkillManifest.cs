@@ -115,9 +115,9 @@ static class StaticSkillManifest
             new(2026, 10, 1, 10, 37, 26, TimeSpan.Zero)),
         new(
             DotnetSkillsRepo,
-            "4be92ceb4e2d20e6b1fe9662a59b2fff0f4c5b4f",
-            new(2026, 9, 30, 22, 19, 57, TimeSpan.Zero),
-            new(2026, 10, 1, 10, 57, 21, TimeSpan.Zero))
+            "973cffbcdbae02557cc68ad0d41b8f20d60cfa03",
+            new(2026, 10, 1, 14, 49, 17, TimeSpan.Zero),
+            new(2026, 10, 1, 15, 30, 28, TimeSpan.Zero))
     ];
 
     internal static IReadOnlyList<SkillManifestEntry> All { get; } =
