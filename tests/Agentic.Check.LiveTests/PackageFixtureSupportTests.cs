@@ -37,6 +37,17 @@ public sealed class PackageFixtureSupportTests
     }
 
     [Fact]
+    public void ChildPathOmitsOnlyHostGlobalToolFolders()
+    {
+        char separator = Path.PathSeparator;
+        string path = string.Join(separator, "/usr/bin", "~/.dotnet/tools", "/home/dev/.dotnet/tools/", "/cli/.dotnet/tools", "/opt/.dotnet/tools", "~/bin");
+        Assert.Equal(string.Join(separator, "/usr/bin", "/opt/.dotnet/tools", "~/bin"),
+            HostPath.WithoutGlobalTools(path, "/home/dev", "/cli", StringComparison.Ordinal));
+        Assert.Equal(string.Join(separator, "/usr/bin", "/cli/.dotnet/tools"),
+            HostPath.WithoutGlobalTools(string.Join(separator, "/usr/bin", "/HOME/dev/.dotnet/tools", "/cli/.dotnet/tools"), "/home/dev", null, StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public void FourteenDefinitionsAndIndependentPreviewScenariosRemainCovered()
     {
         Assert.Equal(14, Directory.GetDirectories(Path.Combine(FixtureFiles.Checkout, "tests/fixtures/definitions")).Length);

@@ -82,7 +82,8 @@ sealed class FixtureWorkspace : IDisposable
             ["DOTNET_SKIP_FIRST_TIME_EXPERIENCE"] = "1", ["GIT_CONFIG_GLOBAL"] = Path.Combine(Root, "gitconfig"),
             ["GIT_CONFIG_NOSYSTEM"] = "1", ["GIT_TERMINAL_PROMPT"] = "0", ["GIT_AUTHOR_NAME"] = "Fixture",
             ["GIT_AUTHOR_EMAIL"] = "fixture@example.invalid", ["GIT_COMMITTER_NAME"] = "Fixture", ["GIT_COMMITTER_EMAIL"] = "fixture@example.invalid",
-            ["AGENTIC_CHECK_CACHE_DIR"] = Path.Combine(Root, "source-cache"), ["AGENTIC_CHECK_CACHE_SECONDS"] = "0", ["TERM"] = "xterm-256color"
+            ["AGENTIC_CHECK_CACHE_DIR"] = Path.Combine(Root, "source-cache"), ["AGENTIC_CHECK_CACHE_SECONDS"] = "0", ["TERM"] = "xterm-256color",
+            ["PATH"] = HostPath.WithoutGlobalTools()
         };
     }
 

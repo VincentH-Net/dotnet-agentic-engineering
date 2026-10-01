@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Agentic.PackageFixtures;
 using Hex1b;
 using Hex1b.Automation;
 using Hex1b.Input;
@@ -1120,7 +1121,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
 
     static string AgenticCheckCommand(TestWorkspace workspace, string arguments)
     {
-        string path = workspace.BinPath + Path.PathSeparator + (Environment.GetEnvironmentVariable("PATH") ?? string.Empty);
+        string path = workspace.BinPath + Path.PathSeparator + HostPath.WithoutGlobalTools();
         // Hex1b 0.165.0 ignores the PTY environment overrides on Unix. Set TERM at the
         // actual command boundary so a headless parent's TERM=dumb cannot disable redraws.
         return $"TERM=xterm-256color HOME={Quote(workspace.HomePath)} XDG_CONFIG_HOME={Quote(Path.Combine(workspace.HomePath, ".config"))} GH_TOKEN= GITHUB_TOKEN= GH_CONFIG_DIR={Quote(Path.Combine(workspace.RootPath, "gh"))} AGENTIC_CHECK_CACHE_SECONDS=3600 AGENTIC_CHECK_CACHE_DIR={Quote(Path.Combine(workspace.RootPath, "cache"))} AGENTIC_CHECK_GH_LOG={Quote(workspace.GhLogPath)} PATH={Quote(path)} {Quote(Path.ChangeExtension(ToolAssemblyPath, null))} {arguments}";
@@ -1128,7 +1129,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
 
     static Hex1bTerminal CreateTerminal(TestWorkspace workspace)
     {
-        string path = workspace.BinPath + Path.PathSeparator + (Environment.GetEnvironmentVariable("PATH") ?? string.Empty);
+        string path = workspace.BinPath + Path.PathSeparator + HostPath.WithoutGlobalTools();
         return Hex1bTerminal.CreateBuilder()
             .WithHeadless()
             .WithDimensions(300, 260)
