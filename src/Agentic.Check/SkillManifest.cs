@@ -115,14 +115,14 @@ static class StaticSkillManifest
             new(2026, 10, 1, 10, 37, 26, TimeSpan.Zero)),
         new(
             DotnetSkillsRepo,
-            "8bbfe7a4d1c5c0cd42cd04e38031779c75f2dda3",
-            new(2026, 9, 17, 3, 9, 52, TimeSpan.Zero),
-            new(2026, 9, 17, 10, 28, 32, TimeSpan.Zero))
+            "4be92ceb4e2d20e6b1fe9662a59b2fff0f4c5b4f",
+            new(2026, 9, 30, 22, 19, 57, TimeSpan.Zero),
+            new(2026, 10, 1, 10, 57, 21, TimeSpan.Zero))
     ];
 
     internal static IReadOnlyList<SkillManifestEntry> All { get; } =
     [
-        VincentDotnet("cli-e2e-testing", [new("cli", "cli")]),
+        VincentDotnet("cli-e2e-testing", [new("terminal", "interactive")]),
         VincentDotnet("dotnet-livecharts2"),
         VincentDotnet("dotnet-modern-csharp-editorconfig"),
         ..DotnetTestSkills(),
@@ -154,8 +154,7 @@ static class StaticSkillManifest
     [
         ..All.Where(skill => skill.SourceRepo != DotnetSkillsRepo || skill.Plugin != "dotnet-test"),
         ..DotnetTestSkills(preview: true),
-        DotnetAspNetCore("dotnet-webapi"),
-        DotnetAspNetCore("minimal-api-file-upload")
+        DotnetAspNetCore("dotnet-webapi")
     ];
 
     static SkillManifestEntry VincentDotnet(string skill)

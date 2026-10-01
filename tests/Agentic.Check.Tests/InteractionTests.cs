@@ -287,7 +287,7 @@ public sealed class InteractionTests
             "Tool.csproj",
             new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
             {
-                ["cli"] = ["cli"]
+                ["terminal"] = ["interactive"]
             });
 
         Assert.Equal(
@@ -301,7 +301,8 @@ public sealed class InteractionTests
                     "Microsoft Orleans",
                     "ASP.NET",
                     ".NET",
-                    "  CLI",
+                    "  Interactive terminal:",
+                    "    Tool.csproj",
                     "Agentic Foundation"
                 ]),
             SpectreReporter.FormatStack(technologies, [unoGate, dotnetGate]));

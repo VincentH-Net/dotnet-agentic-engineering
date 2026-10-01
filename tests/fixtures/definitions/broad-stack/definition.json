@@ -10,8 +10,8 @@
     "aspnetcore"
   ],
   "gates": {
-    "cli": [
-      "cli"
+    "terminal": [
+      "interactive"
     ],
     "presentation": [
       "mvux"

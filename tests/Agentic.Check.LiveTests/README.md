@@ -22,6 +22,8 @@ FullyQualifiedName~AgentRegistryMatchesGhSkill
 
 The agent registry comparison reads `internal/skills/registry/registry.go` from the latest `cli/cli` release, so an older local `gh` cannot hide new, renamed or moved agents, and writes `agent-registry.md` next to the other maintenance reports.
 
+The template detection test, under the same opt-in, creates a project from each installed `dotnet new` template (console, classlib, web, webapi, worker, blazorwasm, mstest, maui, and the blank and recommended `unoapp` presets) without restoring it, and checks the detected technologies and gates against what the gated skills expect. Templates that are not installed are listed as skipped in `template-detection.md`; `console` ships with the SDK and must be present. Run it alone with `FullyQualifiedName~InstalledTemplatesDetectAsExpected`.
+
 Run the offline classification and report tests without GitHub access:
 
 ```sh

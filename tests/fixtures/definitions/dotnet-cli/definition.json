@@ -7,8 +7,8 @@
     "dotnet"
   ],
   "gates": {
-    "cli": [
-      "cli"
+    "terminal": [
+      "interactive"
     ]
   }
 }

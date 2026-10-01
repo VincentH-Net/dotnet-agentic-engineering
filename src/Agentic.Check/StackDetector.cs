@@ -29,7 +29,7 @@ static class StackDetector
         if (unoDetected)
         {
             _ = technologies.Add(TechnologyNames.Uno);
-            installGateReports.AddRange(DetectUnoGates(projectFiles, warnings));
+            installGateReports.AddRange(DetectUnoGates(projectFiles, repoRoot, warnings));
         }
 
         if (projectFiles.Any(HasOrleansReference))
@@ -52,7 +52,7 @@ static class StackDetector
         foreach (string projectFile in projectFiles)
         {
             var document = TryParseProject(projectFile, File.ReadAllText(projectFile), warnings);
-            if (document is null || !IsCliProject(document))
+            if (document is null || !IsInteractiveTerminalProject(document, Path.GetDirectoryName(projectFile) ?? "."))
             {
                 continue;
             }
@@ -62,14 +62,14 @@ static class StackDetector
                 ToRelativePath(projectFile),
                 new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
                 {
-                    ["cli"] = ["cli"]
+                    ["terminal"] = ["interactive"]
                 }));
         }
 
         return reports;
     }
 
-    static List<InstallGateReport> DetectUnoGates(IReadOnlyList<string> projectFiles, List<string> warnings)
+    static List<InstallGateReport> DetectUnoGates(IReadOnlyList<string> projectFiles, string repoRoot, List<string> warnings)
     {
         List<InstallGateReport> reports = [];
         foreach (string projectFile in projectFiles)
@@ -81,6 +81,9 @@ static class StackDetector
                 continue;
             }
 
+            // Features and packages can also be declared in Directory.Build files above the project.
+            XDocument?[] documents = [document, .. AncestorBuildFiles(projectFile, repoRoot, warnings)];
+
             HashSet<string> presentation = new(StringComparer.OrdinalIgnoreCase);
             HashSet<string> markup = new(StringComparer.OrdinalIgnoreCase)
             {
@@ -88,37 +91,37 @@ static class StackDetector
             };
             HashSet<string> theme = new(StringComparer.OrdinalIgnoreCase);
 
-            if (ContainsUnoFeature(document, "mvux") || HasPackageReference(document, "Uno.Extensions.Reactive.WinUI"))
+            if (ContainsUnoFeature(documents,"mvux") || HasPackageReference(documents,"Uno.Extensions.Reactive.WinUI"))
             {
                 _ = presentation.Add("mvux");
             }
 
-            if (ContainsUnoFeature(document, "mvvm") || HasPackageReference(document, "CommunityToolkit.Mvvm"))
+            if (ContainsUnoFeature(documents,"mvvm") || HasPackageReference(documents,"CommunityToolkit.Mvvm"))
             {
                 _ = presentation.Add("mvvm");
             }
 
-            if (ContainsUnoFeature(document, "csharpmarkup") || HasPackageReference(document, "Uno.WinUI.Markup"))
+            if (ContainsUnoFeature(documents,"csharpmarkup") || HasPackageReference(documents,"Uno.WinUI.Markup"))
             {
                 _ = markup.Add("csharp");
             }
 
-            if (HasPackageReference(document, "CSharpMarkup.WinUI"))
+            if (HasPackageReference(documents,"CSharpMarkup.WinUI"))
             {
                 _ = markup.Add("csharp2");
             }
 
-            if (ContainsUnoFeature(document, "cupertino") || HasPackageReference(document, "Uno.Cupertino.WinUI"))
+            if (ContainsUnoFeature(documents,"cupertino") || HasPackageReference(documents,"Uno.Cupertino.WinUI"))
             {
                 _ = theme.Add("cupertino");
             }
 
-            if (ContainsUnoFeature(document, "material") || HasPackageReference(document, "Uno.Material.WinUI"))
+            if (ContainsUnoFeature(documents,"material") || HasPackageReference(documents,"Uno.Material.WinUI"))
             {
                 _ = theme.Add("material");
             }
 
-            if (ContainsUnoFeature(document, "simpletheme"))
+            if (ContainsUnoFeature(documents,"simpletheme"))
             {
                 _ = theme.Add("simple");
             }
@@ -236,10 +239,55 @@ static class StackDetector
                 .Any(sdk => sdk.Equals("Microsoft.NET.Sdk.Web", StringComparison.OrdinalIgnoreCase));
     }
 
-    static bool IsCliProject(XDocument document)
+    // The terminal gate serves cli-e2e-testing, so it needs positive evidence of terminal interaction.
+    // An Exe alone is not enough: Uno, MAUI and Microsoft.Testing.Platform projects are Exe too.
+    static readonly string[] TerminalPackages =
+    [
+        "System.CommandLine",
+        "Spectre.Console",
+        "Spectre.Console.Cli",
+        "Terminal.Gui",
+        "McMaster.Extensions.CommandLineUtils",
+        "CommandLineParser",
+        "ConsoleAppFramework",
+        "Cocona",
+        "CliFx",
+        "Hex1b"
+    ];
+
+    static readonly string[] ConsoleInputSignals = ["Console.ReadKey(", "Console.ReadLine(", "Console.In.", "Console.KeyAvailable"];
+
+    static bool IsInteractiveTerminalProject(XDocument document, string projectDirectory)
+        => HasTrueProperty(document, "PackAsTool")
+            || document.Descendants().Any(element => element.Name.LocalName.Equals("ToolCommandName", StringComparison.OrdinalIgnoreCase))
+            || PackageReferences(document).Any(package => TerminalPackages.Contains(package, StringComparer.OrdinalIgnoreCase))
+            || EnumerateFiles(projectDirectory, "*.cs").Any(file => ConsoleInputSignals.Any(signal => FileContains(file, signal)));
+
+    static bool HasTrueProperty(XDocument document, string name)
         => document.Descendants()
-            .Where(element => element.Name.LocalName.Equals("OutputType", StringComparison.OrdinalIgnoreCase))
-            .Any(element => element.Value.Trim().Equals("Exe", StringComparison.OrdinalIgnoreCase));
+            .Where(element => element.Name.LocalName.Equals(name, StringComparison.OrdinalIgnoreCase))
+            .Any(element => element.Value.Trim().Equals("true", StringComparison.OrdinalIgnoreCase));
+
+    static IEnumerable<XDocument?> AncestorBuildFiles(string projectFile, string repoRoot, List<string> warnings)
+    {
+        string root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(repoRoot));
+        for (var directory = new DirectoryInfo(Path.GetDirectoryName(Path.GetFullPath(projectFile))!); directory is not null; directory = directory.Parent)
+        {
+            foreach (string name in new[] { "Directory.Build.props", "Directory.Build.targets" })
+            {
+                string path = Path.Combine(directory.FullName, name);
+                if (File.Exists(path))
+                {
+                    yield return TryParseProject(path, File.ReadAllText(path), warnings);
+                }
+            }
+
+            if (string.Equals(Path.TrimEndingDirectorySeparator(directory.FullName), root, StringComparison.Ordinal))
+            {
+                yield break;
+            }
+        }
+    }
 
     static bool ContainsSdk(string? value, string sdk)
         => value?.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
@@ -274,13 +322,13 @@ static class StackDetector
             });
     }
 
-    static bool ContainsUnoFeature(XDocument? document, string value)
-        => document?.Descendants()
+    static bool ContainsUnoFeature(IEnumerable<XDocument?> documents, string value)
+        => documents.Any(document => document?.Descendants()
             .Where(element => element.Name.LocalName.Equals("UnoFeatures", StringComparison.OrdinalIgnoreCase))
-            .Any(element => element.Value.Contains(value, StringComparison.OrdinalIgnoreCase)) == true;
+            .Any(element => element.Value.Contains(value, StringComparison.OrdinalIgnoreCase)) == true);
 
-    static bool HasPackageReference(XDocument? document, string packageId)
-        => PackageReferences(document).Any(package => package.Equals(packageId, StringComparison.OrdinalIgnoreCase));
+    static bool HasPackageReference(IEnumerable<XDocument?> documents, string packageId)
+        => documents.Any(document => PackageReferences(document).Any(package => package.Equals(packageId, StringComparison.OrdinalIgnoreCase)));
 
     static IEnumerable<string> PackageReferences(XDocument? document)
         => document?.Descendants()

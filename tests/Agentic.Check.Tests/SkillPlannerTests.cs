@@ -24,7 +24,7 @@ public sealed class SkillPlannerTests
     }
 
     [Fact]
-    public void PlansCliE2eTestingSkillForDotnetCliGate()
+    public void PlansCliE2eTestingSkillForInteractiveTerminalGate()
     {
         StackDetectionResult stack = new(
             new HashSet<string>(StringComparer.OrdinalIgnoreCase)
@@ -38,7 +38,7 @@ public sealed class SkillPlannerTests
                     "Tool.csproj",
                     new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
                     {
-                        ["cli"] = ["cli"]
+                        ["terminal"] = ["interactive"]
                     })
             ],
             []);
@@ -82,7 +82,7 @@ public sealed class SkillPlannerTests
         var plan = SkillPlanner.Plan(StaticSkillManifest.Preview, stack);
 
         Assert.Contains(plan, skill => skill.InstallArg == "plugins/dotnet-aspnetcore/skills/dotnet-webapi");
-        Assert.Contains(plan, skill => skill.InstallArg == "plugins/dotnet-aspnetcore/skills/minimal-api-file-upload");
+        Assert.DoesNotContain(plan, skill => skill.InstallArg.Contains("minimal-api-file-upload", StringComparison.Ordinal));
     }
 
     [Fact]

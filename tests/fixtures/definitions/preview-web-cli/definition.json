@@ -7,9 +7,5 @@
     "dotnet",
     "aspnetcore"
   ],
-  "gates": {
-    "cli": [
-      "cli"
-    ]
-  }
+  "gates": {}
 }

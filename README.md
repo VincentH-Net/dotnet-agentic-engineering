@@ -70,7 +70,9 @@ For Uno Platform, the offered skills are further refined depending on detected:
 
 - MVVM or MVUX update pattern
 - Pure XAML markup or XAML combined with either Uno C# Markup or C# Markup 2
-- Fluent / Material / Cupertino design system
+- Fluent / Material / Simple / Cupertino design system
+
+For .NET, the `cli-e2e-testing` skill is offered only when a project interacts with a terminal: it is packaged as a dotnet tool, references a command-line or terminal UI package such as System.CommandLine, Spectre.Console or Hex1b, or reads console input. A console app that only writes output does not qualify.
 
 
 By default skills come from the latest stable release in each source repo; `--preview` switches that to each source repo's default branch. Target agents default to the ones found on your machine; `--agents` overrides that and decides the skills directories, such as `.claude/skills` and `.agents/skills`. For more options such as `--dry-run` and `--preview`, run:

@@ -29,7 +29,9 @@ Uno Platform skills are selected depending on detected:
 
 - MVVM or MVUX update pattern
 - Pure XAML markup or XAML combined with either Uno C# Markup or C# Markup 2
-- Fluent / Material / Cupertino design system
+- Fluent / Material / Simple / Cupertino design system
+
+The .NET CLI end-to-end testing skill is selected when a project interacts with a terminal: it is packaged as a dotnet tool, references a command-line or terminal UI package such as System.CommandLine, Spectre.Console or Hex1b, or reads console input. A console app that only writes output does not qualify.
 
 ## Prerequisites
 

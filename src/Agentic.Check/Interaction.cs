@@ -339,9 +339,14 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
         if (technologies.Contains(TechnologyNames.Dotnet, StringComparer.OrdinalIgnoreCase))
         {
             lines.Add(".NET");
-            if (HasGate(installGates, TechnologyNames.Dotnet, "cli"))
+            string[] terminalProjects = [.. installGates
+                .Where(report => report.Technology.Equals(TechnologyNames.Dotnet, StringComparison.OrdinalIgnoreCase) && report.GetValues("terminal").Count > 0)
+                .Select(report => report.ProjectPath)
+                .Order(StringComparer.OrdinalIgnoreCase)];
+            if (terminalProjects.Length > 0)
             {
-                lines.Add("  CLI");
+                lines.Add("  Interactive terminal:");
+                lines.AddRange(terminalProjects.Select(project => "    " + project));
             }
         }
 
@@ -362,11 +367,6 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
             .Order(StringComparer.OrdinalIgnoreCase)];
         return values.Length == 0 ? "none" : string.Join(", ", values);
     }
-
-    static bool HasGate(IReadOnlyList<InstallGateReport> installGates, string technology, string gate)
-        => installGates
-            .Where(report => report.Technology.Equals(technology, StringComparison.OrdinalIgnoreCase))
-            .Any(report => report.GetValues(gate).Count > 0);
 
     // Items missing in the target split into those missing everywhere and those installed above or below it.
     internal static string FormatRecommendationStatus(int recommendedCount, int missingCount, int outdatedCount,

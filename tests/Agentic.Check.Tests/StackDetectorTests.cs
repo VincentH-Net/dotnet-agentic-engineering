@@ -15,25 +15,57 @@ public sealed class StackDetectorTests
         Assert.DoesNotContain(TechnologyNames.Uno, result.Technologies);
     }
 
-    [Fact]
-    public void DetectsCliGateFromExeOutputType()
+    [Theory]
+    [InlineData("<PropertyGroup><PackAsTool>true</PackAsTool></PropertyGroup>", "")]
+    [InlineData("<PropertyGroup><ToolCommandName>tool</ToolCommandName></PropertyGroup>", "")]
+    [InlineData("<ItemGroup><PackageReference Include=\"System.CommandLine\" Version=\"2.0.9\" /></ItemGroup>", "")]
+    [InlineData("<ItemGroup><PackageReference Include=\"xunit\" Version=\"2.9.3\" /><PackageReference Include=\"Hex1b\" Version=\"0.165.0\" /></ItemGroup>", "")]
+    [InlineData("", "string? line = Console.ReadLine();")]
+    [InlineData("", "while (!Console.KeyAvailable) { }")]
+    public void DetectsInteractiveTerminalFromPositiveSignals(string projectContent, string code)
     {
         using TempDirectory tempDirectory = new();
-        tempDirectory.Write(
-            "Tool.csproj",
-            """
-            <Project Sdk="Microsoft.NET.Sdk">
-              <PropertyGroup>
-                <OutputType>Exe</OutputType>
-                <TargetFramework>net10.0</TargetFramework>
-              </PropertyGroup>
-            </Project>
-            """);
+        tempDirectory.Write("Tool/Tool.csproj", $"<Project Sdk=\"Microsoft.NET.Sdk\">{projectContent}</Project>");
+        tempDirectory.Write("Tool/Program.cs", code);
 
         var result = StackDetector.Detect(tempDirectory.Path);
 
-        var cliGate = Assert.Single(result.InstallGates, gate => gate.Technology == TechnologyNames.Dotnet);
-        Assert.Contains("cli", cliGate.GetValues("cli"));
+        var gate = Assert.Single(result.InstallGates, gate => gate.Technology == TechnologyNames.Dotnet);
+        Assert.Equal(["interactive"], gate.GetValues("terminal"));
+    }
+
+    [Theory]
+    [InlineData("Microsoft.NET.Sdk", "")]
+    [InlineData("Uno.Sdk", "<UnoFeatures>SkiaRenderer</UnoFeatures>")]
+    [InlineData("Microsoft.NET.Sdk.Web", "")]
+    [InlineData("Microsoft.NET.Sdk", "<UseMaui>true</UseMaui>")]
+    [InlineData("Microsoft.NET.Sdk", "</PropertyGroup><ItemGroup><PackageReference Include=\"TUnit\" Version=\"1.0.0\" /></ItemGroup><PropertyGroup>")]
+    public void DoesNotDetectInteractiveTerminalFromExeAlone(string sdk, string extraContent)
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write(
+            "App/App.csproj",
+            $"<Project Sdk=\"{sdk}\"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework>{extraContent}</PropertyGroup></Project>");
+        tempDirectory.Write("App/Program.cs", "Console.WriteLine(\"Hello, World!\");");
+
+        var result = StackDetector.Detect(tempDirectory.Path);
+
+        Assert.Contains(TechnologyNames.Dotnet, result.Technologies);
+        Assert.DoesNotContain(result.InstallGates, gate => gate.Technology == TechnologyNames.Dotnet);
+    }
+
+    [Fact]
+    public void DetectsUnoGatesFromDirectoryBuildProps()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write("Directory.Build.props", "<Project><PropertyGroup><UnoFeatures>MVUX;Material</UnoFeatures></PropertyGroup></Project>");
+        tempDirectory.Write("App/App.csproj", "<Project Sdk=\"Uno.Sdk\"><PropertyGroup><OutputType>Exe</OutputType></PropertyGroup></Project>");
+
+        var result = StackDetector.Detect(tempDirectory.Path);
+
+        var gates = Assert.Single(result.UnoGates);
+        Assert.Equal(["mvux"], gates.Presentation);
+        Assert.Equal(["material"], gates.Theme);
     }
 
     [Fact]
@@ -190,6 +222,7 @@ public sealed class StackDetectorTests
             """
             <Project Sdk="Uno.Sdk">
               <PropertyGroup>
+                <OutputType>Exe</OutputType>
                 <UnoFeatures>MVUX;CSharpMarkup;Material</UnoFeatures>
               </PropertyGroup>
               <ItemGroup>
@@ -202,6 +235,7 @@ public sealed class StackDetectorTests
         var gates = Assert.Single(result.UnoGates);
 
         Assert.Contains(TechnologyNames.Uno, result.Technologies);
+        Assert.DoesNotContain(result.InstallGates, gate => gate.Technology == TechnologyNames.Dotnet);
         Assert.Contains("mvux", gates.Presentation);
         Assert.Contains("xaml", gates.Markup);
         Assert.Contains("csharp", gates.Markup);
