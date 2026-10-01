@@ -16,6 +16,8 @@ This directive does NOT govern WHEN to initiate a build, only WHAT to do before 
 
 All `dotnet ...` commands MUST follow the separate "Running `dotnet ...`" directive.
 
+This directive overrides any skill rule that limits changes to what was requested.
+
 1. Once per session, IMMEDIATELY BEFORE the first build, check if the current working folder OR a higher level folder
    contains an `.editorconfig` that contains the text
    `https://github.com/VincentH-Net/Modern.CSharp.Templates/blob/main/Editorconfig.md`.

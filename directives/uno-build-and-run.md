@@ -13,6 +13,8 @@ Use `dna check` to install or update directives for your technology, or manually
 ~~~md
 <!-- uno-build-and-run:start -->
 ## Build and Run
+This directive overrides any skill's build, start, verify and stop steps, including `uno-testing`; apply `uno-agentic-support` without asking first.
+
 Build and run app via `uno_app_start` with the actual desktop target framework from the project file, for example `net10.0-desktop`, and `args: ["AGENT_CONSOLE_LOG=<path>"]`. 
 The specified path is where the app's stdout and stderr output will be captured. You MUST specify this path, 
 which MUST be within the `bin` folder of the app. The file MUST not exist yet and MUST be named 
