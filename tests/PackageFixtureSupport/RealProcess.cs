@@ -83,7 +83,9 @@ sealed class FixtureWorkspace : IDisposable
             ["GIT_CONFIG_NOSYSTEM"] = "1", ["GIT_TERMINAL_PROMPT"] = "0", ["GIT_AUTHOR_NAME"] = "Fixture",
             ["GIT_AUTHOR_EMAIL"] = "fixture@example.invalid", ["GIT_COMMITTER_NAME"] = "Fixture", ["GIT_COMMITTER_EMAIL"] = "fixture@example.invalid",
             ["AGENTIC_CHECK_CACHE_DIR"] = Path.Combine(Root, "source-cache"), ["AGENTIC_CHECK_CACHE_SECONDS"] = "0", ["TERM"] = "xterm-256color",
-            ["PATH"] = HostPath.WithoutGlobalTools()
+            ["PATH"] = HostPath.WithoutGlobalTools(),
+            // The latest-version check reads the same feed the SDK installs from, so results do not depend on nuget.org.
+            ["AGENTIC_CHECK_NUGET_INDEX"] = Path.Combine(Root, "feed")
         };
     }
 

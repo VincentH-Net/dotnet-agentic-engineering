@@ -1124,7 +1124,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
         string path = workspace.BinPath + Path.PathSeparator + HostPath.WithoutGlobalTools();
         // Hex1b 0.165.0 ignores the PTY environment overrides on Unix. Set TERM at the
         // actual command boundary so a headless parent's TERM=dumb cannot disable redraws.
-        return $"TERM=xterm-256color HOME={Quote(workspace.HomePath)} XDG_CONFIG_HOME={Quote(Path.Combine(workspace.HomePath, ".config"))} GH_TOKEN= GITHUB_TOKEN= GH_CONFIG_DIR={Quote(Path.Combine(workspace.RootPath, "gh"))} AGENTIC_CHECK_CACHE_SECONDS=3600 AGENTIC_CHECK_CACHE_DIR={Quote(Path.Combine(workspace.RootPath, "cache"))} AGENTIC_CHECK_GH_LOG={Quote(workspace.GhLogPath)} PATH={Quote(path)} {Quote(Path.ChangeExtension(ToolAssemblyPath, null))} {arguments}";
+        return $"TERM=xterm-256color HOME={Quote(workspace.HomePath)} XDG_CONFIG_HOME={Quote(Path.Combine(workspace.HomePath, ".config"))} GH_TOKEN= GITHUB_TOKEN= GH_CONFIG_DIR={Quote(Path.Combine(workspace.RootPath, "gh"))} AGENTIC_CHECK_CACHE_SECONDS=3600 AGENTIC_CHECK_CACHE_DIR={Quote(Path.Combine(workspace.RootPath, "cache"))} AGENTIC_CHECK_GH_LOG={Quote(workspace.GhLogPath)} AGENTIC_CHECK_NUGET_INDEX={Quote(workspace.NuGetIndexPath)} PATH={Quote(path)} {Quote(Path.ChangeExtension(ToolAssemblyPath, null))} {arguments}";
     }
 
     static Hex1bTerminal CreateTerminal(TestWorkspace workspace)
@@ -1141,6 +1141,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
                 options.Environment = new Dictionary<string, string>
                 {
                     ["AGENTIC_CHECK_GH_LOG"] = workspace.GhLogPath,
+                    ["AGENTIC_CHECK_NUGET_INDEX"] = workspace.NuGetIndexPath,
                     ["HOME"] = workspace.HomePath,
                     ["XDG_CONFIG_HOME"] = Path.Combine(workspace.HomePath, ".config"),
                     ["GH_PAGER"] = "cat",
@@ -1195,6 +1196,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
             RepoPath = Path.Combine(rootPath, "repo");
             BinPath = Path.Combine(rootPath, "bin");
             HomePath = Path.Combine(rootPath, "home");
+            NuGetIndexPath = Path.Combine(rootPath, "nuget-index");
             GhLogPath = Path.Combine(rootPath, "gh.log");
             RecordingPath = CreateRecordingPath(testName);
         }
@@ -1209,6 +1211,9 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
         // so the fake CLI probes in BinPath stay the only signal and the default agents are fixed.
         public string HomePath { get; }
 
+        // An empty package folder: the latest-version check finds nothing and leaves the tool actions as they are.
+        public string NuGetIndexPath { get; }
+
         public string GhLogPath { get; }
 
         public string RecordingPath { get; }
@@ -1220,6 +1225,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
             _ = Directory.CreateDirectory(workspace.RepoPath);
             _ = Directory.CreateDirectory(workspace.BinPath);
             _ = Directory.CreateDirectory(workspace.HomePath);
+            _ = Directory.CreateDirectory(workspace.NuGetIndexPath);
             await File.WriteAllTextAsync(workspace.GhLogPath, string.Empty).ConfigureAwait(true);
             if (writeDotnetProject)
             {

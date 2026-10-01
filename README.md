@@ -11,7 +11,7 @@ Agentic engineering `directives`, `skills` and `tools` that I use for building r
 
 Install `dna` once per machine, then one command does everything:
 
-- **`dna check`** scans your repo, detects your tech stack, and composes, installs and updates an optimized set of directives and skills, directly from best-in-class GitHub skills repo's. Where a directive or skill needs deterministic tooling, it installs that tool too, pinned once per repository. Run it again any time: directives, skills and tools are updated together, so they stay compatible.
+- **`dna check`** scans your repo, detects your tech stack, and composes, installs and updates an optimized set of directives and skills, directly from best-in-class GitHub skills repo's. Where a directive or skill needs deterministic tooling, it installs that tool too, pinned once per repository. Run it again any time: directives, skills and tools are updated together, so they stay compatible, and a tool that is already the latest on nuget.org is left alone.
 - **`dotnet agentic`** is the repo-local tool that directives and skills call for their deterministic steps; `dna check` installs it and keeps it versioned with them, and then `dna` acts as a shortcut for the `dotnet agentic` commands so you have less to remember and type.
 - **`dna prompt-log`** shows the prompts and answers that produced your commits.
 

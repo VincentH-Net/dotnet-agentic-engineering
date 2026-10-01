@@ -27,7 +27,8 @@ sealed class CheckWorkflow(
     ISourceVersionResolver? sourceVersionResolver = null,
     IReadOnlyList<SkillManifestEntry>? skillManifest = null,
     DnaInstaller? dnaInstaller = null,
-    Func<string, string?>? readEnvironment = null)
+    Func<string, string?>? readEnvironment = null,
+    INuGetVersionSource? versionSource = null)
 {
     // A manual test shell sets this so every check it starts, including dna check and dnx, reads pinned content.
     internal const string PreviewSourceRefVariable = "AGENTIC_CHECK_PREVIEW_SOURCE_REF";
@@ -408,13 +409,9 @@ sealed class CheckWorkflow(
                 repairRequirement = CompanionDependency.ReadLocalRequirement(installedConsumers);
                 string? installed = installedCompanion;
                 restoreOnly = installed is not null && ToolVersion.Parse(installed).Satisfies(repairRequirement);
-                if (restoreOnly)
+                if (restoreOnly && await CompanionRunsAsync().ConfigureAwait(false))
                 {
-                    var available = await githubRunner.RunAsync("dotnet", ["tool", "run", "agentic", "--", "--version"], targetDirectory, cancellationToken).ConfigureAwait(false);
-                    if (available.Success && available.StandardOutput.Trim().Split('+')[0] == installed!.Split('+')[0])
-                    {
-                        repairRequirement = null;
-                    }
+                    repairRequirement = null;
                 }
             }
         }
@@ -425,22 +422,31 @@ sealed class CheckWorkflow(
 
         bool hasDependentRecommendations = recommendedDirectives.Any(d => CompanionDependency.ForDirective(d.Name, d.Content).Count > 0)
             || recommendedSkillActions.Any(skill => skill.Dependencies.Contains(CompanionDependency.Identity));
+        List<string> currentTools = [];
         if (hasDependentRecommendations || repairRequirement is not null || repairError is not null)
         {
             string status;
+            bool current = false;
+            ToolVersion? plannedRequirement = null;
             try
             {
-                var plannedRequirement = hasDependentRecommendations
+                plannedRequirement = hasDependentRecommendations
                     ? await companionVersions.ReadAsync(recommendedDirectives.FirstOrDefault(d => CompanionDependency.ForDirective(d.Name, d.Content).Count > 0)?.SourceRef
                         ?? recommendedSkillActions.First(skill => skill.Dependencies.Contains(CompanionDependency.Identity)).ResolvedSourceRef, cancellationToken).ConfigureAwait(false)
                     : repairRequirement;
                 status = $"required {plannedRequirement?.Minimum ?? "unknown"}";
                 if (installedCompanion is not null)
                     status = $"currently {installedCompanion}; {status}";
-                // Selected dependent content always re-resolves the newest package in the major, even when
-                // the installed version already satisfies the minimum; say so instead of implying a version bump.
+                // Selected dependent content re-resolves the newest package in the major. nuget.org tells
+                // whether that is a version bump; when it cannot, say so instead of implying one.
                 if (installedCompanion is not null && hasDependentRecommendations && plannedRequirement is not null)
-                    status += $"; refreshes to the latest {plannedRequirement.Pattern(options.Preview)}";
+                {
+                    var latest = repairRequirement is null && repairError is null
+                        ? await LatestAsync(CompanionDependency.PackageId, plannedRequirement.Major, options.Preview).ConfigureAwait(false)
+                        : null;
+                    current = latest is not null && IsAtLeast(installedCompanion, latest) && await CompanionRunsAsync().ConfigureAwait(false);
+                    status += latest is null ? $"; refreshes to the latest {plannedRequirement.Pattern(options.Preview)}" : $"; latest {latest}";
+                }
             }
             catch (Exception exception) when (exception is DirectiveException or FormatException or System.Xml.XmlException or IOException or UnauthorizedAccessException or JsonException or KeyNotFoundException)
             {
@@ -448,14 +454,24 @@ sealed class CheckWorkflow(
                 status = "version unavailable: " + exception.Message;
             }
 
-            string action = !hasDependentRecommendations && repairError is not null ? "repair"
-                : !hasDependentRecommendations && restoreOnly ? "restore"
-                : installedCompanion is null ? "install" : "update";
-            recommendedSkillActions = [.. recommendedSkillActions, CompanionDependency.Action(action) with
+            if (current)
             {
-                Version = status,
-                IsRequiredToolRepair = repairRequirement is not null || repairError is not null
-            }];
+                string pattern = plannedRequirement!.Pattern(options.Preview);
+                report.Companion = new(CompanionInstaller.ManifestPath(targetDirectory), installedCompanion, plannedRequirement.Minimum, pattern, "current", true, installedCompanion, false, null);
+                report.Actions.Add($"current {CompanionDependency.PackageId}: installed {installedCompanion}, required {plannedRequirement.Minimum}, pattern {pattern}, already the latest");
+                currentTools.Add($"{CompanionDependency.PackageId} {installedCompanion}");
+            }
+            else
+            {
+                string action = !hasDependentRecommendations && repairError is not null ? "repair"
+                    : !hasDependentRecommendations && restoreOnly ? "restore"
+                    : installedCompanion is null ? "install" : "update";
+                recommendedSkillActions = [.. recommendedSkillActions, CompanionDependency.Action(action) with
+                {
+                    Version = status,
+                    IsRequiredToolRepair = repairRequirement is not null || repairError is not null
+                }];
+            }
         }
 
         DnaInstallation? dnaInstallation = null;
@@ -465,8 +481,33 @@ sealed class CheckWorkflow(
             // no companion action. Existing repos can still opt into or update the shorthand.
             // A run started by dna never offers it: the running launcher's files are locked on Windows.
             dnaInstallation = await shorthandInstaller.InspectAsync(targetDirectory, cancellationToken).ConfigureAwait(false);
-            recommendedSkillActions = [.. recommendedSkillActions, DnaInstaller.Action(dnaInstallation)];
+            // The global shorthand follows the latest stable release of any major, as dotnet tool update --global does.
+            var latestDna = dnaInstallation.Version is null || dnaInstallation.Error is not null
+                ? null
+                : await LatestAsync(DnaInstaller.PackageId, null, false).ConfigureAwait(false);
+            if (latestDna is not null && IsAtLeast(dnaInstallation.Version!, latestDna))
+            {
+                report.Dna = new("current", dnaInstallation.Version, dnaInstallation.Version, true, false, [], null);
+                report.Actions.Add($"current {DnaInstaller.PackageId} globally: installed {dnaInstallation.Version}, already the latest");
+                currentTools.Add($"{DnaInstaller.PackageId} {dnaInstallation.Version}");
+            }
+            else
+            {
+                recommendedSkillActions = [.. recommendedSkillActions, DnaInstaller.Action(dnaInstallation)];
+            }
         }
+
+        // The pinned companion answers with its own version only when it is restored and runnable.
+        async Task<bool> CompanionRunsAsync()
+        {
+            var available = await githubRunner.RunAsync("dotnet", ["tool", "run", "agentic", "--", "--version"], targetDirectory, cancellationToken).ConfigureAwait(false);
+            return available.Success && available.StandardOutput.Trim().Split('+')[0] == installedCompanion!.Split('+')[0];
+        }
+
+        async Task<ToolVersion?> LatestAsync(string packageId, int? major, bool includePrerelease)
+            => versionSource is null
+                ? null
+                : NuGetVersionSource.Latest(await versionSource.VersionsAsync(packageId, cancellationToken).ConfigureAwait(false), major, includePrerelease);
 
         if (codexRulesPlan is { IsCurrent: false })
         {
@@ -478,6 +519,15 @@ sealed class CheckWorkflow(
         if (!options.DryRun && !options.Preview)
         {
             ReportUpToDateItems(directivePlan.Directives, recommended, missing, skillUpdates, stableSwitchSkills);
+        }
+
+        if (!options.DryRun && currentTools.Count > 0)
+        {
+            ReportSectionHeader("Up to date tools:");
+            foreach (string tool in currentTools)
+            {
+                reporter.Success($"  ✓ {tool}");
+            }
         }
 
         if (recommendedDirectives.Count > 0 || recommendedSkillActions.Count > 0)
@@ -956,6 +1006,18 @@ sealed class CheckWorkflow(
 
         ReportSectionHeader("Would update skills in skills directories:");
         ReportSkillUpdateGroups(skillUpdates, recommendedSkills);
+    }
+
+    static bool IsAtLeast(string installed, ToolVersion latest)
+    {
+        try
+        {
+            return ToolVersion.Parse(installed).CompareTo(latest) >= 0;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
     }
 
     void ReportUpToDateItems(

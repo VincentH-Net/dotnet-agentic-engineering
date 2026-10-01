@@ -527,6 +527,40 @@ public sealed class CompanionTests
         Assert.False(recommendation.IsRequiredToolRepair);
     }
 
+    // Nothing is selected, so an offered action leaves no report; a current tool is reported without being offered.
+    [Theory]
+    [InlineData("2.3.0", "2.3.0", "1.0.0", false, null, null)]
+    [InlineData("2.3.1", "2.3.0", "1.0.0", false, null, null)]
+    [InlineData("2.3.0", "2.3.1", "1.0.0", false, "currently 2.3.0; required 2.3; latest 2.3.1", null)]
+    [InlineData("2.3.0", "2.3.0", "1.0.0", true, "currently 2.3.0; required 2.3; latest 2.3.0", null)]
+    [InlineData("2.3.0", "2.3.0", "0.9.0", false, null, "global launcher; currently 0.9.0")]
+    public async Task ToolsThatAreAlreadyTheLatestAreReportedNotOffered(string installed, string published, string dna, bool notRestored, string? companionStatus, string? dnaStatus)
+    {
+        using TempDirectory temp = new();
+        WriteManifest(temp.Path, installed);
+        FakePrompts prompts = new() { SelectedDirectiveNames = [], SelectedSkillInstallArgs = [] };
+        ToolRunner runner = new() { NotRestored = notRestored, Resolved = installed };
+        FakeVersionSource versions = new(new Dictionary<string, string[]?>(StringComparer.Ordinal)
+        {
+            // Prereleases and other majors never count for the stable pattern or the global shorthand.
+            [CompanionDependency.PackageId] = ["2.2.0", published, "2.4.0-preview.1", "3.0.0"],
+            [DnaInstaller.PackageId] = ["1.0.0", "1.1.0-preview.1"]
+        });
+        var result = await new CheckWorkflow(runner, prompts, new RecordingReporter(), new FakeDirectiveSource(), new FakeSourceVersionResolver(),
+            null, new DnaInstaller(new DnaRunner(runner) { Version = dna }, string.Empty), null, versions)
+            .RunAsync(new(temp.Path, false, false, null, null, "codex", false), CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        var companion = prompts.RecommendedSkillActions.SingleOrDefault(skill => skill.IsCompanion);
+        Assert.Equal(companionStatus, companion?.Version);
+        Assert.Equal(companionStatus is null ? "current" : null, result.Report.Companion?.Action);
+        if (companionStatus is null)
+            Assert.Contains(result.Report.Actions, action => action == $"current InnoWvate.Agentic: installed {installed}, required 2.3, pattern 2.*, already the latest");
+        var shorthand = prompts.RecommendedSkillActions.SingleOrDefault(skill => skill.IsDna);
+        Assert.Equal(dnaStatus, shorthand?.Version);
+        Assert.Equal(dnaStatus is null ? "current" : null, result.Report.Dna?.Action);
+    }
+
     [Theory]
     [InlineData(null, "install InnoWvate.Agentic: installed absent, required 2.3, pattern 2.*, resolved 2.3.0")]
     [InlineData("2.2.0", "update InnoWvate.Agentic: installed 2.2.0, required 2.3, pattern 2.*, resolved 2.3.0")]

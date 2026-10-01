@@ -3,9 +3,62 @@ using System.Text.RegularExpressions;
 
 namespace Agentic;
 
-sealed partial record ToolVersion(int Major, int Minor, int Patch, string Suffix)
+sealed partial record ToolVersion(int Major, int Minor, int Patch, string Suffix) : IComparable<ToolVersion>
 {
     public bool IsPrerelease => Suffix.StartsWith('-');
+
+    public override string ToString() => string.Create(CultureInfo.InvariantCulture, $"{Major}.{Minor}.{Patch}{Suffix}");
+
+    // Semantic Versioning 2.0.0 precedence: a release outranks its prereleases, prerelease
+    // identifiers compare numerically or ordinally, and build metadata does not take part.
+    public int CompareTo(ToolVersion? other)
+    {
+        if (other is null)
+        {
+            return 1;
+        }
+
+        int result = (Major, Minor, Patch).CompareTo((other.Major, other.Minor, other.Patch));
+        if (result != 0)
+        {
+            return result;
+        }
+
+        string[] mine = PrereleaseIdentifiers();
+        string[] theirs = other.PrereleaseIdentifiers();
+        if (mine.Length == 0 || theirs.Length == 0)
+        {
+            return theirs.Length.CompareTo(mine.Length);
+        }
+
+        for (int index = 0; index < Math.Min(mine.Length, theirs.Length); index++)
+        {
+            bool mineNumeric = mine[index].All(char.IsAsciiDigit);
+            bool theirsNumeric = theirs[index].All(char.IsAsciiDigit);
+            result = mineNumeric && theirsNumeric ? CompareNumeric(mine[index], theirs[index])
+                : mineNumeric != theirsNumeric ? (mineNumeric ? -1 : 1)
+                : string.CompareOrdinal(mine[index], theirs[index]);
+            if (result != 0)
+            {
+                return result;
+            }
+        }
+
+        return mine.Length.CompareTo(theirs.Length);
+    }
+
+    string[] PrereleaseIdentifiers()
+    {
+        string prerelease = Suffix.Split('+')[0];
+        return prerelease.Length == 0 ? [] : prerelease[1..].Split('.');
+    }
+
+    static int CompareNumeric(string left, string right)
+    {
+        left = left.TrimStart('0');
+        right = right.TrimStart('0');
+        return left.Length != right.Length ? left.Length.CompareTo(right.Length) : string.CompareOrdinal(left, right);
+    }
 
     public string Minimum => string.Create(CultureInfo.InvariantCulture, $"{Major}.{Minor}");
 

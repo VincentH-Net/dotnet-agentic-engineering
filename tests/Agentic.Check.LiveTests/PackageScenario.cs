@@ -174,8 +174,8 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
             || dryReport.GetProperty("directiveSummary").GetProperty("outdatedCount").GetInt32() > 0
             || dryReport.GetProperty("missingSkills").GetArrayLength() > 0 || preview
             || dryReport.GetProperty("actions").EnumerateArray().Any(action => action.GetString()!.StartsWith("Would install ", StringComparison.Ordinal))
-            || (dryReport.TryGetProperty("companion", out var companion) && companion.ValueKind == JsonValueKind.Object)
-            || (dryReport.TryGetProperty("dna", out var dna) && dna.ValueKind == JsonValueKind.Object)
+            || (dryReport.TryGetProperty("companion", out var companion) && companion.ValueKind == JsonValueKind.Object && companion.GetProperty("action").GetString() != "current")
+            || (dryReport.TryGetProperty("dna", out var dna) && dna.ValueKind == JsonValueKind.Object && dna.GetProperty("action").GetString() != "current")
             || (dryReport.TryGetProperty("codexRules", out var codexRules) && codexRules.ValueKind == JsonValueKind.Object);
         if (hasActions)
         {

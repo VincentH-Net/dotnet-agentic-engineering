@@ -12,6 +12,17 @@ static class AuthenticationTestCommands
                 ? new(0, RepositoryResponse, string.Empty) : null;
 }
 
+sealed class FakeVersionSource(IReadOnlyDictionary<string, string[]?> versions) : INuGetVersionSource
+{
+    public Task<IReadOnlyList<ToolVersion>?> VersionsAsync(string packageId, CancellationToken cancellationToken)
+    {
+        IReadOnlyList<ToolVersion>? result = versions.TryGetValue(packageId, out string[]? found) && found is not null
+            ? [.. found.Select(ToolVersion.Parse)]
+            : null;
+        return Task.FromResult(result);
+    }
+}
+
 sealed class TempDirectory : IDisposable
 {
     public TempDirectory()

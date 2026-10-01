@@ -211,10 +211,13 @@ static class AgenticCheckCli
                         preview,
                         parseResult.GetValue(previewSourceRefOption));
 
+                    // One short request decides whether a tool is already the latest; a slow or absent nuget.org only costs the shortcut.
+                    using HttpClient nugetClient = new() { Timeout = TimeSpan.FromSeconds(5) };
                     var workflow = new CheckWorkflow(
                         new ProcessCommandRunner(),
                         new SpectreUserPrompts(AnsiConsole.Console),
-                        reporter);
+                        reporter,
+                        versionSource: new NuGetVersionSource(nugetClient, Environment.GetEnvironmentVariable(NuGetVersionSource.IndexVariable)));
 
                     var result = await workflow.RunAsync(options, CancellationToken.None).ConfigureAwait(false);
                     return result.ExitCode;

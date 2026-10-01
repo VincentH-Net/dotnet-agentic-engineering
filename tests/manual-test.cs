@@ -212,7 +212,11 @@ try
     };
 
     if (!published)
+    {
         environment["AGENTIC_CHECK_PREVIEW_SOURCE_REF"] = sha;
+        // The latest-version check reads the local feed, as the SDK does in this shell.
+        environment["AGENTIC_CHECK_NUGET_INDEX"] = feed;
+    }
 
     Say(published ? "\nInstalling dna from nuget.org into the isolated CLI home..." : "\nInstalling the local dna into the isolated CLI home...");
     var (installCode, installOutput) = Capture("dotnet", ["tool", "install", "--global", "InnoWvate.Dna", "--configfile", nugetConfig], target!, environment);

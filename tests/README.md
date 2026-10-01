@@ -16,7 +16,7 @@ isolated feed, unpacks a baseline fixture (default: the newest collection's `bro
 new Git repository under the temp folder, installs the local `dna` into an isolated .NET CLI home,
 caches the local `Agentic.Check`, and on macOS opens a Terminal window in that repository. Only that
 terminal's environment changes: `DOTNET_CLI_HOME`, `NUGET_PACKAGES`, `AGENTIC_CHECK_CACHE_DIR`,
-PATH, and `AGENTIC_CHECK_PREVIEW_SOURCE_REF`. Your normal global tools, caches, GitHub login and
+PATH, `AGENTIC_CHECK_PREVIEW_SOURCE_REF` and `AGENTIC_CHECK_NUGET_INDEX`. Your normal global tools, caches, GitHub login and
 shell profiles are untouched. In that shell `dna check`, `dna prompt-log`, `dnx agentic.check` and
 agent-started `dotnet agentic` commands all resolve the local packages, because the repository's
 `NuGet.Config` lists only the local feed.
