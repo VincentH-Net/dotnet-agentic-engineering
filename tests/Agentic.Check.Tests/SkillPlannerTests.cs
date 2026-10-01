@@ -195,12 +195,12 @@ public sealed class SkillPlannerTests
 
         var plan = SkillPlanner.Plan(StaticSkillManifest.All, stack);
 
-        Assert.Contains(plan, skill => skill.InstallArg == "uno-mvux-overview");
-        Assert.Contains(plan, skill => skill.InstallArg == "uno-toolkit-csharp-markup");
-        Assert.Contains(plan, skill => skill.InstallArg == "uno-themes-material");
-        Assert.Contains(plan, skill => skill.InstallArg == "uno-themes-semantic-colors-brushes");
+        Assert.Contains(plan, skill => skill.InstallArg == "uno-mvux");
+        Assert.Contains(plan, skill => skill.InstallArg == "uno-toolkit");
+        Assert.Contains(plan, skill => skill.InstallArg == "uno-themes");
+        Assert.Contains(plan, skill => skill.InstallArg == "uno-csharp-markup");
         Assert.DoesNotContain(plan, skill => skill.InstallArg == "uno-mvvm");
-        Assert.DoesNotContain(plan, skill => skill.InstallArg == "uno-themes-simple");
+        Assert.DoesNotContain(plan, skill => skill.InstallArg == "uno-csharpmarkup2");
     }
 
     [Fact]

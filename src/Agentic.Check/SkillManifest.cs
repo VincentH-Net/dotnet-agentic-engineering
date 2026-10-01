@@ -110,9 +110,9 @@ static class StaticSkillManifest
             new(2026, 6, 12, 14, 59, 14, TimeSpan.Zero)),
         new(
             UnoStudioRepo,
-            "609cb685ecf77ae9ade89fc8c0a459f85df0413e",
-            new(2026, 9, 21, 16, 10, 10, TimeSpan.Zero),
-            new(2026, 9, 22, 7, 43, 59, TimeSpan.Zero)),
+            "6874bb4c471b228cc17dd97fd73ce5659569cc92",
+            new(2026, 9, 30, 20, 0, 37, TimeSpan.Zero),
+            new(2026, 10, 1, 10, 37, 26, TimeSpan.Zero)),
         new(
             DotnetSkillsRepo,
             "8bbfe7a4d1c5c0cd42cd04e38031779c75f2dda3",
@@ -139,16 +139,15 @@ static class StaticSkillManifest
         VincentUno("uno-test-resize-app-window"),
         MattUno("uno-extensions-services"),
         MattUno("uno-csharp-markup", "markup", "csharp"),
-        ..UnoStudioMvux(),
-        ..UnoStudioNavigation(),
-        UnoStudio("uno-testing-assertions"),
-        UnoStudio("uno-testing-ui"),
-        UnoStudio("uno-themes-material", "theme", "material"),
-        UnoStudio("uno-themes-simple", "theme", "simple"),
-        UnoStudio("uno-themes-semantic-colors-brushes", [new("theme", "material"), new("theme", "simple")]),
-        UnoStudio("uno-toolkit-material-theme", "theme", "material"),
-        UnoStudio("uno-toolkit-csharp-markup", "markup", "csharp"),
-        ..UnoStudioToolkitUngated()
+        // Each Studio hub folds its former per-topic skills into references/*.md, so a hub
+        // takes the union of their gates (unoplatform/studio#157).
+        UnoStudio("uno-platform"),
+        UnoStudio("uno-build-app"),
+        UnoStudio("uno-mvux", "presentation", "mvux"),
+        UnoStudio("uno-navigation"),
+        UnoStudio("uno-toolkit"),
+        UnoStudio("uno-themes", [new("theme", "material"), new("theme", "simple")]),
+        UnoStudio("uno-testing")
     ];
 
     internal static IReadOnlyList<SkillManifestEntry> Preview { get; } =
@@ -244,74 +243,6 @@ static class StaticSkillManifest
             DotnetTest("writing-mstest-tests")
         ];
 
-    static IReadOnlyList<SkillManifestEntry> UnoStudioMvux()
-        =>
-        [
-            UnoStudio("uno-mvux-commands", "presentation", "mvux"),
-            UnoStudio("uno-mvux-feed-basics", "presentation", "mvux"),
-            UnoStudio("uno-mvux-feedview", "presentation", "mvux"),
-            UnoStudio("uno-mvux-listfeed", "presentation", "mvux"),
-            UnoStudio("uno-mvux-liststate", "presentation", "mvux"),
-            UnoStudio("uno-mvux-messaging", "presentation", "mvux"),
-            UnoStudio("uno-mvux-overview", "presentation", "mvux"),
-            UnoStudio("uno-mvux-pagination", "presentation", "mvux"),
-            UnoStudio("uno-mvux-records", "presentation", "mvux"),
-            UnoStudio("uno-mvux-selection", "presentation", "mvux"),
-            UnoStudio("uno-mvux-state-basics", "presentation", "mvux")
-        ];
-
-    static IReadOnlyList<SkillManifestEntry> UnoStudioNavigation()
-        =>
-        [
-            UnoStudio("uno-navigation-code"),
-            UnoStudio("uno-navigation-contentcontrol"),
-            UnoStudio("uno-navigation-data"),
-            UnoStudio("uno-navigation-dialogs"),
-            UnoStudio("uno-navigation-navigationview"),
-            UnoStudio("uno-navigation-panel-visibility"),
-            UnoStudio("uno-navigation-qualifiers"),
-            UnoStudio("uno-navigation-regions"),
-            UnoStudio("uno-navigation-responsive-shell"),
-            UnoStudio("uno-navigation-routes"),
-            UnoStudio("uno-navigation-setup"),
-            UnoStudio("uno-navigation-tabbar"),
-            UnoStudio("uno-navigation-troubleshooting"),
-            UnoStudio("uno-navigation-xaml")
-        ];
-
-    static IReadOnlyList<SkillManifestEntry> UnoStudioToolkitUngated()
-        =>
-        [
-            UnoStudio("uno-toolkit-ancestor-binding"),
-            UnoStudio("uno-toolkit-autolayout"),
-            UnoStudio("uno-toolkit-card"),
-            UnoStudio("uno-toolkit-chip"),
-            UnoStudio("uno-toolkit-command-extensions"),
-            UnoStudio("uno-toolkit-cupertino-theme"),
-            UnoStudio("uno-toolkit-divider"),
-            UnoStudio("uno-toolkit-drawer"),
-            UnoStudio("uno-toolkit-extendedsplashscreen"),
-            UnoStudio("uno-toolkit-flipview-extensions"),
-            UnoStudio("uno-toolkit-getting-started"),
-            UnoStudio("uno-toolkit-input-extensions"),
-            UnoStudio("uno-toolkit-itemsrepeater-extensions"),
-            UnoStudio("uno-toolkit-lightweight-styling"),
-            UnoStudio("uno-toolkit-loadingview"),
-            UnoStudio("uno-toolkit-navigationbar"),
-            UnoStudio("uno-toolkit-progress-extensions"),
-            UnoStudio("uno-toolkit-resource-extensions"),
-            UnoStudio("uno-toolkit-responsive"),
-            UnoStudio("uno-toolkit-safearea"),
-            UnoStudio("uno-toolkit-segmented-controls"),
-            UnoStudio("uno-toolkit-selector-extensions"),
-            UnoStudio("uno-toolkit-shadowcontainer"),
-            UnoStudio("uno-toolkit-statusbar-extensions"),
-            UnoStudio("uno-toolkit-system-theme-helper"),
-            UnoStudio("uno-toolkit-tabbar"),
-            UnoStudio("uno-toolkit-tabbaritem-extensions"),
-            UnoStudio("uno-toolkit-visualstatemanager-extensions"),
-            UnoStudio("uno-toolkit-zoomcontentcontrol")
-        ];
 }
 
 static class SkillPlanner

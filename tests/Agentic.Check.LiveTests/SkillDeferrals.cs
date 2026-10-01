@@ -11,12 +11,8 @@ sealed record SkillDeferral(string SourceRepo, string SkillName, string TriggerR
 
 static class SkillDeferrals
 {
-    internal static IReadOnlyList<SkillDeferral> All { get; } =
-    [
-        // FlexPanel is unoplatform/uno.toolkit.ui#1639 (opened 2026-09-10, unmerged); the skill's docs lookups need its docs.
-        new("unoplatform/studio", "uno-toolkit-flexpanel", "unoplatform/uno.toolkit.ui", "doc/controls/FlexPanel.md",
-            "an Uno Toolkit release that contains FlexPanel")
-    ];
+    // FlexPanel (unoplatform/uno.toolkit.ui#1639) is now a reference inside the uno-toolkit hub, so nothing waits.
+    internal static IReadOnlyList<SkillDeferral> All { get; } = [];
 
     internal static IReadOnlyList<SkillDeferral> For(string repo)
         => [.. All.Where(deferral => deferral.SourceRepo.Equals(repo, StringComparison.OrdinalIgnoreCase))];
