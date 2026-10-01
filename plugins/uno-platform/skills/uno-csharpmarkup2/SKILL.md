@@ -3,7 +3,7 @@ name: uno-csharpmarkup2
 description: Build or edit Uno Platform 6 UI in declarative C# with C# Markup 2 (CSharpForMarkup), instead of XAML. Use for Uno 6 apps on .NET 10/9 with MVVM or MVUX, Uno Extensions Navigation/Toolkit, and supported C# Markup 2 integrations such as LiveCharts2, ScottPlot, and Mapsui.
 metadata:
   author: https://github.com/VincentH-Net
-  version: "1.4.2"
+  version: "1.4.3"
   framework: uno-platform
   category: ui-markup
   sources:
@@ -16,6 +16,8 @@ metadata:
 Use when you want to build a Uno Platform 6 UI in **pure C#** using the concise, declarative, strongly-typed **C# Markup 2** (`CSharpForMarkup`) library — no XAML, no CSS, no HTML, no JS / TS. Provides a Flutter-like fluent-builder developer experience with allocation-free, reflection-free implementation and compile-time-checked bindings.
 
 > This skill is about **CSharpForMarkup** / **C# Markup 2** by VincentH-Net, distributed as the `CSharpMarkup.WinUI.*` NuGet package family. It is **not** the same technology as the separately-named "C# Markup" shipped by the Uno Platform team under `Uno.Extensions.Markup`. The APIs, project structure, and conventions differ — only use the sources listed in the References section of this skill.
+>
+> In an app that uses C# Markup 2, write C# UI only with C# Markup 2. Do not add or use Uno C# Markup (`Uno.*.Markup` packages, `CSharpMarkup` in `<UnoFeatures>`), even when another skill points to it, unless the user explicitly asks for it.
 
 ## 1. When to use this skill
 
