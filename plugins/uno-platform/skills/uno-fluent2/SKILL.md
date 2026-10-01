@@ -548,7 +548,7 @@ Variants: Filled, Outlined, Elevated (also Avatar and SmallMedia sub-variants)
 `NavigationBarForeground`, `NavigationBarBackground`, `NavigationBarMainCommandForeground`, `NavigationBarPadding`, `NavigationBarFontFamily`, `NavigationBarFontWeight`, `NavigationBarFontSize`
 
 ### TabBar
-Key pattern: `TabBarItem{Property}{State}` — use the Uno Toolkit docs or the `uno-toolkit` skill's `references/tabbar.md` for the full list.
+Key pattern: `TabBarItem{Property}{State}` — use the Uno Toolkit docs or the Uno Studio TabBar skill (`uno-toolkit-tabbar`, or `references/tabbar.md` in `uno-toolkit`) for the full list.
 
 ---
 

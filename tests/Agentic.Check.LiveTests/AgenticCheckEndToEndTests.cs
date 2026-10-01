@@ -746,7 +746,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
                 {
                     string filteredScreen = snapshot.GetScreenText();
                     Assert.DoesNotContain("orleans-result-pattern (install)", filteredScreen, StringComparison.Ordinal);
-                    Assert.DoesNotContain("uno-navigation (install)", filteredScreen, StringComparison.Ordinal);
+                    Assert.DoesNotContain("uno-navigation-contentcontrol (install)", filteredScreen, StringComparison.Ordinal);
                 }
 
                 await auto.TypeAsync("-no-such-skill").ConfigureAwait(true);

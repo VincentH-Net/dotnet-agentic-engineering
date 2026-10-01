@@ -139,21 +139,24 @@ static class StaticSkillManifest
         VincentUno("uno-test-resize-app-window"),
         MattUno("uno-extensions-services"),
         MattUno("uno-csharp-markup", "markup", "csharp"),
-        // Each Studio hub folds its former per-topic skills into references/*.md, so a hub
-        // takes the union of their gates (unoplatform/studio#157).
-        UnoStudio("uno-platform"),
-        UnoStudio("uno-build-app"),
-        UnoStudio("uno-mvux", "presentation", "mvux"),
-        UnoStudio("uno-navigation"),
-        UnoStudio("uno-toolkit"),
-        UnoStudio("uno-themes", [new("theme", "material"), new("theme", "simple")]),
-        UnoStudio("uno-testing")
+        // The latest Studio release still ships the per-topic skills; the hubs are preview only.
+        ..UnoStudioMvux(),
+        ..UnoStudioNavigation(),
+        UnoStudio("uno-testing-assertions"),
+        UnoStudio("uno-testing-ui"),
+        UnoStudio("uno-themes-material", "theme", "material"),
+        UnoStudio("uno-themes-simple", "theme", "simple"),
+        UnoStudio("uno-themes-semantic-colors-brushes", [new("theme", "material"), new("theme", "simple")]),
+        UnoStudio("uno-toolkit-material-theme", "theme", "material"),
+        UnoStudio("uno-toolkit-csharp-markup", "markup", "csharp"),
+        ..UnoStudioToolkitUngated()
     ];
 
     internal static IReadOnlyList<SkillManifestEntry> Preview { get; } =
     [
-        ..All.Where(skill => skill.SourceRepo != DotnetSkillsRepo || skill.Plugin != "dotnet-test"),
+        ..All.Where(skill => (skill.SourceRepo != DotnetSkillsRepo || skill.Plugin != "dotnet-test") && skill.SourceRepo != UnoStudioRepo),
         ..DotnetTestSkills(preview: true),
+        ..UnoStudioHubs(),
         DotnetAspNetCore("dotnet-webapi")
     ];
 
@@ -242,6 +245,88 @@ static class StaticSkillManifest
             DotnetTest("writing-mstest-tests")
         ];
 
+    // Each hub folds its former per-topic skills into references/*.md, so a hub takes the union
+    // of their gates (unoplatform/studio#157). Default branch only until a release ships them.
+    static IReadOnlyList<SkillManifestEntry> UnoStudioHubs()
+        =>
+        [
+            UnoStudio("uno-platform"),
+            UnoStudio("uno-build-app"),
+            UnoStudio("uno-mvux", "presentation", "mvux"),
+            UnoStudio("uno-navigation"),
+            UnoStudio("uno-toolkit"),
+            UnoStudio("uno-themes", [new("theme", "material"), new("theme", "simple")]),
+            UnoStudio("uno-testing")
+        ];
+
+    static IReadOnlyList<SkillManifestEntry> UnoStudioMvux()
+        =>
+        [
+            UnoStudio("uno-mvux-commands", "presentation", "mvux"),
+            UnoStudio("uno-mvux-feed-basics", "presentation", "mvux"),
+            UnoStudio("uno-mvux-feedview", "presentation", "mvux"),
+            UnoStudio("uno-mvux-listfeed", "presentation", "mvux"),
+            UnoStudio("uno-mvux-liststate", "presentation", "mvux"),
+            UnoStudio("uno-mvux-messaging", "presentation", "mvux"),
+            UnoStudio("uno-mvux-overview", "presentation", "mvux"),
+            UnoStudio("uno-mvux-pagination", "presentation", "mvux"),
+            UnoStudio("uno-mvux-records", "presentation", "mvux"),
+            UnoStudio("uno-mvux-selection", "presentation", "mvux"),
+            UnoStudio("uno-mvux-state-basics", "presentation", "mvux")
+        ];
+
+    static IReadOnlyList<SkillManifestEntry> UnoStudioNavigation()
+        =>
+        [
+            UnoStudio("uno-navigation-code"),
+            UnoStudio("uno-navigation-contentcontrol"),
+            UnoStudio("uno-navigation-data"),
+            UnoStudio("uno-navigation-dialogs"),
+            UnoStudio("uno-navigation-navigationview"),
+            UnoStudio("uno-navigation-panel-visibility"),
+            UnoStudio("uno-navigation-qualifiers"),
+            UnoStudio("uno-navigation-regions"),
+            UnoStudio("uno-navigation-responsive-shell"),
+            UnoStudio("uno-navigation-routes"),
+            UnoStudio("uno-navigation-setup"),
+            UnoStudio("uno-navigation-tabbar"),
+            UnoStudio("uno-navigation-troubleshooting"),
+            UnoStudio("uno-navigation-xaml")
+        ];
+
+    static IReadOnlyList<SkillManifestEntry> UnoStudioToolkitUngated()
+        =>
+        [
+            UnoStudio("uno-toolkit-ancestor-binding"),
+            UnoStudio("uno-toolkit-autolayout"),
+            UnoStudio("uno-toolkit-card"),
+            UnoStudio("uno-toolkit-chip"),
+            UnoStudio("uno-toolkit-command-extensions"),
+            UnoStudio("uno-toolkit-cupertino-theme"),
+            UnoStudio("uno-toolkit-divider"),
+            UnoStudio("uno-toolkit-drawer"),
+            UnoStudio("uno-toolkit-extendedsplashscreen"),
+            UnoStudio("uno-toolkit-flipview-extensions"),
+            UnoStudio("uno-toolkit-getting-started"),
+            UnoStudio("uno-toolkit-input-extensions"),
+            UnoStudio("uno-toolkit-itemsrepeater-extensions"),
+            UnoStudio("uno-toolkit-lightweight-styling"),
+            UnoStudio("uno-toolkit-loadingview"),
+            UnoStudio("uno-toolkit-navigationbar"),
+            UnoStudio("uno-toolkit-progress-extensions"),
+            UnoStudio("uno-toolkit-resource-extensions"),
+            UnoStudio("uno-toolkit-responsive"),
+            UnoStudio("uno-toolkit-safearea"),
+            UnoStudio("uno-toolkit-segmented-controls"),
+            UnoStudio("uno-toolkit-selector-extensions"),
+            UnoStudio("uno-toolkit-shadowcontainer"),
+            UnoStudio("uno-toolkit-statusbar-extensions"),
+            UnoStudio("uno-toolkit-system-theme-helper"),
+            UnoStudio("uno-toolkit-tabbar"),
+            UnoStudio("uno-toolkit-tabbaritem-extensions"),
+            UnoStudio("uno-toolkit-visualstatemanager-extensions"),
+            UnoStudio("uno-toolkit-zoomcontentcontrol")
+        ];
 }
 
 static class SkillPlanner

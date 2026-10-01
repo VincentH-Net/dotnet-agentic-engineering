@@ -112,8 +112,10 @@ public sealed class SkillPlannerTests
     [Fact]
     public void PreviewPreservesOtherStableSkillsAndDependencyKeys()
     {
+        // Preview replaces the dotnet-test reference skill and every per-topic Studio skill.
         foreach (var stable in StaticSkillManifest.All.Where(skill =>
-            skill.SourceRepo != "dotnet/skills" || skill.LocalFolder is not ("dotnet-test-frameworks" or "test-anti-patterns")))
+            skill.SourceRepo != "unoplatform/studio"
+            && (skill.SourceRepo != "dotnet/skills" || skill.LocalFolder is not ("dotnet-test-frameworks" or "test-anti-patterns"))))
         {
             var preview = Assert.Single(StaticSkillManifest.Preview, skill => skill.Key == stable.Key);
             Assert.Equal(stable.LocalFolder, preview.LocalFolder);
@@ -195,12 +197,19 @@ public sealed class SkillPlannerTests
 
         var plan = SkillPlanner.Plan(StaticSkillManifest.All, stack);
 
-        Assert.Contains(plan, skill => skill.InstallArg == "uno-mvux");
-        Assert.Contains(plan, skill => skill.InstallArg == "uno-toolkit");
-        Assert.Contains(plan, skill => skill.InstallArg == "uno-themes");
+        Assert.Contains(plan, skill => skill.InstallArg == "uno-mvux-overview");
+        Assert.Contains(plan, skill => skill.InstallArg == "uno-toolkit-csharp-markup");
+        Assert.Contains(plan, skill => skill.InstallArg == "uno-themes-material");
         Assert.Contains(plan, skill => skill.InstallArg == "uno-csharp-markup");
         Assert.DoesNotContain(plan, skill => skill.InstallArg == "uno-mvvm");
-        Assert.DoesNotContain(plan, skill => skill.InstallArg == "uno-csharpmarkup2");
+        Assert.DoesNotContain(plan, skill => skill.InstallArg == "uno-themes-simple");
+
+        // Preview replaces the per-topic Studio skills with hubs that take the union of their gates.
+        var preview = SkillPlanner.Plan(StaticSkillManifest.Preview, stack);
+        Assert.Contains(preview, skill => skill.InstallArg == "uno-mvux");
+        Assert.Contains(preview, skill => skill.InstallArg == "uno-toolkit");
+        Assert.Contains(preview, skill => skill.InstallArg == "uno-themes");
+        Assert.DoesNotContain(preview, skill => skill.InstallArg.StartsWith("uno-mvux-", StringComparison.Ordinal));
     }
 
     [Fact]

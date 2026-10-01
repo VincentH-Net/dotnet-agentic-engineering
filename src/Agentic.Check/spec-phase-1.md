@@ -77,19 +77,29 @@ agentic-check must inspect the local target repo content to detect skill install
   ────────────  ─────────────────────────────────────────────────────────────────────────────
    Matt          uno-csharp-markup                          -markup csharp
   ────────────  ─────────────────────────────────────────────────────────────────────────────
-   Uno Studio    uno-platform                               none
+   Uno Studio    uno-mvux-* skills                          -presentation mvux
   ────────────  ─────────────────────────────────────────────────────────────────────────────
-   Uno Studio    uno-build-app                              none
+   Uno Studio    uno-navigation-* skills                    none
   ────────────  ─────────────────────────────────────────────────────────────────────────────
-   Uno Studio    uno-mvux                                   -presentation mvux
+   Uno Studio    uno-testing-* skills                       none
   ────────────  ─────────────────────────────────────────────────────────────────────────────
-   Uno Studio    uno-navigation                             none
+   Uno Studio    uno-themes-material                        -theme material
   ────────────  ─────────────────────────────────────────────────────────────────────────────
-   Uno Studio    uno-toolkit                                none
+   Uno Studio    uno-themes-simple                          -theme simple
   ────────────  ─────────────────────────────────────────────────────────────────────────────
-   Uno Studio    uno-themes                                 -theme material or -theme simple
+   Uno Studio    uno-themes-semantic-colors-brushes         -theme material or -theme simple
   ────────────  ─────────────────────────────────────────────────────────────────────────────
-   Uno Studio    uno-testing                                none
+   Uno Studio    uno-toolkit-material-theme                 -theme material
+  ────────────  ─────────────────────────────────────────────────────────────────────────────
+   Uno Studio    uno-toolkit-csharp-markup                  -markup csharp
+  ────────────  ─────────────────────────────────────────────────────────────────────────────
+   Uno Studio    other uno-toolkit-* skills                 none
+
+   With `--preview`, the Uno Studio rows are replaced by the hubs that unoplatform/studio's
+   default branch folds them into, each taking the union of the old gates: uno-platform,
+   uno-build-app, uno-mvux (-presentation mvux), uno-navigation, uno-toolkit, uno-themes
+   (-theme material or -theme simple) and uno-testing. They move to stable once a release
+   ships them.
 
 6. Then agentic-check must check the repo-local presence of all skills in the collection and report either all skills present, or display an interactive multi-selection list of all missing skills like `gh skills` presents in interactive installs (Found <nr> recommended skills missing, select skill(s) to install:  [Use arrows to move, space to select, <right> to all, <left> to none, type to filter]), with by default all items selected for install, with enter to confirm the selection. The list must show the repo and skill name parameters as would be passed to `gh skill`.
 
