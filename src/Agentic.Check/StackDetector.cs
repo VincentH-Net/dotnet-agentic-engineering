@@ -4,10 +4,14 @@ namespace Agentic.Check;
 
 static class StackDetector
 {
-    internal static readonly string[] ExcludedDirectoryNames = [".git", ".vs", "bin", "obj", "node_modules"];
+    internal static readonly string[] ExcludedDirectoryNames = [".git", ".vs", "bin", "obj", "node_modules", "TestResults"];
 
-    internal static StackDetectionResult Detect(string repoRoot)
+    internal static StackDetectionResult Detect(string repoRoot) => Detect(repoRoot, null);
+
+    // files: the repository's own file list (see RepositoryFiles); null walks the folder instead.
+    internal static StackDetectionResult Detect(string repoRoot, IReadOnlyCollection<string>? files)
     {
+        FileUniverse universe = new(files);
         List<string> warnings = [];
         List<InstallGateReport> installGateReports = [];
         HashSet<string> technologies = new(StringComparer.OrdinalIgnoreCase)
@@ -15,14 +19,13 @@ static class StackDetector
             TechnologyNames.Foundation
         };
 
-        var projectFiles = EnumerateFiles(repoRoot, "*.csproj");
-        IReadOnlyList<string> propsTargetsFiles = [.. EnumerateFiles(repoRoot, "*.props")
-, .. EnumerateFiles(repoRoot, "*.targets")];
+        var projectFiles = universe.Enumerate(repoRoot, "*.csproj");
+        IReadOnlyList<string> propsTargetsFiles = [.. universe.Enumerate(repoRoot, "*.props"), .. universe.Enumerate(repoRoot, "*.targets")];
 
         if (projectFiles.Count > 0)
         {
             _ = technologies.Add(TechnologyNames.Dotnet);
-            installGateReports.AddRange(DetectDotnetGates(projectFiles, warnings));
+            installGateReports.AddRange(DetectDotnetGates(projectFiles, universe, warnings));
         }
 
         bool unoDetected = projectFiles.Concat(propsTargetsFiles).Any(file => FileContains(file, "Uno.Sdk"));
@@ -37,7 +40,7 @@ static class StackDetector
             _ = technologies.Add(TechnologyNames.Orleans);
         }
 
-        if (projectFiles.Any(IsAspNetCoreProject))
+        if (projectFiles.Any(projectFile => IsAspNetCoreProject(projectFile, universe)))
         {
             _ = technologies.Add(TechnologyNames.AspNetCore);
         }
@@ -46,13 +49,13 @@ static class StackDetector
         return new StackDetectionResult(technologies, installGateReports, warnings);
     }
 
-    static List<InstallGateReport> DetectDotnetGates(IReadOnlyList<string> projectFiles, List<string> warnings)
+    static List<InstallGateReport> DetectDotnetGates(IReadOnlyList<string> projectFiles, FileUniverse universe, List<string> warnings)
     {
         List<InstallGateReport> reports = [];
         foreach (string projectFile in projectFiles)
         {
             var document = TryParseProject(projectFile, File.ReadAllText(projectFile), warnings);
-            if (document is null || !IsInteractiveTerminalProject(document, Path.GetDirectoryName(projectFile) ?? "."))
+            if (document is null || !IsInteractiveTerminalProject(document, universe, Path.GetDirectoryName(projectFile) ?? "."))
             {
                 continue;
             }
@@ -211,7 +214,7 @@ static class StackDetector
         return PackageReferences(document).Any(package => package.StartsWith("Microsoft.Orleans.", StringComparison.OrdinalIgnoreCase));
     }
 
-    static bool IsAspNetCoreProject(string projectFile)
+    static bool IsAspNetCoreProject(string projectFile, FileUniverse universe)
     {
         var document = TryParseProject(projectFile, File.ReadAllText(projectFile), []);
         if (document is null)
@@ -225,7 +228,7 @@ static class StackDetector
         }
 
         return FrameworkReferences(document).Any(reference => reference.Equals("Microsoft.AspNetCore.App", StringComparison.OrdinalIgnoreCase))
-            && HasAspNetCoreCodeSignal(Path.GetDirectoryName(projectFile) ?? ".");
+            && HasAspNetCoreCodeSignal(universe, Path.GetDirectoryName(projectFile) ?? ".");
     }
 
     static bool UsesWebSdk(XDocument document)
@@ -257,11 +260,11 @@ static class StackDetector
 
     static readonly string[] ConsoleInputSignals = ["Console.ReadKey(", "Console.ReadLine(", "Console.In.", "Console.KeyAvailable"];
 
-    static bool IsInteractiveTerminalProject(XDocument document, string projectDirectory)
+    static bool IsInteractiveTerminalProject(XDocument document, FileUniverse universe, string projectDirectory)
         => HasTrueProperty(document, "PackAsTool")
             || document.Descendants().Any(element => element.Name.LocalName.Equals("ToolCommandName", StringComparison.OrdinalIgnoreCase))
             || PackageReferences(document).Any(package => TerminalPackages.Contains(package, StringComparer.OrdinalIgnoreCase))
-            || EnumerateFiles(projectDirectory, "*.cs").Any(file => ConsoleInputSignals.Any(signal => FileContains(file, signal)));
+            || universe.Enumerate(projectDirectory, "*.cs").Any(file => ConsoleInputSignals.Any(signal => FileContains(file, signal)));
 
     static bool HasTrueProperty(XDocument document, string name)
         => document.Descendants()
@@ -294,7 +297,7 @@ static class StackDetector
             .Any(part => part.Equals(sdk, StringComparison.OrdinalIgnoreCase)
                 || part.StartsWith($"{sdk}/", StringComparison.OrdinalIgnoreCase)) == true;
 
-    static bool HasAspNetCoreCodeSignal(string projectDirectory)
+    static bool HasAspNetCoreCodeSignal(FileUniverse universe, string projectDirectory)
     {
         string[] signals =
         [
@@ -314,7 +317,7 @@ static class StackDetector
             "ControllerBase"
         ];
 
-        return EnumerateFiles(projectDirectory, "*.cs")
+        return universe.Enumerate(projectDirectory, "*.cs")
             .Any(file =>
             {
                 string content = File.ReadAllText(file);
@@ -352,6 +355,22 @@ static class StackDetector
         {
             warnings.Add($"Could not parse {projectFile}: {exception.Message}");
             return null;
+        }
+    }
+
+    // The files a scan may see: the repository's own list when there is one, else a walk of the folder.
+    sealed class FileUniverse(IReadOnlyCollection<string>? files)
+    {
+        internal List<string> Enumerate(string directory, string pattern)
+        {
+            if (files is null)
+            {
+                return EnumerateFiles(directory, pattern);
+            }
+
+            string root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(directory)) + Path.DirectorySeparatorChar;
+            string extension = pattern.TrimStart('*');
+            return [.. files.Where(file => file.StartsWith(root, StringComparison.Ordinal) && file.EndsWith(extension, StringComparison.OrdinalIgnoreCase))];
         }
     }
 

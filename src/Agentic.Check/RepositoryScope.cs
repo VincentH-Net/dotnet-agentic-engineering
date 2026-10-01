@@ -19,6 +19,6 @@ static class RepositoryScope
         return [directories[0]];
     }
 
-    static bool IsGitRoot(string directory)
+    internal static bool IsGitRoot(string directory)
         => Directory.Exists(Path.Combine(directory, ".git")) || File.Exists(Path.Combine(directory, ".git"));
 }

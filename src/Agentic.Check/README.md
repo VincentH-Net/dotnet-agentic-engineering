@@ -37,6 +37,7 @@ The .NET CLI end-to-end testing skill is selected when a project interacts with 
 
 - .NET 10 SDK or later ([install](https://dotnet.microsoft.com/download))
 - `gh` CLI ([install](https://cli.github.com/))
+- Optional: Git ([install](https://git-scm.com/downloads)). Inside a repository that has a `.gitignore`, the file list comes from git, so ignored output folders are never scanned. Otherwise the folder is walked, skipping `bin`, `obj`, `TestResults` and similar output folders.
 
 GitHub login is optional. Without it, public sources are read anonymously, which is enough for
 a handful of skills. When GitHub's anonymous rate limit is reached, `agentic.check` stops and asks

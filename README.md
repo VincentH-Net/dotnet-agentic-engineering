@@ -54,6 +54,7 @@ Prerequisites:
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download) or later
 - [`gh` CLI](https://cli.github.com/). Skills are installed with `gh skill`, which uses GitHub's API quota. Anonymous access is enough for a handful of skills; `gh auth login` gives you a much higher quota, and `agentic.check` tells you when you need it.
+- Optional: [Git](https://git-scm.com/downloads). Inside a repository that has a `.gitignore`, `dna check` takes its file list from git, so ignored output folders are never scanned. Otherwise it walks the folder and skips `bin`, `obj`, `TestResults` and similar output folders.
 - Recommended: check the [Agentic Development Environment Setup](docs/dev-environment-setup.md) for models, harnesses and MCPs
 
 ### 1. Install or update in a repo

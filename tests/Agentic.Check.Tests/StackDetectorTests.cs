@@ -55,6 +55,34 @@ public sealed class StackDetectorTests
     }
 
     [Fact]
+    public void DetectScansOnlyTheRepositoryFiles()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write("App/App.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\" />");
+        tempDirectory.Write("App/Program.cs", "Console.ReadLine();");
+        tempDirectory.Write("out/Stale/Stale.csproj", "<Project Sdk=\"Uno.Sdk\" />");
+
+        var result = StackDetector.Detect(tempDirectory.Path, [Path.Combine(tempDirectory.Path, "App", "App.csproj")]);
+
+        Assert.Contains(TechnologyNames.Dotnet, result.Technologies);
+        Assert.DoesNotContain(TechnologyNames.Uno, result.Technologies);
+        Assert.DoesNotContain(result.InstallGates, gate => gate.Technology == TechnologyNames.Dotnet);
+    }
+
+    [Fact]
+    public void WalkSkipsTestResults()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write("App.csproj", "<Project />");
+        tempDirectory.Write("TestResults/Old/Old.csproj", "<Project Sdk=\"Uno.Sdk\" />");
+
+        var result = StackDetector.Detect(tempDirectory.Path);
+
+        Assert.Contains(TechnologyNames.Dotnet, result.Technologies);
+        Assert.DoesNotContain(TechnologyNames.Uno, result.Technologies);
+    }
+
+    [Fact]
     public void DetectsUnoGatesFromDirectoryBuildProps()
     {
         using TempDirectory tempDirectory = new();

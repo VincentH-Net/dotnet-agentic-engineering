@@ -278,12 +278,13 @@ sealed class CheckWorkflow(
             }
         }
 
+        var repositoryFiles = await RepositoryFiles.ListAsync(commandRunner, targetDirectory, cancellationToken).ConfigureAwait(false);
         await reporter.RunProgressAsync(
             "Scanning target directory",
             4,
             async advance =>
             {
-                var detectedStack = StackDetector.Detect(targetDirectory);
+                var detectedStack = StackDetector.Detect(targetDirectory, repositoryFiles);
                 stack = detectedStack;
                 report.Technologies.AddRange(detectedStack.Technologies.Order(StringComparer.OrdinalIgnoreCase));
                 report.InstallGates.AddRange(detectedStack.InstallGates);
