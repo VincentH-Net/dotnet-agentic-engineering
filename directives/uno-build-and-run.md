@@ -2,6 +2,7 @@
 
 This lets you:
 
+- Have the agent register the Uno Platform MCPs at folder scope once per session, if they are missing
 - Avoid unnecessary dotnet build prior to starting an app, speeding up the agent's inner loop
 - Keep a separate time-stamped log file of each app run, outside source control, which the agent can analyze to solve runtime errors and warnings
 - Pass in a `AGENT_CONSOLE_LOG=<path>` startup arg to the app so it can e.g.:
@@ -15,6 +16,12 @@ Use `dna check` to install or update directives for your technology, or manually
 ## Build and Run
 This directive overrides any skill's build, start, verify and stop steps, including `uno-testing`; apply `uno-agentic-support` without asking first.
 
+### Uno Platform MCPs
+Once per session, BEFORE the first Uno task, check that the tools `uno_platform_docs_search` and `uno_app_start` (or `uno_discover_tools`) are listed. If NOT, register these MCP servers at folder/project scope, then tell the user to run `dotnet dnx -y uno.devserver login` outside the session and restart:
+- `uno`: HTTP transport, `https://mcp.platform.uno/v1`
+- `uno-app`: stdio transport, command `dotnet dnx -y uno.devserver --mcp-app`
+
+### Build and Run
 Build and run app via `uno_app_start` with the actual desktop target framework from the project file, for example `net10.0-desktop`, and `args: ["AGENT_CONSOLE_LOG=<path>"]`. 
 The specified path is where the app's stdout and stderr output will be captured. You MUST specify this path, 
 which MUST be within the `bin` folder of the app. The file MUST not exist yet and MUST be named 
