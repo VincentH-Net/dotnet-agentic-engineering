@@ -229,12 +229,14 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
         ProgressLog.Append($"{fixtureName} {scenario}: verifying");
         var after = FixtureFiles.Inventory(workspace.Target);
         foreach (var (path, hash) in before.Where(file => file.Key is not "AGENTS.md" and not "CLAUDE.md" and not ".config/dotnet-tools.json"
+            && !IsReadme(file.Key)
             && !file.Key.StartsWith(".agents/skills/", StringComparison.Ordinal) && !file.Key.StartsWith(".claude/skills/", StringComparison.Ordinal)
             && !file.Key.StartsWith(".codex/rules/", StringComparison.Ordinal)))
         {
             FixtureFiles.Require(after.GetValueOrDefault(path) == hash, $"Unrelated file changed: {path}");
         }
 
+        await VerifyReadmeAsync(after).ConfigureAwait(false);
         string agents = await File.ReadAllTextAsync(Path.Combine(workspace.Target, "AGENTS.md")).ConfigureAwait(false);
         if (scenario != "fresh")
         {
@@ -414,6 +416,32 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
         }
         return false;
     }
+
+    // The README is dna-owned only for the badge: a declined run leaves it alone, and every other run
+    // that installs the dna directive adds the badge unless the README already links to the repository.
+    async Task VerifyReadmeAsync(SortedDictionary<string, string> after)
+    {
+        string? readme = after.Keys.FirstOrDefault(IsReadme);
+        if (readme is null)
+        {
+            FixtureFiles.Require(!before.Keys.Any(IsReadme), "README disappeared.");
+            return;
+        }
+
+        if (scenario is "preview-declined" or "stable-declined")
+        {
+            FixtureFiles.Require(after[readme] == before.GetValueOrDefault(readme), "Deselected README badge changed README.");
+            return;
+        }
+
+        string content = await File.ReadAllTextAsync(Path.Combine(workspace.Target, readme)).ConfigureAwait(false);
+        FixtureFiles.Require(content.Contains(ToolHeader.RepositoryUrl, StringComparison.OrdinalIgnoreCase), "README does not link to the repository after the run.");
+        if (before.TryGetValue(readme, out string? previous) && previous != after[readme])
+            FixtureFiles.Require(content.Contains(ReadmeBadgeInstaller.Badge, StringComparison.Ordinal), "README changed without the badge.");
+    }
+
+    static bool IsReadme(string path)
+        => path.Equals("README.md", StringComparison.OrdinalIgnoreCase);
 
     static bool ContentChanged(SortedDictionary<string, string> oldFiles, SortedDictionary<string, string> newFiles)
         => oldFiles.Where(file => file.Key.StartsWith(".agents/skills/", StringComparison.Ordinal))

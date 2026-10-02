@@ -342,6 +342,11 @@ sealed class CheckWorkflow(
             ? CodexRulesInstaller.Plan(targetDirectory)
             : null;
 
+        // Offered once: in the run that installs the attribution directive, when the README does not link here yet.
+        var readmeBadgePlan = directivePlan.Directives.Any(directive => directive.Name == DirectiveInstaller.AttributionDirectiveName && directive.Status == DirectiveStatuses.Missing)
+            ? ReadmeBadgeInstaller.Plan(targetDirectory)
+            : null;
+
         report.AgentsFile = directivePlan.AgentsFile;
         report.ClaudeFile = directivePlan.ClaudeFile;
         report.Directives.AddRange(directivePlan.Directives.Select(directive => new DirectiveReportItem(directive.Name, directive.Status)));
@@ -522,6 +527,11 @@ sealed class CheckWorkflow(
             recommendedSkillActions = [.. recommendedSkillActions, CodexRulesInstaller.Action(codexRulesPlan)];
         }
 
+        if (readmeBadgePlan is { IsCurrent: false })
+        {
+            recommendedSkillActions = [.. recommendedSkillActions, ReadmeBadgeInstaller.Action(readmeBadgePlan)];
+        }
+
         IReadOnlyList<DirectivePlanItem> selectedDirectives = [];
         IReadOnlyList<SkillManifestEntry> selectedSkills = [];
         if (!options.DryRun && !options.Preview)
@@ -639,7 +649,24 @@ sealed class CheckWorkflow(
             }
         }
 
-        selectedSkills = [.. selectedSkills.Where(skill => !skill.IsCompanion && !skill.IsDna && !skill.IsCodexRules)];
+        if (selectedSkills.Any(skill => skill.IsReadmeBadge))
+        {
+            var readmeBadge = await ReadmeBadgeInstaller.EnsureAsync(readmeBadgePlan!, options.DryRun, cancellationToken).ConfigureAwait(false);
+            report.ReadmeBadge = readmeBadge;
+            string verb = options.DryRun ? "Would add" : "Added";
+            string description = ActionOutputFormatter.FormatLine($"{verb} README badge", readmeBadgePlan!.Display);
+            report.Actions.Add($"{verb} README badge in {readmeBadge.File}.");
+            if (readmeBadge.Success)
+            {
+                reporter.Success(description);
+            }
+            else
+            {
+                reporter.Error($"{description}: {readmeBadge.Error}");
+            }
+        }
+
+        selectedSkills = [.. selectedSkills.Where(skill => !skill.IsCompanion && !skill.IsDna && !skill.IsCodexRules && !skill.IsReadmeBadge)];
 
         var directiveResult = await directiveInstaller
             .ApplyAsync(directivePlan, selectedDirectives.Select(directive => directive.Name), options.DryRun, cancellationToken)
@@ -675,7 +702,7 @@ sealed class CheckWorkflow(
             }
 
             await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
-            return new CheckRunResult(report.Companion?.Success == false || report.Dna?.Success == false || report.CodexRules?.Success == false ? 1 : 0, report);
+            return new CheckRunResult(report.Companion?.Success == false || report.Dna?.Success == false || report.CodexRules?.Success == false || report.ReadmeBadge?.Success == false ? 1 : 0, report);
         }
 
         if (selectedSkills.Count > 0)
@@ -749,7 +776,7 @@ sealed class CheckWorkflow(
             }, cancellationToken).ConfigureAwait(false);
         }
 
-        int exitCode = report.Companion?.Success == false || report.Dna?.Success == false || report.CodexRules?.Success == false || report.SkillUpdates.Any(result => !result.Success) || report.InstallResults.Any(result => !result.Success) || report.SkillCopyResults.Any(result => !result.Success) ? 1 : 0;
+        int exitCode = report.Companion?.Success == false || report.Dna?.Success == false || report.CodexRules?.Success == false || report.ReadmeBadge?.Success == false || report.SkillUpdates.Any(result => !result.Success) || report.InstallResults.Any(result => !result.Success) || report.SkillCopyResults.Any(result => !result.Success) ? 1 : 0;
         await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
         return new CheckRunResult(exitCode, report);
     }

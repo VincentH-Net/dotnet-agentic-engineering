@@ -597,6 +597,27 @@ public sealed class SkillSelectionStateTests
     static string[] PlainRows(RecommendationSelectionState state)
         => [.. RecommendationSelectionPrompt.FormatFilterRows(state).Select(Spectre.Console.Markup.Remove)];
 
+    [Fact]
+    public void ReadmeBadgeIsAToolRowSelectedByDefaultAndDeselectable()
+    {
+        var badge = ReadmeBadgeInstaller.Action(new ReadmeBadgePlan("/repo/README.md", false, "README.md"));
+        var items = RecommendationSelectionPrompt.BuildItems([], [new("owner/repo", "alpha", "alpha", TechnologyNames.Dotnet, []), badge]);
+        var badgeItem = Assert.Single(items, item => item.Skill?.IsReadmeBadge == true);
+        RecommendationSelectionState state = new(items);
+
+        Assert.Equal(RecommendationSelectionKind.Tool, badgeItem.Kind);
+        Assert.Equal("README badge: agentic engineering with dna (add)", badgeItem.Display);
+        Assert.True(state.IsSelected(badgeItem));
+        var defaults = RecommendationSelectionPrompt.DefaultSelection([], [badge], new(new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)));
+        Assert.Contains(badge, defaults.SelectedSkills);
+
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Down));
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Toggle));
+
+        Assert.False(state.IsSelected(badgeItem));
+        Assert.DoesNotContain(badge, state.SelectedSkills);
+    }
+
     static IReadOnlyList<RecommendationSelectionItem> CreateItems(string[] directiveNames, string[] skillNames)
         => [.. directiveNames
             .Select(name => new RecommendationSelectionItem(

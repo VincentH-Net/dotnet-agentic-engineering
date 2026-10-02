@@ -16,6 +16,8 @@ sealed class AgenticCheckReport
 
     public CodexRulesReport? CodexRules { get; set; }
 
+    public ReadmeBadgeReport? ReadmeBadge { get; set; }
+
     public string? RepoRoot { get; set; }
 
     public string? SkillsDirectory { get; set; }

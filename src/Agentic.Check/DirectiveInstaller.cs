@@ -68,6 +68,10 @@ static class DirectiveStatuses
 
 sealed partial class DirectiveInstaller(IDirectiveSource source, IReporter reporter)
 {
+    // The one-line attribution block describes the blocks below it, so it is inserted above the
+    // first managed block of an existing file; in a new file it comes first by plan order.
+    internal const string AttributionDirectiveName = "dna";
+
     public async Task<DirectiveResult> EnsureAsync(
         string repoRoot,
         StackDetectionResult stack,
@@ -276,7 +280,9 @@ sealed partial class DirectiveInstaller(IDirectiveSource source, IReporter repor
                 continue;
             }
 
-            content = AppendBlock(content, directive.Content);
+            content = directive.Name == AttributionDirectiveName
+                ? InsertBlockAboveManagedBlocks(content, directive.Content)
+                : AppendBlock(content, directive.Content);
             actions.Add(dryRun
                 ? $"Would add directive {directive.Name} to AGENTS."
                 : $"Added directive {directive.Name} to AGENTS.");
@@ -422,11 +428,31 @@ sealed partial class DirectiveInstaller(IDirectiveSource source, IReporter repor
         return EnsureTrailingNewline(content).TrimEnd('\n') + "\n\n" + block;
     }
 
+    static string InsertBlockAboveManagedBlocks(string content, string block)
+    {
+        var firstMarker = StartMarkerLineRegex().Match(content);
+        if (!firstMarker.Success)
+        {
+            return AppendBlock(content, block);
+        }
+
+        string before = content[..firstMarker.Index];
+        if (before.Length > 0 && !before.EndsWith("\n\n", StringComparison.Ordinal))
+        {
+            before = before.TrimEnd('\n') + "\n\n";
+        }
+
+        return before + block + "\n\n" + content[firstMarker.Index..];
+    }
+
     static string NormalizeNewlines(string value)
         => value.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
 
     static string EnsureTrailingNewline(string value)
         => value.EndsWith('\n') ? value : value + "\n";
+
+    [GeneratedRegex(@"(?m)^<!-- [^\s]+:start -->[ \t]*$", RegexOptions.CultureInvariant)]
+    private static partial Regex StartMarkerLineRegex();
 
     [GeneratedRegex(@"(?ms)^~~~md\s*$\n(?<content>.*?)^~~~\s*$|^```md\s*$\n(?<content>.*?)^```\s*$", RegexOptions.CultureInvariant)]
     private static partial Regex DirectiveFenceRegex();

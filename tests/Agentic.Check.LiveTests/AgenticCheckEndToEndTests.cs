@@ -139,6 +139,36 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
 
     [Fact]
     [Trait("Category", "EndToEnd")]
+    public async Task ReadmeBadgeIsOfferedSelectedAndAddedWhenKept()
+    {
+        if (IsUnsupportedPlatform())
+        {
+            return;
+        }
+
+        using var workspace = await TestWorkspace.CreateAsync(nameof(ReadmeBadgeIsOfferedSelectedAndAddedWhenKept), writeDotnetProject: false).ConfigureAwait(true);
+        workspace.WriteRepoFile("README.md", "# Sample\n\nHello.\n");
+        _ = await RunInteractiveCommandAsync(workspace, $"--agents codex {Quote(workspace.RepoPath)}", async auto =>
+        {
+            await auto.WaitUntilTextAsync("[x] README badge: agentic engineering with dna (add)").ConfigureAwait(true);
+            await auto.WaitUntilTextAsync("[x] dna (install)").ConfigureAwait(true);
+            // Keep only the badge: deselect everything, then check it back through the filter.
+            await auto.LeftAsync().ConfigureAwait(true);
+            await auto.TypeAsync("README").ConfigureAwait(true);
+            await auto.WaitUntilTextAsync("Filter: README").ConfigureAwait(true);
+            await auto.SpaceAsync().ConfigureAwait(true);
+            await auto.WaitUntilTextAsync("[x] README badge").ConfigureAwait(true);
+            await auto.EscapeAsync().ConfigureAwait(true);
+            await auto.WaitUntilTextAsync("Type to filter").ConfigureAwait(true);
+            await auto.EnterAsync().ConfigureAwait(true);
+        }).ConfigureAwait(true);
+        Assert.Equal($"# Sample\n\n{ReadmeBadgeInstaller.Badge}\n\nHello.\n", await workspace.ReadRepoFileAsync("README.md").ConfigureAwait(true));
+        Assert.DoesNotContain("skill install", await workspace.ReadGhLogAsync().ConfigureAwait(true), StringComparison.Ordinal);
+        AssertRecordingWasWritten(workspace);
+    }
+
+    [Fact]
+    [Trait("Category", "EndToEnd")]
     public async Task DirectiveSelectionIncludesCompanionAndDryRunDoesNotInstall()
     {
         if (IsUnsupportedPlatform())

@@ -268,7 +268,7 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
     }
 
     static bool IsTargetLocalRepair(RecommendationSelectionItem item)
-        => item.Skill is { IsCompanion: true } or { IsDna: true } or { IsCodexRules: true }
+        => item.Skill is { IsCompanion: true } or { IsDna: true } or { IsCodexRules: true } or { IsReadmeBadge: true }
             || item.Directive?.Status == DirectiveStatuses.Outdated
             || item.Skill?.ForceInstall == true;
 
@@ -538,7 +538,7 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console, IRecommendation
         items.AddRange(missingSkills.Select(skill => new RecommendationSelectionItem(
             RecommendationSelectionState.FormatSkillKey(skill.SourceRepo, skill.InstallArg),
             FormatSkillListItem(skill),
-            skill.IsCompanion || skill.IsDna || skill.IsCodexRules ? RecommendationSelectionKind.Tool : RecommendationSelectionKind.Skill,
+            skill.IsCompanion || skill.IsDna || skill.IsCodexRules || skill.IsReadmeBadge ? RecommendationSelectionKind.Tool : RecommendationSelectionKind.Skill,
             null,
             skill,
             skill.Version)));
@@ -881,7 +881,7 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console, IRecommendation
                 lastSkillPlugin = null;
             }
 
-            if (item.Skill is { IsCompanion: false, IsDna: false, IsCodexRules: false })
+            if (item.Skill is { IsCompanion: false, IsDna: false, IsCodexRules: false, IsReadmeBadge: false })
             {
                 string skillSourceRepo = item.Skill.SourceRepo;
                 bool showPluginHeaders = !visibleSkillSourceReposWithoutPluginHeaders.Contains(skillSourceRepo, StringComparer.OrdinalIgnoreCase);

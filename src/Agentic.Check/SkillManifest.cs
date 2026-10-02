@@ -58,6 +58,8 @@ sealed record SkillManifestEntry
 
     public bool IsCodexRules => Key == CodexRulesInstaller.Identity.Key;
 
+    public bool IsReadmeBadge => Key == ReadmeBadgeInstaller.Identity.Key;
+
     public bool IsRequiredToolRepair { get; init; }
 
     public string RecommendationAction { get; init; }

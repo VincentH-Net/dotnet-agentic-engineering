@@ -82,7 +82,7 @@ By default skills come from the latest stable release in each source repo; `--pr
 dnx agentic.check -- -h
 ```
 
-Directives are installed in `AGENTS.md` (which is included in `CLAUDE.md`), skills with `gh skill`, tools with `dotnet tool`; for Codex, rules to run `dotnet` with network access go in `.codex/rules`.
+Directives are installed in `AGENTS.md` (which is included in `CLAUDE.md`), skills with `gh skill`, tools with `dotnet tool`; for Codex, rules to run `dotnet` with network access go in `.codex/rules`. The first `dna check` in a repository with a `README.md` also offers a badge that links here, selected like every other recommendation and deselectable in the list.
 
 GitHub login is optional. Without it, public sources are read anonymously, which is enough for
 a handful of skills. If GitHub's anonymous rate limit is reached, `agentic.check` stops and asks
@@ -153,6 +153,7 @@ This repo offers the following directives (markdown snippets to include in your 
 
 | Directive | Description |
 |----------|-------------|
+| [`dna`](./directives/dna.md) | One visible line above the other blocks that says they are managed by dna, links to this repository, and tells agents and people to update them with `dna check` rather than by hand. |
 | [`foundation-documentation-sources`](./directives/foundation-documentation-sources.md) | Prioritizes first-party vendor MCPs for external documentation, e.g. using Microsoft Learn before Context7 for Microsoft technologies. |
 | [`foundation-prompt-log`](./directives/foundation-prompt-log.md) | Records sanitized user prompts and agent question-and-answer pairs in code commit messages so intent is preserved and can be replayed later. Uses the `dotnet agentic` tool. |
 | [`dotnet-cli-run`](./directives/dotnet-cli-run.md) | Prevents long agent timeout delays from running `dotnet` without network access. For Codex, `dna check` also offers rules that run `dotnet` outside the sandbox without approval prompts. |
