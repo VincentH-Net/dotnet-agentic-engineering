@@ -93,11 +93,13 @@ static class FixtureFiles
 }
 
 sealed record FixtureDefinition(string Name, string Agents, bool BaselinePreview, string[] Technologies, Dictionary<string, string[]> Gates);
-sealed record BaselineDefinition(string InstallerId, string InstallerVersion, string PackageUrl, bool CompanionExpected, PublishedToolDefinition? Companion = null);
+// Dna names the published shorthand package an installer with --yes installs globally; the controlled
+// feed must carry it, or the installer's global install step fails for every fixture.
+sealed record BaselineDefinition(string InstallerId, string InstallerVersion, string PackageUrl, bool CompanionExpected, PublishedToolDefinition? Companion = null, PublishedToolDefinition? Dna = null);
 sealed record FixtureCapture(string Name, DateTimeOffset PreparedAtUtc, string Label, FixtureDefinition Definition,
     SortedDictionary<string, string> TriggerHashes, SortedDictionary<string, string> Files, JsonElement Report,
     IReadOnlyList<SkillOrigin> Sources, PackageArtifact? Companion, string SnapshotSha256, SourceIdentity DirectiveSource,
-    string[] Invocation, string[] RejectedItems);
+    string[] Invocation, string[] RejectedItems, PackageArtifact? Dna = null);
 sealed record BaselineCollection(string Id, BaselineDefinition Definition, PackageArtifact Installer, DateTimeOffset RetrievedAtUtc,
     string SdkVersion, string GhVersion, string OperatingSystem, string[] Completed, Dictionary<string, string> Failed, string InstallerRuntimeVersion);
 

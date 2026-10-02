@@ -1,0 +1,49 @@
+{
+  "id": "agentic-check-2.4.0-2026-10-02-capture01",
+  "definition": {
+    "installerId": "Agentic.Check",
+    "installerVersion": "2.4.0",
+    "packageUrl": "https://api.nuget.org/v3-flatcontainer/agentic.check/2.4.0/agentic.check.2.4.0.nupkg",
+    "companionExpected": true,
+    "companion": {
+      "id": "InnoWvate.Agentic",
+      "version": "2.4.0",
+      "url": "https://api.nuget.org/v3-flatcontainer/innowvate.agentic/2.4.0/innowvate.agentic.2.4.0.nupkg"
+    },
+    "dna": {
+      "id": "InnoWvate.Dna",
+      "version": "1.0.0",
+      "url": "https://api.nuget.org/v3-flatcontainer/innowvate.dna/1.0.0/innowvate.dna.1.0.0.nupkg"
+    }
+  },
+  "installer": {
+    "path": "Agentic.Check.2.4.0.nupkg",
+    "id": "Agentic.Check",
+    "version": "2.4.0",
+    "sha256": "872194b4db6bebd58f60adc352ce4f6802223d3de5c370f4ead6999909fcfcf7",
+    "repositoryCommit": "2ebc341870075004a564a586c1f53e1118298973",
+    "retrievedAtUtc": "2026-10-02T16:48:23.733903+00:00"
+  },
+  "retrievedAtUtc": "2026-10-02T16:48:23.733903+00:00",
+  "sdkVersion": "10.0.301",
+  "ghVersion": "gh version 2.101.0 (2026-09-15)\nhttps://github.com/cli/cli/releases/tag/v2.101.0",
+  "operatingSystem": "macOS 26.6.2",
+  "completed": [
+    "aspnetcore-framework-reference",
+    "aspnetcore-test-exclusion",
+    "aspnetcore-web",
+    "broad-stack",
+    "dotnet-cli",
+    "dotnet-library",
+    "foundation-only",
+    "orleans",
+    "preview-web-cli",
+    "uno-conflicting-gates",
+    "uno-cupertino",
+    "uno-defaults",
+    "uno-mvvm-csharp2-fluent",
+    "uno-simple"
+  ],
+  "failed": {},
+  "installerRuntimeVersion": "2.4.0\u002B2ebc341870075004a564a586c1f53e1118298973"
+}

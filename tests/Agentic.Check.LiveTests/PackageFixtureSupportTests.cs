@@ -96,7 +96,17 @@ public sealed class PackageFixtureSupportTests
                 FixtureFiles.ExtractSnapshot(archive, snapshot);
                 Assert.True(FixtureFiles.EqualInventory(metadata.Files, FixtureFiles.Inventory(snapshot)));
                 foreach (var (path, hash) in metadata.TriggerHashes)
-                    Assert.Equal(hash, FixtureFiles.Hash(Path.Combine(snapshot, path)));
+                {
+                    string installed = Path.Combine(snapshot, path);
+                    // The installer may add the built-with badge to a trigger README; every other trigger file stays byte-identical.
+                    if (path.Equals("README.md", StringComparison.OrdinalIgnoreCase) && FixtureFiles.Hash(installed) != hash)
+                    {
+                        Assert.Contains(ToolHeader.RepositoryUrl, File.ReadAllText(installed), StringComparison.OrdinalIgnoreCase);
+                        continue;
+                    }
+
+                    Assert.Equal(hash, FixtureFiles.Hash(installed));
+                }
                 BaselinePreparation.VerifyReport(metadata.Report, metadata.Definition);
                 AssertDetection(MigrationExpectations.ForBaseline(collection.Id, metadata.Definition), snapshot);
                 Assert.DoesNotContain(metadata.Files.Keys, path => path.Split('/').Any(part => part is ".git" or "bin" or "obj") || path.EndsWith(".nupkg", StringComparison.Ordinal));

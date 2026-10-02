@@ -30,6 +30,7 @@ static class BaselinePreparation
         await WaitForSourceBudgetAsync().ConfigureAwait(false);
         var package = await PackageArtifact.DownloadAsync(definition).ConfigureAwait(false);
         var companion = definition.Companion is null ? null : await PackageArtifact.DownloadAsync(definition.Companion).ConfigureAwait(false);
+        var dna = definition.Dna is null ? null : await PackageArtifact.DownloadAsync(definition.Dna).ConfigureAwait(false);
         var retrieved = previous?.RetrievedAtUtc ?? package.RetrievedAtUtc ?? DateTimeOffset.UtcNow;
         if (previous is not null)
             FixtureFiles.Require(previous.Installer.Sha256 == package.Sha256, "Resume installer bytes differ.");
@@ -55,7 +56,7 @@ static class BaselinePreparation
             Console.WriteLine($"Preparing {fixture.Name} with published {package.Id} {package.Version}...");
             try
             {
-                await CaptureAsync(fixture, fixturePath, definition, destination, pending, executable, companion).ConfigureAwait(false);
+                await CaptureAsync(fixture, fixturePath, definition, destination, pending, executable, companion, dna).ConfigureAwait(false);
                 completed.Add(fixture.Name);
                 _ = failed.Remove(fixture.Name);
                 Console.WriteLine($"Completed {fixture.Name}.");
@@ -105,7 +106,7 @@ static class BaselinePreparation
         }
     }
 
-    static async Task CaptureAsync(FixtureDefinition fixture, string fixturePath, BaselineDefinition baseline, string destination, string captureDestination, string executable, PackageArtifact? companion)
+    static async Task CaptureAsync(FixtureDefinition fixture, string fixturePath, BaselineDefinition baseline, string destination, string captureDestination, string executable, PackageArtifact? companion, PackageArtifact? dna)
     {
         using FixtureWorkspace workspace = new();
         FixtureFiles.MaterializeTrigger(fixturePath, workspace.Target);
@@ -113,6 +114,8 @@ static class BaselinePreparation
         await workspace.InitializeAsync().ConfigureAwait(false);
         if (companion is not null)
             workspace.AddPackage(companion);
+        if (dna is not null)
+            workspace.AddPackage(dna);
         // Reuse only responses written by real invocations during this explicit preparation operation.
         workspace.Environment["AGENTIC_CHECK_CACHE_DIR"] = Path.Combine(FixtureFiles.Reports, "preparation", Path.GetFileName(destination), "http-cache");
         workspace.Environment["AGENTIC_CHECK_CACHE_SECONDS"] = "3600";
@@ -166,7 +169,8 @@ static class BaselinePreparation
         FixtureFiles.WriteJson(Path.Combine(capture, "metadata.json"), new FixtureCapture(fixture.Name, capturedAt,
             $"Installed using {baseline.InstallerId} {baseline.InstallerVersion} on {capturedAt:O}", fixture, triggerHashes,
             FixtureFiles.Inventory(workspace.Target), sanitizedReport.RootElement.Clone(), origins, companion is null ? null : companion with { Path = Path.GetFileName(companion.Path) }, FixtureFiles.Hash(installed), new(directiveSource.Repository, directiveSource.Reference, directiveSource.Commit),
-            ["agentic-check", .. arguments.Select(argument => argument.Replace(workspace.Target, "$TARGET", StringComparison.Ordinal).Replace(workspace.Root, "$WORKSPACE", StringComparison.Ordinal))], []));
+            ["agentic-check", .. arguments.Select(argument => argument.Replace(workspace.Target, "$TARGET", StringComparison.Ordinal).Replace(workspace.Root, "$WORKSPACE", StringComparison.Ordinal))], [],
+            dna is null ? null : dna with { Path = Path.GetFileName(dna.Path) }));
         foreach (var origin in origins.Select(origin => new SourceIdentity(origin.Repository, origin.Reference, origin.Commit))
             .Append(new(directiveSource.Repository, directiveSource.Reference, directiveSource.Commit)).DistinctBy(origin => origin.Repository))
         {

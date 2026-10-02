@@ -31,7 +31,9 @@ ZIP storage prevents tools from generating `obj` files in persistent snapshots. 
 actual preparation time, invocation/report, source refs/commits/trees and upstream file hashes.
 The collection records the published installer URL, original package checksum and retrieval
 time, SDK/gh/OS versions, completed captures and explicit failures. A null companion means
-there was no companion in that baseline. Third-party root licenses/notices are beside each
+there was no companion in that baseline. A definition's optional `dna` entry names the published
+shorthand package the installer installs globally with `--yes` (2.3.0 and later); it joins the
+controlled feed and is recorded per capture. Third-party root licenses/notices are beside each
 snapshot; licenses inside skill directories remain in the archive.
 
 Snapshots are immutable. Tests extract independent copies, validate inventories, and check

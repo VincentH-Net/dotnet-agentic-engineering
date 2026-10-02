@@ -1,0 +1,175 @@
+{
+  "name": "foundation-only",
+  "preparedAtUtc": "2026-10-02T16:52:39.556898+00:00",
+  "label": "Installed using Agentic.Check 2.4.0 on 2026-10-02T16:52:39.5568980\u002B00:00",
+  "definition": {
+    "name": "foundation-only",
+    "agents": "codex",
+    "baselinePreview": false,
+    "technologies": [
+      "foundation"
+    ],
+    "gates": {}
+  },
+  "triggerHashes": {
+    "README.md": "0ce5c46a2e6f8e89eb49e96441c845051ec55a9f16ea0e9ad3c16b0748462101"
+  },
+  "files": {
+    ".config/dotnet-tools.json": "fddc5b873e9b05a0cd130b269315e186f484ac7ebce2f38d844f9db9d162fcca",
+    "AGENTS.md": "56824cb04f208122465363f299604a01c50d9750cceeed239695cf04ae2df73f",
+    "README.md": "5aeb9b5d769018d908b411c4240378714dc9d88383d2547cd7d38774b4b76686"
+  },
+  "report": {
+    "targetDirectory": "$TARGET",
+    "dryRun": false,
+    "previewSourceRef": null,
+    "previewSourceRefOrigin": null,
+    "companion": {
+      "manifestPath": "$TARGET/.config/dotnet-tools.json",
+      "installedVersion": null,
+      "requiredMinimum": "2.4",
+      "pattern": "2.*",
+      "action": "install",
+      "success": true,
+      "resolvedVersion": "2.4.0",
+      "changed": true,
+      "error": null
+    },
+    "dna": {
+      "action": "install",
+      "installedVersion": null,
+      "resolvedVersion": "1.0.0",
+      "success": true,
+      "skipped": false,
+      "conflicts": [],
+      "error": null
+    },
+    "codexRules": null,
+    "readmeBadge": {
+      "file": "$TARGET/README.md",
+      "action": "add",
+      "success": true,
+      "error": null
+    },
+    "repoRoot": "$TARGET",
+    "skillsDirectory": "$TARGET/.agents/skills",
+    "skillsDirectories": [
+      "$TARGET/.agents/skills"
+    ],
+    "prerequisites": [
+      {
+        "name": "gh",
+        "success": true,
+        "version": "2.101.0",
+        "minimumVersion": "2.93.0",
+        "standardOutput": "gh version 2.101.0 (2026-09-15)\nhttps://github.com/cli/cli/releases/tag/v2.101.0\n",
+        "standardError": ""
+      },
+      {
+        "name": "gh skill",
+        "success": true,
+        "version": null,
+        "minimumVersion": null,
+        "standardOutput": "Install and manage agent skills from GitHub repositories.\n\nWorking with agent skills in the GitHub CLI is in preview and\nsubject to change without notice.\n\n\nUSAGE\n  gh skill \u003Ccommand\u003E [flags]\n\nALIASES\n  gh skills\n\nAVAILABLE COMMANDS\n  install:       Install agent skills from a GitHub repository (preview)\n  list:          List installed skills (preview)\n  preview:       Preview a skill from a GitHub repository (preview)\n  publish:       Validate and publish skills to a GitHub repository (preview)\n  search:        Search for skills across GitHub (preview)\n  update:        Update installed skills to their latest versions (preview)\n\nINHERITED FLAGS\n  --help   Show help for command\n\nEXAMPLES\n  # Search for skills\n  $ gh skill search terraform\n  \n  # Install a skill\n  $ gh skill install github/awesome-copilot documentation-writer\n  \n  # List installed skills\n  $ gh skill list\n  \n  # Preview a skill before installing\n  $ gh skill preview github/awesome-copilot documentation-writer\n  \n  # Update all installed skills\n  $ gh skill update --all\n  \n  # Validate skills for publishing\n  $ gh skill publish --dry-run\n\nLEARN MORE\n  Use \u0060gh \u003Ccommand\u003E \u003Csubcommand\u003E --help\u0060 for more information about a command.\n  Read the manual at https://cli.github.com/manual\n  Learn about exit codes using \u0060gh help exit-codes\u0060\n  Learn about accessibility experiences using \u0060gh help accessibility\u0060\n\n",
+        "standardError": ""
+      },
+      {
+        "name": "GitHub access",
+        "success": true,
+        "version": null,
+        "minimumVersion": null,
+        "standardOutput": "",
+        "standardError": ""
+      }
+    ],
+    "technologies": [
+      "foundation"
+    ],
+    "installGates": [],
+    "warnings": [],
+    "advisories": [],
+    "agentsFile": "$TARGET/AGENTS.md",
+    "claudeFile": "",
+    "directiveSummary": {
+      "createAgentsFile": true,
+      "createClaudeFile": false,
+      "recommendedCount": 2,
+      "missingCount": 2,
+      "outdatedCount": 0
+    },
+    "directives": [
+      {
+        "name": "foundation-documentation-sources",
+        "status": "missing"
+      },
+      {
+        "name": "foundation-prompt-log",
+        "status": "missing"
+      }
+    ],
+    "recommendedSkills": [],
+    "missingSkills": [],
+    "outdatedSkills": 0,
+    "installResults": [],
+    "actions": [
+      "Ran gh skill update --dir $TARGET/.agents/skills --all --dry-run.",
+      "install InnoWvate.Agentic: installed absent, required 2.4, pattern 2.*, resolved 2.4.0",
+      "install InnoWvate.Dna globally (\u0060dna\u0060 shorthand for \u0060dotnet agentic\u0060)",
+      "Added README badge in $TARGET/README.md.",
+      "Added directive foundation-documentation-sources to AGENTS.",
+      "Added directive foundation-prompt-log to AGENTS.",
+      "No target-local skill updates found."
+    ],
+    "skillUpdateDryRun": {
+      "exitCode": 0,
+      "standardOutput": "",
+      "standardError": "No installed skills found.\n",
+      "success": true
+    },
+    "skillUpdate": null,
+    "skillCopyResults": [],
+    "skillUpdateDryRuns": [
+      {
+        "exitCode": 0,
+        "standardOutput": "",
+        "standardError": "No installed skills found.\n",
+        "success": true
+      }
+    ],
+    "skillUpdates": []
+  },
+  "sources": [],
+  "companion": {
+    "path": "InnoWvate.Agentic.2.4.0.nupkg",
+    "id": "InnoWvate.Agentic",
+    "version": "2.4.0",
+    "sha256": "bb38b4b4b6afc31cdf9eafe75357e4368138fa2d3b44a23f20d369f86a654bd8",
+    "repositoryCommit": "2ebc341870075004a564a586c1f53e1118298973",
+    "retrievedAtUtc": "2026-10-02T16:48:23.792662+00:00"
+  },
+  "snapshotSha256": "4561b6bf1ab85aa1b7d007976e0fb05cbd9ba11d49fcb4863c65771ca75bdf42",
+  "directiveSource": {
+    "repository": "VincentH-Net/dotnet-agentic-engineering",
+    "reference": "v2.4.0",
+    "commit": "2ebc341870075004a564a586c1f53e1118298973"
+  },
+  "invocation": [
+    "agentic-check",
+    "$TARGET",
+    "--yes",
+    "--agents",
+    "codex",
+    "--verbose",
+    "--report",
+    "$WORKSPACE/installation.json"
+  ],
+  "rejectedItems": [],
+  "dna": {
+    "path": "InnoWvate.Dna.1.0.0.nupkg",
+    "id": "InnoWvate.Dna",
+    "version": "1.0.0",
+    "sha256": "db80fbdb6ac631804b111e90d0f62ca6851abe5815374721a9f695b3318a90bd",
+    "repositoryCommit": "d7c6d79d43b3cb1738b7544a8ef5d3c2451043cd",
+    "retrievedAtUtc": "2026-10-02T16:50:41.347474+00:00"
+  }
+}

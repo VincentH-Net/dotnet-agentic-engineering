@@ -1,0 +1,16 @@
+{
+  "installerId": "Agentic.Check",
+  "installerVersion": "2.4.0",
+  "packageUrl": "https://api.nuget.org/v3-flatcontainer/agentic.check/2.4.0/agentic.check.2.4.0.nupkg",
+  "companionExpected": true,
+  "companion": {
+    "id": "InnoWvate.Agentic",
+    "version": "2.4.0",
+    "url": "https://api.nuget.org/v3-flatcontainer/innowvate.agentic/2.4.0/innowvate.agentic.2.4.0.nupkg"
+  },
+  "dna": {
+    "id": "InnoWvate.Dna",
+    "version": "1.0.0",
+    "url": "https://api.nuget.org/v3-flatcontainer/innowvate.dna/1.0.0/innowvate.dna.1.0.0.nupkg"
+  }
+}
