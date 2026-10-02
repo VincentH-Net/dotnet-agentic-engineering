@@ -25,7 +25,7 @@ static class StackDetector
         if (projectFiles.Count > 0)
         {
             _ = technologies.Add(TechnologyNames.Dotnet);
-            installGateReports.AddRange(DetectDotnetGates(projectFiles, universe, warnings));
+            installGateReports.AddRange(DetectDotnetGates(projectFiles, repoRoot, universe, warnings));
         }
 
         bool unoDetected = projectFiles.Concat(propsTargetsFiles).Any(file => FileContains(file, "Uno.Sdk"));
@@ -49,7 +49,7 @@ static class StackDetector
         return new StackDetectionResult(technologies, installGateReports, warnings);
     }
 
-    static List<InstallGateReport> DetectDotnetGates(IReadOnlyList<string> projectFiles, FileUniverse universe, List<string> warnings)
+    static List<InstallGateReport> DetectDotnetGates(IReadOnlyList<string> projectFiles, string repoRoot, FileUniverse universe, List<string> warnings)
     {
         List<InstallGateReport> reports = [];
         foreach (string projectFile in projectFiles)
@@ -62,7 +62,7 @@ static class StackDetector
 
             reports.Add(new InstallGateReport(
                 TechnologyNames.Dotnet,
-                ToRelativePath(projectFile),
+                ToRelativePath(repoRoot, projectFile),
                 new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
                 {
                     ["terminal"] = ["interactive"]
@@ -135,7 +135,7 @@ static class StackDetector
             }
 
             reports.Add(new UnoGateReport(
-                ToRelativePath(projectFile),
+                ToRelativePath(repoRoot, projectFile),
                 [.. presentation.Order(StringComparer.OrdinalIgnoreCase)],
                 [.. markup.Order(StringComparer.OrdinalIgnoreCase)],
                 [.. theme.Order(StringComparer.OrdinalIgnoreCase)]));
@@ -407,8 +407,9 @@ static class StackDetector
     static bool FileContains(string path, string value)
         => File.ReadAllText(path).Contains(value, StringComparison.OrdinalIgnoreCase);
 
-    static string ToRelativePath(string path)
-        => Path.GetRelativePath(Environment.CurrentDirectory, path);
+    // Reported like every other path: relative to the target, not to where the command was started.
+    static string ToRelativePath(string repoRoot, string path)
+        => Path.GetRelativePath(repoRoot, path);
 }
 
 sealed record StackDetectionResult(

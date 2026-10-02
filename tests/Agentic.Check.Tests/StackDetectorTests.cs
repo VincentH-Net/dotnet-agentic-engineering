@@ -32,6 +32,23 @@ public sealed class StackDetectorTests
 
         var gate = Assert.Single(result.InstallGates, gate => gate.Technology == TechnologyNames.Dotnet);
         Assert.Equal(["interactive"], gate.GetValues("terminal"));
+        Assert.Equal(Path.Combine("Tool", "Tool.csproj"), gate.ProjectPath);
+    }
+
+    [Fact]
+    public void GateProjectPathsAreRelativeToTheTargetNotTheWorkingDirectory()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write("src/Cli/Cli.csproj", "<Project Sdk=\"Microsoft.NET.Sdk\"><PropertyGroup><PackAsTool>true</PackAsTool></PropertyGroup></Project>");
+        tempDirectory.Write("src/App/App.csproj", "<Project Sdk=\"Uno.Sdk\"></Project>");
+        Assert.NotEqual(tempDirectory.Path, Environment.CurrentDirectory);
+
+        var result = StackDetector.Detect(tempDirectory.Path);
+
+        Assert.Equal(
+            [Path.Combine("src", "App", "App.csproj"), Path.Combine("src", "Cli", "Cli.csproj")],
+            result.InstallGates.Select(gate => gate.ProjectPath).Order(StringComparer.Ordinal));
+        Assert.DoesNotContain(result.InstallGates, gate => gate.ProjectPath.StartsWith("..", StringComparison.Ordinal));
     }
 
     [Theory]
@@ -297,13 +314,13 @@ public sealed class StackDetectorTests
         var result = StackDetector.Detect(tempDirectory.Path);
 
         string presentationWarning = Assert.Single(result.Warnings, warning => warning.Contains("presentation", StringComparison.OrdinalIgnoreCase));
-        Assert.Contains($"{Path.DirectorySeparatorChar}Mvvm.csproj: mvvm", presentationWarning, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains($"{Path.DirectorySeparatorChar}Mvux.csproj: mvux", presentationWarning, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains($"{Environment.NewLine}  Mvvm.csproj: mvvm", presentationWarning, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains($"{Environment.NewLine}  Mvux.csproj: mvux", presentationWarning, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(Environment.NewLine, presentationWarning, StringComparison.Ordinal);
 
         string themeWarning = Assert.Single(result.Warnings, warning => warning.Contains("theme", StringComparison.OrdinalIgnoreCase));
-        Assert.Contains($"{Path.DirectorySeparatorChar}Mvvm.csproj: material", themeWarning, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains($"{Path.DirectorySeparatorChar}Mvux.csproj: simple", themeWarning, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains($"{Environment.NewLine}  Mvvm.csproj: material", themeWarning, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains($"{Environment.NewLine}  Mvux.csproj: simple", themeWarning, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(Environment.NewLine, themeWarning, StringComparison.Ordinal);
     }
 
@@ -359,8 +376,8 @@ public sealed class StackDetectorTests
         Assert.Contains("csharp", warning, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("csharp2", warning, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("xaml", warning, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains($"{Path.DirectorySeparatorChar}CSharpMarkup.csproj: csharp", warning, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains($"{Path.DirectorySeparatorChar}CSharpMarkup2.csproj: csharp2", warning, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains($"{Environment.NewLine}  CSharpMarkup.csproj: csharp", warning, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains($"{Environment.NewLine}  CSharpMarkup2.csproj: csharp2", warning, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(Environment.NewLine, warning, StringComparison.Ordinal);
     }
 }
