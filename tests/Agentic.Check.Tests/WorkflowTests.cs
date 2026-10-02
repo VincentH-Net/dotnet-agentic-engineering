@@ -1102,6 +1102,42 @@ public sealed class WorkflowTests
         Assert.DoesNotContain(result.Report.Actions, action => action.Contains("dotnet-livecharts2", StringComparison.Ordinal));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SubfolderCoveredFromAboveGetsNoAgentsOrClaudeFile(bool dryRun)
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
+        tempDirectory.Write(
+            "AGENTS.md",
+            """
+            <!-- foundation-prompt-log:start -->
+            ## foundation-prompt-log
+            <!-- foundation-prompt-log:end -->
+            """);
+        string backend = tempDirectory.CreateDirectory("backend");
+        FakeCommandRunner commandRunner = new();
+        commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "No updates available.", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "No updates available.", string.Empty));
+        RecordingReporter reporter = new();
+        CheckWorkflow workflow = new(commandRunner, new FakePrompts(), reporter, new FakeDirectiveSource(), new FakeSourceVersionResolver());
+
+        var result = await workflow.RunAsync(
+            new AgenticCheckOptions(backend, dryRun, true, null, null, "codex,claude-code", false),
+            CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Equal(new PresentElsewhere(1, 0, PresentElsewhere.Above), reporter.PresentElsewhere);
+        Assert.False(result.Report.DirectiveSummary?.CreateAgentsFile);
+        Assert.False(result.Report.DirectiveSummary?.CreateClaudeFile);
+        Assert.DoesNotContain(result.Report.Actions, action => action.Contains("Would create", StringComparison.Ordinal));
+        Assert.False(File.Exists(Path.Combine(backend, "AGENTS.md")));
+        Assert.False(File.Exists(Path.Combine(backend, "CLAUDE.md")));
+    }
+
     [Fact]
     public async Task InteractiveRunReceivesTheScanThatTheSummaryUsed()
     {

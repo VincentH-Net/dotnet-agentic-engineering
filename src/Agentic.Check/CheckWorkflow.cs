@@ -356,9 +356,13 @@ sealed class CheckWorkflow(
             return new CheckRunResult(2, report);
         }
 
+        // A missing AGENTS.md is created only when a directive is written to it, which the default
+        // selection decides; CLAUDE.md is created only to import a file that will exist.
+        bool defaultSelectsADirective = RecommendationSelectionPrompt.DefaultSelection(directivePlan.SelectableDirectives, [], duplicates).SelectedDirectives.Count > 0;
+        bool agentsFileWillExist = !directivePlan.CreateAgentsFile || defaultSelectsADirective;
         DirectiveSummary directiveSummary = new(
-            directivePlan.CreateAgentsFile,
-            directivePlan.CreateClaudeFile,
+            directivePlan.CreateAgentsFile && defaultSelectsADirective,
+            directivePlan.CreateClaudeFile && agentsFileWillExist,
             directivePlan.RecommendedCount,
             directivePlan.MissingCount,
             directivePlan.OutdatedCount);

@@ -225,6 +225,47 @@ public sealed class DirectiveInstallerTests
         Assert.Contains(result.Actions, action => action.Contains("Would create", StringComparison.Ordinal));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ApplyingNoDirectiveCreatesNeitherAgentsNorClaudeFile(bool dryRun)
+    {
+        using TempDirectory tempDirectory = new();
+        _ = tempDirectory.CreateDirectory(".");
+        DirectiveInstaller installer = new(new FakeDirectiveSource(), new NullReporter());
+        var plan = await installer.PlanAsync(tempDirectory.Path, DotnetStack(), CancellationToken.None);
+        Assert.True(plan.CreateAgentsFile);
+        Assert.True(plan.CreateClaudeFile);
+
+        var result = await installer.ApplyAsync(plan, [], dryRun, CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Empty(result.Actions);
+        Assert.False(File.Exists(Path.Combine(tempDirectory.Path, "AGENTS.md")));
+        Assert.False(File.Exists(Path.Combine(tempDirectory.Path, "CLAUDE.md")));
+    }
+
+    [Fact]
+    public async Task ClaudeImportFollowsTheAgentsFile()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write("CLAUDE.md", "Own notes.\n");
+        DirectiveInstaller installer = new(new FakeDirectiveSource(), new NullReporter());
+        var plan = await installer.PlanAsync(tempDirectory.Path, DotnetStack(), CancellationToken.None);
+
+        var nothing = await installer.ApplyAsync(plan, [], false, CancellationToken.None);
+
+        Assert.True(nothing.Success);
+        Assert.Equal("Own notes.\n", await File.ReadAllTextAsync(Path.Combine(tempDirectory.Path, "CLAUDE.md"), CancellationToken.None));
+        Assert.False(File.Exists(Path.Combine(tempDirectory.Path, "AGENTS.md")));
+
+        var one = await installer.ApplyAsync(plan, ["dotnet-cli-run"], false, CancellationToken.None);
+
+        Assert.True(one.Success);
+        Assert.Contains("<!-- dotnet-cli-run:start -->", await File.ReadAllTextAsync(Path.Combine(tempDirectory.Path, "AGENTS.md"), CancellationToken.None), StringComparison.Ordinal);
+        Assert.Equal("Own notes.\n\n@AGENTS.md\n", await File.ReadAllTextAsync(Path.Combine(tempDirectory.Path, "CLAUDE.md"), CancellationToken.None));
+    }
+
     [Fact]
     public async Task PlanReportsDirectiveSummaryCounts()
     {

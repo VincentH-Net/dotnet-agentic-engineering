@@ -5,6 +5,10 @@ namespace Agentic.Check.Tests;
 
 public sealed class CompanionTests
 {
+    // A run that applies no directive creates no AGENTS.md.
+    static async Task<string> ReadIfExistsAsync(string path)
+        => File.Exists(path) ? await File.ReadAllTextAsync(path).ConfigureAwait(false) : string.Empty;
+
     [Fact]
     public void WorkingTreeSourceLocationAndConsumersAgree()
     {
@@ -289,11 +293,11 @@ public sealed class CompanionTests
         {
             Assert.Equal(installed, File.Exists(result.Report.AgentsFile));
             if (installed)
-                Assert.Equal("User instructions\n" + block, await File.ReadAllTextAsync(result.Report.AgentsFile));
+                Assert.Equal("User instructions\n" + block, await ReadIfExistsAsync(result.Report.AgentsFile));
         }
         else
         {
-            string content = await File.ReadAllTextAsync(result.Report.AgentsFile);
+            string content = await ReadIfExistsAsync(result.Report.AgentsFile);
             Assert.Contains(DirectiveMarkers.Normalize(block, "foundation-prompt-log").TrimEnd(), content, StringComparison.Ordinal);
             Assert.DoesNotContain("dotnet-agentic-engineering:", content, StringComparison.Ordinal);
             if (installed)
@@ -326,7 +330,7 @@ public sealed class CompanionTests
         Assert.True(result.Report.Dna.Success);
         Assert.Equal("update", result.Report.Dna.Action);
         Assert.Equal(manifest, await File.ReadAllTextAsync(CompanionInstaller.ManifestPath(temp.Path)));
-        Assert.Contains(DirectiveMarkers.Normalize(block, "foundation-prompt-log").TrimEnd(), await File.ReadAllTextAsync(result.Report.AgentsFile), StringComparison.Ordinal);
+        Assert.Contains(DirectiveMarkers.Normalize(block, "foundation-prompt-log").TrimEnd(), await ReadIfExistsAsync(result.Report.AgentsFile), StringComparison.Ordinal);
         Assert.Equal(["tool", "run", "agentic", "--", "--version"], Assert.Single(runner.Calls, call => call.FileName == "dotnet" && !call.Arguments.Contains("--global")).Arguments);
         Assert.DoesNotContain(runner.Calls, call => call.Arguments.Contains("uninstall"));
     }
@@ -376,7 +380,7 @@ public sealed class CompanionTests
         CheckWorkflow workflow = new(runner, new FakePrompts(), new RecordingReporter(), new FakeDirectiveSource(), new FakeSourceVersionResolver());
         var result = await workflow.RunAsync(new(temp.Path, false, true, null, null, "codex", false), CancellationToken.None);
         Assert.Equal(1, result.ExitCode);
-        Assert.DoesNotContain("foundation-prompt-log:start", await File.ReadAllTextAsync(result.Report.AgentsFile), StringComparison.Ordinal);
+        Assert.DoesNotContain("foundation-prompt-log:start", await ReadIfExistsAsync(result.Report.AgentsFile), StringComparison.Ordinal);
         Assert.NotNull(result.Report.Companion);
         Assert.False(result.Report.Companion.Success);
     }
@@ -399,7 +403,7 @@ public sealed class CompanionTests
         Assert.False(result.Report.Companion.Success);
         Assert.DoesNotContain(runner.Calls, call => call.FileName == "dotnet" && call.Arguments[1] is "install" or "update" or "restore");
         if (File.Exists(result.Report.AgentsFile))
-            Assert.DoesNotContain("foundation-prompt-log:start", await File.ReadAllTextAsync(result.Report.AgentsFile), StringComparison.Ordinal);
+            Assert.DoesNotContain("foundation-prompt-log:start", await ReadIfExistsAsync(result.Report.AgentsFile), StringComparison.Ordinal);
     }
 
     internal static SkillManifestEntry Consumer()
@@ -446,7 +450,7 @@ public sealed class CompanionTests
         Assert.Equal(action, result.Report.Companion.Action);
         Assert.Equal("1.3", result.Report.Companion.RequiredMinimum);
         Assert.Equal("1.4.0", result.Report.Companion.ResolvedVersion);
-        Assert.Equal(block, await File.ReadAllTextAsync(result.Report.AgentsFile));
+        Assert.Equal(block, await ReadIfExistsAsync(result.Report.AgentsFile));
         _ = Assert.Single(runner.Calls, call => call.FileName == "dotnet" && call.Arguments[1] == action && !call.Arguments.Contains("--global"));
         if (installed == "3.0.0")
         {
@@ -485,7 +489,7 @@ public sealed class CompanionTests
         var result = await workflow.RunAsync(new(temp.Path, false, true, null, null, "codex", false), CancellationToken.None);
         Assert.Equal(1, result.ExitCode);
         Assert.DoesNotContain(runner.Calls, call => call.FileName == "dotnet" && call.Arguments[1] != "list");
-        Assert.DoesNotContain("foundation-prompt-log:start", await File.ReadAllTextAsync(result.Report.AgentsFile), StringComparison.Ordinal);
+        Assert.DoesNotContain("foundation-prompt-log:start", await ReadIfExistsAsync(result.Report.AgentsFile), StringComparison.Ordinal);
         _ = Assert.Throws<FormatException>(() => CompanionDependency.ReadLocalRequirement(["dotnet agentic prompt-log show -m 1.3", "dotnet agentic --minver 2.3 prompt-log check"]));
     }
 
@@ -503,7 +507,7 @@ public sealed class CompanionTests
         Assert.Equal(0, result.ExitCode);
         Assert.Equal(selectTool ? 1 : 0, runner.Calls.Count(call => call.FileName == "dotnet" && call.Arguments[1] == "install"));
         Assert.Equal(selectTool, File.Exists(CompanionInstaller.ManifestPath(temp.Path)));
-        Assert.DoesNotContain("foundation-prompt-log:start", await File.ReadAllTextAsync(result.Report.AgentsFile), StringComparison.Ordinal);
+        Assert.DoesNotContain("foundation-prompt-log:start", await ReadIfExistsAsync(result.Report.AgentsFile), StringComparison.Ordinal);
     }
 
     [Theory]

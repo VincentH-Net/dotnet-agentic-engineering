@@ -161,8 +161,11 @@ sealed partial class DirectiveInstaller(IDirectiveSource source, IReporter repor
             IReadOnlyList<DirectiveBlock> selectedBlocks = [.. plan.Directives
                 .Where(directive => selectedNames.Contains(directive.Name))
                 .Select(directive => new DirectiveBlock(directive.Name, directive.Content))];
+            // A specialized folder whose directives all live above it needs no AGENTS.md of its own:
+            // nothing selected and no file yet means no empty file, and no CLAUDE.md import of it.
+            bool agentsFileWillExist = !plan.CreateAgentsFile || selectedBlocks.Count > 0;
             string updatedAgentsContent = ApplyDirectiveBlocks(plan.AgentsContent, selectedBlocks, actions, dryRun);
-            string updatedClaudeContent = plan.ManageClaudeFile
+            string updatedClaudeContent = plan.ManageClaudeFile && agentsFileWillExist
                 ? EnsureClaudeImport(
                     plan.ClaudeContent,
                     Path.GetFileName(plan.AgentsFile),
@@ -173,17 +176,17 @@ sealed partial class DirectiveInstaller(IDirectiveSource source, IReporter repor
 
             if (dryRun)
             {
-                if (plan.CreateAgentsFile)
+                if (plan.CreateAgentsFile && selectedBlocks.Count > 0)
                 {
                     actions.Add($"Would create {plan.AgentsFile}.");
                 }
 
-                if (plan.CreateClaudeFile)
+                if (plan.CreateClaudeFile && agentsFileWillExist)
                 {
                     actions.Add($"Would create {plan.ClaudeFile}.");
                 }
             }
-            else
+            else if (agentsFileWillExist)
             {
                 await WriteIfChangedAsync(plan.AgentsFile, updatedAgentsContent, cancellationToken).ConfigureAwait(false);
                 if (plan.ManageClaudeFile)

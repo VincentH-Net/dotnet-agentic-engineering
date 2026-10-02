@@ -237,7 +237,8 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
         }
 
         await VerifyReadmeAsync(after).ConfigureAwait(false);
-        string agents = await File.ReadAllTextAsync(Path.Combine(workspace.Target, "AGENTS.md")).ConfigureAwait(false);
+
+        string agents = await ReadAgentsAsync().ConfigureAwait(false);
         if (scenario != "fresh")
         {
             FixtureFiles.Require(agents.Contains(UserText.Trim(), StringComparison.Ordinal), "Unrelated instructions changed.");
@@ -328,7 +329,7 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
             else
                 FixtureFiles.Require(origin.Pin is null, $"Stable switch left a pin on {origin.LocalPath}: {origin.Pin}. Production compatibility defect; do not manually unpin.");
         }
-        string agents = await File.ReadAllTextAsync(Path.Combine(workspace.Target, "AGENTS.md")).ConfigureAwait(false);
+        string agents = await ReadAgentsAsync().ConfigureAwait(false);
         foreach (var (name, block) in ExpectedDirectives())
         {
             FixtureFiles.Require(agents.Contains(block, StringComparison.Ordinal), $"Directive {name} differs from {sources[SourceOracle.OwnRepository].Commit}");
@@ -442,6 +443,13 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
 
     static bool IsReadme(string path)
         => path.Equals("README.md", StringComparison.OrdinalIgnoreCase);
+
+    // A run that writes no directive creates no AGENTS.md, so a declined run may leave none behind.
+    async Task<string> ReadAgentsAsync()
+    {
+        string path = Path.Combine(workspace.Target, "AGENTS.md");
+        return File.Exists(path) ? await File.ReadAllTextAsync(path).ConfigureAwait(false) : string.Empty;
+    }
 
     static bool ContentChanged(SortedDictionary<string, string> oldFiles, SortedDictionary<string, string> newFiles)
         => oldFiles.Where(file => file.Key.StartsWith(".agents/skills/", StringComparison.Ordinal))
