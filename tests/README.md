@@ -71,7 +71,7 @@ It follows this fixed sequence:
 3. Return zero only if every build, packaging operation, and test command succeeds. Setup/build
    failures stop the run; tests retain their documented genuine skip behavior.
 
-The default persisted baseline is `agentic-check-2.2.0-2026-09-14-capture02`.
+The default persisted baseline is `agentic-check-2.4.0-2026-10-02-capture01`; select another collection, such as the 2.2.0 one, with `AGENTIC_E2E_BASELINE`.
 Set `AGENTIC_E2E_BASELINE` explicitly to select a later collection. Baselines are never prepared
 or modified by the runner. Normal `dotnet test` defaults are unchanged.
 

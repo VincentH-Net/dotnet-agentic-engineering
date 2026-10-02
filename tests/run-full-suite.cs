@@ -21,7 +21,7 @@ if (args.Length != 0)
 }
 
 string checkout = Checkout();
-string baseline = Environment.GetEnvironmentVariable("AGENTIC_E2E_BASELINE") ?? "agentic-check-2.2.0-2026-09-14-capture02";
+string baseline = Environment.GetEnvironmentVariable("AGENTIC_E2E_BASELINE") ?? "agentic-check-2.4.0-2026-10-02-capture01";
 string runId = DateTime.UtcNow.ToString("yyyyMMdd'T'HHmmss'Z'", CultureInfo.InvariantCulture) + "-" + Guid.NewGuid().ToString("N");
 string reports = Path.Combine(checkout, "tests", "TestResults", "full-suite", runId);
 string candidates = Path.Combine(reports, "candidates");
