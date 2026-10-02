@@ -111,6 +111,7 @@ public sealed class RecommendationPreviewTests
     [InlineData(ConsoleKey.UpArrow, 5, 4)]
     [InlineData(ConsoleKey.DownArrow, 5, 6)]
     [InlineData(ConsoleKey.PageUp, 30, 6)]
+    [InlineData(ConsoleKey.B, 30, 6)]
     [InlineData(ConsoleKey.PageDown, 5, 29)]
     [InlineData(ConsoleKey.Spacebar, 5, 29)]
     [InlineData(ConsoleKey.Home, 5, 0)]
@@ -139,7 +140,7 @@ public sealed class RecommendationPreviewTests
         Assert.Equal(string.Empty, RecommendationSelectionPrompt.FormatPreviewPositionLine(0, RecommendationSelectionPrompt.PreviewPageSize));
         Assert.Equal("Lines 7–30 of 30", RecommendationSelectionPrompt.FormatPreviewPositionLine(6, 30));
         Assert.Equal("Esc close preview", Spectre.Console.Markup.Remove(RecommendationSelectionPrompt.FormatPreviewKeyHelpLine(3)));
-        Assert.Equal("↑ ↓ scroll, PgUp PgDn page, Esc close preview", Spectre.Console.Markup.Remove(RecommendationSelectionPrompt.FormatPreviewKeyHelpLine(30)));
+        Assert.Equal("↑ ↓ scroll, space b page, Esc close preview", Spectre.Console.Markup.Remove(RecommendationSelectionPrompt.FormatPreviewKeyHelpLine(30)));
     }
 
     [Fact]
@@ -173,7 +174,8 @@ public sealed class RecommendationPreviewTests
         FakeCommandRunner runner = new();
         runner.Enqueue(new(0, string.Join('\n', Enumerable.Range(1, 30).Select(line => $"line {line}")), string.Empty));
         console.Input.PushKey(ConsoleKey.F3);
-        console.Input.PushKey(ConsoleKey.End);
+        console.Input.PushKey(ConsoleKey.Spacebar);
+        console.Input.PushKey(ConsoleKey.B);
         console.Input.PushKey(ConsoleKey.Escape);
         console.Input.PushKey(ConsoleKey.F3);
         console.Input.PushKey(ConsoleKey.Escape);
@@ -181,11 +183,12 @@ public sealed class RecommendationPreviewTests
 
         _ = await Prompt(console, runner).PromptAsync([], [Skill()], NoDuplicates(), NothingElsewhere(), CancellationToken.None);
 
-        Assert.Contains("Lines 1–24 of 30", console.Output, StringComparison.Ordinal);
-        Assert.Contains("Lines 7–30 of 30", console.Output, StringComparison.Ordinal);
-        Assert.Contains("↑ ↓ scroll, PgUp PgDn page, Esc close preview", console.Output, StringComparison.Ordinal);
+        // Opened at the top, paged down with space, back up with b, then reopened at the top.
+        Assert.Equal(3, Occurrences(console.Output, "Lines 1–24 of 30"));
+        Assert.Equal(1, Occurrences(console.Output, "Lines 7–30 of 30"));
+        Assert.Contains("↑ ↓ scroll, space b page, Esc close preview", console.Output, StringComparison.Ordinal);
         _ = Assert.Single(runner.Calls);
-        Assert.Equal(3, Occurrences(console.Output, "Preview: "));
+        Assert.Equal(4, Occurrences(console.Output, "Preview: "));
     }
 
     [Fact]

@@ -710,13 +710,15 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console, IRecommendation
     }
 
     // null closes the preview; any other key keeps it open, scrolling when the key says so.
+    // Space and b page like less does, because macOS terminals keep Page Up/Down and Home/End for
+    // their own scrollback; those keys still work where the terminal passes them through.
     internal static int? NextPreviewOffset(ConsoleKey key, int offset)
         => key switch
         {
             ConsoleKey.Escape or ConsoleKey.F3 or ConsoleKey.Enter or ConsoleKey.Q => null,
             ConsoleKey.UpArrow => offset - 1,
             ConsoleKey.DownArrow => offset + 1,
-            ConsoleKey.PageUp => offset - PreviewPageSize,
+            ConsoleKey.PageUp or ConsoleKey.B => offset - PreviewPageSize,
             ConsoleKey.PageDown or ConsoleKey.Spacebar => offset + PreviewPageSize,
             ConsoleKey.Home => 0,
             ConsoleKey.End => int.MaxValue,
@@ -756,7 +758,7 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console, IRecommendation
         => (lineCount <= PreviewPageSize
                 ? string.Empty
                 : ToolHeader.KeyMarkup("↑") + InfoText(" ") + ToolHeader.KeyMarkup("↓") + InfoText(" scroll, ")
-                    + ToolHeader.KeyMarkup("PgUp") + InfoText(" ") + ToolHeader.KeyMarkup("PgDn") + InfoText(" page, "))
+                    + ToolHeader.KeyMarkup("space") + InfoText(" ") + ToolHeader.KeyMarkup("b") + InfoText(" page, "))
             + ToolHeader.KeyMarkup("Esc") + InfoText(" close preview");
 
     void RenderPreview(string title, string[] lines, int offset)
