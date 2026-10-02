@@ -435,6 +435,10 @@ sealed class CheckWorkflow(
             repairError = exception.Message;
         }
 
+        // What a kept companion row needs without a selected consumer: the installed consumers'
+        // minimum, otherwise the installed companion's own line, so an update never goes below it.
+        var keptRequirement = installedRequirement ?? InstalledLine(installedCompanion);
+
         bool hasDependentRecommendations = recommendedDirectives.Any(d => CompanionDependency.ForDirective(d.Name, d.Content).Count > 0)
             || recommendedSkillActions.Any(skill => skill.Dependencies.Contains(CompanionDependency.Identity));
         List<string> currentTools = [];
@@ -466,10 +470,10 @@ sealed class CheckWorkflow(
                     status += latestSuffix;
                 }
 
-                // With the consuming update deselected, the installed consumers set the requirement.
-                if (hasDependentRecommendations && installedRequirement is not null && plannedRequirement is not null && installedRequirement.Minimum != plannedRequirement.Minimum)
+                // With the consuming update deselected, what is installed sets the requirement.
+                if (hasDependentRecommendations && keptRequirement is not null && plannedRequirement is not null && keptRequirement.Minimum != plannedRequirement.Minimum)
                 {
-                    statusWithoutConsumers = $"required {installedRequirement.Minimum}";
+                    statusWithoutConsumers = $"required {keptRequirement.Minimum}";
                     if (installedCompanion is not null)
                         statusWithoutConsumers = $"currently {installedCompanion}; {statusWithoutConsumers}";
                     statusWithoutConsumers += latestSuffix;
@@ -608,7 +612,7 @@ sealed class CheckWorkflow(
             }
             // Without a selected consumer the installed consumers set the requirement. A companion that
             // satisfies it but does not run is restored; one that runs is updated, as its row says.
-            else if (!await EnsureCompanionAsync(selectedRef, selectedConsumer ? null : installedRequirement ?? repairRequirement, !selectedConsumer && restoreOnly && repairRequirement is not null).ConfigureAwait(false))
+            else if (!await EnsureCompanionAsync(selectedRef, selectedConsumer ? null : keptRequirement ?? repairRequirement, !selectedConsumer && restoreOnly && repairRequirement is not null).ConfigureAwait(false))
             {
                 var failedItems = RecommendationSelectionPrompt.BuildItems(selectedDirectives, selectedSkills);
                 RecommendationSelectionState failedSelection = new(failedItems);
@@ -1097,6 +1101,23 @@ sealed class CheckWorkflow(
 
         ReportSectionHeader("Would update skills in skills directories:");
         ReportSkillUpdateGroups(skillUpdates, recommendedSkills);
+    }
+
+    static ToolVersion? InstalledLine(string? installed)
+    {
+        if (installed is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            return ToolVersion.ParseMinimum(ToolVersion.Parse(installed).Minimum);
+        }
+        catch (FormatException)
+        {
+            return null;
+        }
     }
 
     static bool IsAtLeast(string installed, ToolVersion latest)
