@@ -177,7 +177,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
 
         using var workspace = await TestWorkspace.CreateAsync(nameof(DirectiveSelectionIncludesCompanionAndDryRunDoesNotInstall), writeDotnetProject: false).ConfigureAwait(true);
         var dry = await RunCommandAsync(workspace, $"--dry-run --agents codex {Quote(workspace.RepoPath)}").ConfigureAwait(true);
-        Assert.Contains("required 2.3, pattern 2.*", dry.Screen, StringComparison.Ordinal);
+        Assert.Contains("required 2.4, pattern 2.*", dry.Screen, StringComparison.Ordinal);
         Assert.False(File.Exists(CompanionInstaller.ManifestPath(workspace.RepoPath)));
         Assert.DoesNotContain(await File.ReadAllLinesAsync(Path.Combine(workspace.RootPath, "tool.log")).ConfigureAwait(true), line => !line.StartsWith("tool list ", StringComparison.Ordinal));
         _ = await RunInteractiveCommandAsync(workspace, $"--agents codex {Quote(workspace.RepoPath)}", async auto =>
@@ -193,7 +193,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
             await auto.EnterAsync().ConfigureAwait(true);
         }).ConfigureAwait(true);
         Assert.Contains("foundation-prompt-log:start", await workspace.ReadRepoFileAsync("AGENTS.md").ConfigureAwait(true), StringComparison.Ordinal);
-        Assert.Equal("2.3.0", CompanionInstaller.InstalledVersion(workspace.RepoPath));
+        Assert.Equal("2.4.0", CompanionInstaller.InstalledVersion(workspace.RepoPath));
         _ = Assert.Single(await File.ReadAllLinesAsync(Path.Combine(workspace.RootPath, "tool.log")).ConfigureAwait(true), line => line.Contains("InnoWvate.Agentic", StringComparison.Ordinal));
         Assert.True(File.Exists(Path.Combine(workspace.RootPath, "dna-installed")));
         AssertRecordingWasWritten(workspace);
@@ -217,7 +217,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
             await auto.WaitUntilTextAsync("[x] InnoWvate.Agentic").ConfigureAwait(true);
             await auto.EnterAsync().ConfigureAwait(true);
         }).ConfigureAwait(true);
-        Assert.Equal("2.3.0", CompanionInstaller.InstalledVersion(workspace.RepoPath));
+        Assert.Equal("2.4.0", CompanionInstaller.InstalledVersion(workspace.RepoPath));
         Assert.False(File.Exists(Path.Combine(workspace.RootPath, "dna-installed")));
         Assert.Contains("foundation-prompt-log:start", await workspace.ReadRepoFileAsync("AGENTS.md").ConfigureAwait(true), StringComparison.Ordinal);
         AssertRecordingWasWritten(workspace);
@@ -310,7 +310,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
         Assert.Equal(!consent, dna.GetProperty("skipped").GetBoolean());
         Assert.Equal(unknown, dna.GetProperty("conflicts")[0].GetString());
         Assert.Equal(consent, File.Exists(Path.Combine(workspace.RootPath, "dna-installed")));
-        Assert.Equal("2.3.0", CompanionInstaller.InstalledVersion(workspace.RepoPath));
+        Assert.Equal("2.4.0", CompanionInstaller.InstalledVersion(workspace.RepoPath));
         Assert.False(File.Exists(Path.Combine(workspace.RootPath, "unknown-executed")));
         AssertRecordingWasWritten(workspace);
     }
@@ -1441,7 +1441,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
                     print('fixture SDK installation failure', file=sys.stderr)
                     sys.exit(1)
                 if args[1] == 'run':
-                    print('2.3.0')
+                    print('2.4.0')
                     sys.exit(0)
                 if '--global' in args:
                     assert 'InnoWvate.Dna' in args
@@ -1450,7 +1450,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
                 manifest = pathlib.Path(args[args.index('--tool-manifest') + 1])
                 data = json.loads(manifest.read_text())
                 if args[1] in ('install', 'update'):
-                    version = '2.2.0' if (root / 'tool-invalid-version').exists() else '2.3.0'
+                    version = '2.2.0' if (root / 'tool-invalid-version').exists() else '2.4.0'
                     data['tools']['innowvate.agentic'] = {'version': version, 'commands': ['agentic']}
                     manifest.write_text(json.dumps(data))
                 sys.exit(0)
