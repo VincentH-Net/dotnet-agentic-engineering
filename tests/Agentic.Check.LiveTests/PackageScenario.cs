@@ -1,7 +1,6 @@
 ﻿using System.Text.Json;
 using Agentic.PackageFixtures;
 using Hex1b.Automation;
-using Hex1b.Input;
 
 namespace Agentic.Check.LiveTests;
 
@@ -190,8 +189,7 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
                 await auto.TypeAsync("InnoWvate.Agentic").ConfigureAwait(false);
                 await auto.WaitUntilTextAsync("Filter: InnoWvate.Agentic").ConfigureAwait(false);
                 await auto.SpaceAsync().ConfigureAwait(false);
-                // A deselected row leaves the selected view; F2 shows all rows so the unchecked row is visible.
-                await auto.KeyAsync(Hex1bKey.F2).ConfigureAwait(false);
+                // Typing a filter switched to the all view, so the unchecked row stays visible.
                 await auto.WaitUntilTextAsync("[ ] InnoWvate.Agentic").ConfigureAwait(false);
                 // An Escape sent right before another key can merge with it into an Alt chord and be lost, and
                 // Enter is refused while a filter is typed, so wait until the prompt shows the filter is cleared.

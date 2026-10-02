@@ -12,11 +12,10 @@ public sealed class SkillSelectionStateTests
     }
 
     [Fact]
-    public void RightSelectsAllRecommendations()
+    public void RightSelectsAllRecommendationsWithoutAFilter()
     {
         RecommendationSelectionState state = new(CreateItems(["foundation-prompt-log"], ["alpha", "beta", "gamma"]));
         state.Apply(new SkillSelectionInput(SkillSelectionCommand.SelectNone));
-        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Character, 'g'));
         state.Apply(new SkillSelectionInput(SkillSelectionCommand.SelectAll));
 
         Assert.Equal(["foundation-prompt-log"], state.SelectedDirectives.Select(directive => directive.Name));
@@ -24,14 +23,67 @@ public sealed class SkillSelectionStateTests
     }
 
     [Fact]
-    public void LeftClearsAllRecommendations()
+    public void LeftClearsAllRecommendationsWithoutAFilter()
     {
         RecommendationSelectionState state = new(CreateItems(["foundation-prompt-log"], ["alpha", "beta", "gamma"]));
-        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Character, 'g'));
         state.Apply(new SkillSelectionInput(SkillSelectionCommand.SelectNone));
 
         Assert.Empty(state.SelectedDirectives);
         Assert.Empty(state.SelectedSkills);
+    }
+
+    [Fact]
+    public void ArrowsActOnTheMatchingRowsWhileAFilterIsTyped()
+    {
+        RecommendationSelectionState state = new(CreateItems(["foundation-prompt-log"], ["alpha", "beta", "gamma"]));
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Character, 'b'));
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.SelectNone));
+
+        Assert.Equal(["foundation-prompt-log"], state.SelectedDirectives.Select(directive => directive.Name));
+        Assert.Equal(["alpha", "gamma"], state.SelectedSkills.Select(skill => skill.LocalFolder));
+        Assert.Equal(["beta"], state.FilteredItems.Select(item => item.Display));
+
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.SelectAll));
+
+        Assert.Equal(["alpha", "beta", "gamma"], state.SelectedSkills.Select(skill => skill.LocalFolder));
+    }
+
+    [Fact]
+    public void TypingAFilterSwitchesToTheAllViewAndStaysThereAfterClearing()
+    {
+        RecommendationSelectionState state = new(CreateItems(["foundation-prompt-log"], ["alpha", "beta"]));
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Down));
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Down));
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Toggle));
+        Assert.True(state.ShowSelectedOnly);
+        Assert.Equal(2, state.FilteredItems.Count);
+
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Character, 'b'));
+
+        Assert.False(state.ShowSelectedOnly);
+        Assert.Equal(["beta"], state.FilteredItems.Select(item => item.Display));
+
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.ClearFilter));
+
+        Assert.False(state.ShowSelectedOnly);
+        Assert.Equal(3, state.FilteredItems.Count);
+
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.ToggleView));
+
+        Assert.True(state.ShowSelectedOnly);
+        Assert.Equal(2, state.FilteredItems.Count);
+    }
+
+    [Fact]
+    public void KeyHelpNamesTheArrowScope()
+    {
+        RecommendationSelectionState state = new(CreateItems([], ["alpha", "beta"]));
+
+        Assert.Contains("← deselect all, → select all, Enter confirm", Spectre.Console.Markup.Remove(RecommendationSelectionPrompt.FormatKeyHelpLine(state)), StringComparison.Ordinal);
+
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Character, 'a'));
+
+        Assert.Contains("← deselect matching, → select matching, ", Spectre.Console.Markup.Remove(RecommendationSelectionPrompt.FormatKeyHelpLine(state)), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -464,7 +516,7 @@ public sealed class SkillSelectionStateTests
     }
 
     [Fact]
-    public void TextFilterNarrowsWithinTheCurrentView()
+    public void TextFilterShowsEveryMatchAndTheViewToggleStillNarrowsToTheSelectedOnes()
     {
         RecommendationSelectionState state = new(CreateItems([], ["uno-mvvm", "uno-xaml", "dotnet-livecharts2"]));
         state.Apply(new SkillSelectionInput(SkillSelectionCommand.Down));
@@ -473,17 +525,19 @@ public sealed class SkillSelectionStateTests
         state.Apply(new SkillSelectionInput(SkillSelectionCommand.Character, 'n'));
         state.Apply(new SkillSelectionInput(SkillSelectionCommand.Character, 'o'));
 
-        var row = Assert.Single(state.FilteredItems);
-        Assert.Equal("uno-mvvm", row.Display);
+        Assert.False(state.ShowSelectedOnly);
+        Assert.Equal(["uno-mvvm", "uno-xaml"], state.FilteredItems.Select(item => item.Display));
 
         state.Apply(new SkillSelectionInput(SkillSelectionCommand.ToggleView));
 
-        Assert.Equal(["uno-mvvm", "uno-xaml"], state.FilteredItems.Select(item => item.Display));
+        Assert.True(state.ShowSelectedOnly);
+        var row = Assert.Single(state.FilteredItems);
+        Assert.Equal("uno-mvvm", row.Display);
 
         state.Apply(new SkillSelectionInput(SkillSelectionCommand.ClearFilter));
 
-        Assert.False(state.ShowSelectedOnly);
-        Assert.Equal(3, state.FilteredItems.Count);
+        Assert.True(state.ShowSelectedOnly);
+        Assert.Equal(["uno-mvvm", "dotnet-livecharts2"], state.FilteredItems.Select(item => item.Display));
     }
 
     [Fact]
@@ -586,7 +640,7 @@ public sealed class SkillSelectionStateTests
 
         Assert.False(state.CanConfirm);
         string filtered = Spectre.Console.Markup.Remove(RecommendationSelectionPrompt.FormatKeyHelpLine(state));
-        Assert.EndsWith("→ all, clear the filter before confirming", filtered, StringComparison.Ordinal);
+        Assert.EndsWith("→ select matching, clear the filter before confirming", filtered, StringComparison.Ordinal);
         Assert.DoesNotContain("Enter", filtered, StringComparison.Ordinal);
 
         state.Apply(new SkillSelectionInput(SkillSelectionCommand.ClearFilter));

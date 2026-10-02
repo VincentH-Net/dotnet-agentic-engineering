@@ -228,18 +228,38 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
             .Select(item => item.Key));
     }
 
+    // Without a filter the arrows act on every row. With one typed they act on the matching rows
+    // only, each as the space bar would: selecting brings dependencies along, deselecting takes
+    // dependents away.
     void SetAllSelection(bool selected)
     {
-        automaticallySelectedKeys.Clear();
-        if (!selected)
+        if (Filter.Length == 0)
         {
-            selectedKeys.Clear();
+            automaticallySelectedKeys.Clear();
+            if (!selected)
+            {
+                selectedKeys.Clear();
+                return;
+            }
+
+            foreach (var item in items)
+            {
+                SelectWithDependencies(item.Key);
+            }
+
             return;
         }
 
-        foreach (var item in items)
+        foreach (var item in items.Where(item => MatchesFilter(item, Filter)))
         {
-            SelectWithDependencies(item.Key);
+            if (selected)
+            {
+                SelectRow(item.Key);
+            }
+            else
+            {
+                DeselectWithDependents(item.Key);
+            }
         }
     }
 
@@ -326,12 +346,22 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
         selection.ExceptWith(automaticallySelectedKeys.Except(retained));
     }
 
+    // The filter is a lens over the whole list, so typing its first character switches to the all
+    // view: every match shows with its real state, and the arrows act on exactly what is shown.
+    // The view stays on all after the filter is cleared, until F2.
     void AddFilterCharacter(char character)
     {
-        if (!char.IsControl(character))
+        if (char.IsControl(character))
         {
-            SetFilter(Filter + character);
+            return;
         }
+
+        if (Filter.Length == 0)
+        {
+            ShowSelectedOnly = false;
+        }
+
+        SetFilter(Filter + character);
     }
 
     void RemoveFilterCharacter()
@@ -1025,9 +1055,9 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console, IRecommendation
             + ToolHeader.KeyMarkup("space")
             + InfoText(" toggle, ")
             + ToolHeader.KeyMarkup("←")
-            + InfoText(" none, ")
+            + InfoText(state.Filter.Length == 0 ? " deselect all, " : " deselect matching, ")
             + ToolHeader.KeyMarkup("→")
-            + InfoText(" all, ")
+            + InfoText(state.Filter.Length == 0 ? " select all, " : " select matching, ")
             + (canPreview ? ToolHeader.KeyMarkup("F3") + InfoText(" view, ") : string.Empty)
             + (state.CanConfirm ? ToolHeader.KeyMarkup("Enter") + InfoText(" confirm") : InfoText(ClearFilterToConfirm));
 

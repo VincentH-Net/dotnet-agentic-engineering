@@ -82,8 +82,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
             await auto.TypeAsync("InnoWvate.Agentic").ConfigureAwait(true);
             await auto.WaitUntilTextAsync("Filter: InnoWvate.Agentic").ConfigureAwait(true);
             await auto.SpaceAsync().ConfigureAwait(true);
-            // A deselected row leaves the selected view; F2 shows all rows so the unchecked row is visible.
-            await auto.KeyAsync(Hex1bKey.F2).ConfigureAwait(true);
+            // Typing a filter switched to the all view, so the unchecked row stays visible.
             await auto.WaitUntilTextAsync("[ ] InnoWvate.Agentic").ConfigureAwait(true);
             await auto.EscapeAsync().ConfigureAwait(true);
             await auto.WaitUntilTextAsync("[ ] foundation-prompt-log").ConfigureAwait(true);
@@ -212,8 +211,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
             await auto.TypeAsync("shorthand").ConfigureAwait(true);
             await auto.WaitUntilTextAsync("Filter: shorthand").ConfigureAwait(true);
             await auto.SpaceAsync().ConfigureAwait(true);
-            // A deselected row leaves the selected view; F2 shows all rows so the unchecked row is visible.
-            await auto.KeyAsync(Hex1bKey.F2).ConfigureAwait(true);
+            // Typing a filter switched to the all view, so the unchecked row stays visible.
             await auto.WaitUntilTextAsync("[ ] `dna`").ConfigureAwait(true);
             await auto.EscapeAsync().ConfigureAwait(true);
             await auto.WaitUntilTextAsync("[x] InnoWvate.Agentic").ConfigureAwait(true);
@@ -270,7 +268,8 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
 
         Assert.Equal(selectToolFirst, File.Exists(CompanionInstaller.ManifestPath(workspace.RepoPath)));
         Assert.Equal(selectToolFirst, File.Exists(Path.Combine(workspace.RootPath, "dna-installed")));
-        Assert.DoesNotContain("foundation-prompt-log:start", await workspace.ReadRepoFileAsync("AGENTS.md").ConfigureAwait(true), StringComparison.Ordinal);
+        // With every directive deselected no AGENTS.md is created at all.
+        Assert.False(File.Exists(Path.Combine(workspace.RepoPath, "AGENTS.md")));
         string[] toolCalls = await File.ReadAllLinesAsync(Path.Combine(workspace.RootPath, "tool.log")).ConfigureAwait(true);
         Assert.Equal(selectToolFirst ? 2 : 0, toolCalls.Count(line => line.StartsWith("tool install ", StringComparison.Ordinal)));
         AssertRecordingWasWritten(workspace);

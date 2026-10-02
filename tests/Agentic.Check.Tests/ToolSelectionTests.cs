@@ -54,6 +54,8 @@ public sealed class ToolSelectionTests
         {
             state.Apply(new(SkillSelectionCommand.SelectNone));
             Toggle(state, "foundation-prompt-log");
+            // With a filter typed the arrows act on the matching rows only, so clear it first.
+            state.Apply(new(SkillSelectionCommand.ClearFilter));
             state.Apply(new(SkillSelectionCommand.SelectAll));
         }
 
