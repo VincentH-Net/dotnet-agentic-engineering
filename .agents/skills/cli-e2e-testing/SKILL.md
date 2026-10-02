@@ -1,8 +1,19 @@
 ---
-name: cli-e2e-testing
 description: Use when creating, modifying, debugging, or reviewing end-to-end tests for any CLI tool that must run in a real terminal, accept keyboard input, and expose observable terminal output. Prefer Hex1b terminal automation for PTY/headless terminal flows.
+metadata:
+    author: https://github.com/VincentH-Net
+    category: testing
+    framework: dotnet
+    github-path: plugins/dotnet/skills/cli-e2e-testing
+    github-ref: refs/tags/v2.4.0
+    github-repo: https://github.com/VincentH-Net/dotnet-agentic-engineering
+    github-tree-sha: 00e1b75ce490a385c1d12c86865e974cd38b0e11
+    sources:
+        - github.com/microsoft/aspire/blob/main/.agents/skills/cli-e2e-testing/SKILL.md
+        - github.com/mitchdenny/hex1b
+    version: 1.0.0
+name: cli-e2e-testing
 ---
-
 # CLI End-to-End Testing
 
 Use this skill when a CLI test must exercise the real executable through a terminal-like environment instead of calling internal APIs or redirecting standard input/output.
