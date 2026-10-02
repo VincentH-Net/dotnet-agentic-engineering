@@ -1,5 +1,7 @@
 # dotnet-agentic-engineering
 
+[![built with: dna](https://img.shields.io/badge/built%20with-dna-512BD4)](https://github.com/VincentH-Net/dotnet-agentic-engineering)
+
 Battle-tested agentic engineering for [.NET](https://dotnet.microsoft.com), [Aspire](https://aspire.dev), [Azure](https://azure.microsoft.com), [Fabric](https://www.microsoft.com/en-us/microsoft-fabric), [Orleans](https://learn.microsoft.com/en-us/dotnet/orleans) and [Uno Platform](https://platform.uno)
 
 ## What this is
