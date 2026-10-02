@@ -195,6 +195,7 @@ sealed class CheckWorkflow(
         IReadOnlyList<SkillManifestEntry> recommended = [];
         IReadOnlyList<SkillManifestEntry> missing = [];
         IReadOnlyList<SkillUpdateCandidate> skillUpdates = [];
+        IReadOnlyList<string> skillsWithoutMetadata = [];
         ScopeDuplicateScanResult? duplicates = null;
         PresentElsewhere? presentElsewhere = null;
         var directiveCacheSettings = DirectiveCacheSettings.FromEnvironment();
@@ -308,6 +309,12 @@ sealed class CheckWorkflow(
                     await RunSkillUpdateDryRunAsync(githubRunner, skillsDirectories, targetDirectory, report, cancellationToken).ConfigureAwait(false);
                     skillUpdates = ExtractDistinctSkillUpdates(report.SkillUpdateDryRuns, recommended);
                     report.OutdatedSkills = skillUpdates.Count;
+
+                    // gh prefixes notices with "!": skills it skips are not updates. A skill without
+                    // GitHub metadata gets a re-install action below; other notices are warnings.
+                    string[] notices = [.. report.SkillUpdateDryRuns.SelectMany(ExtractNotices).Distinct(StringComparer.Ordinal)];
+                    skillsWithoutMetadata = [.. notices.Select(ParseSkillWithoutMetadata).OfType<string>().Distinct(StringComparer.OrdinalIgnoreCase)];
+                    report.Warnings.AddRange(notices.Where(notice => ParseSkillWithoutMetadata(notice) is null).Select(FormatNotice));
                 }
 
                 advance();
@@ -363,9 +370,10 @@ sealed class CheckWorkflow(
 
         var recommendedDirectives = directivePlan.SelectableDirectives;
         var stableSwitchSkills = FindStableSwitchSkillActions(options.Preview, recommended, skillsDirectories);
+        var metadataReinstallSkills = FindMetadataReinstallSkillActions(options.Preview, recommended, skillsWithoutMetadata);
         var recommendedSkillActions = options.Preview
             ? [.. recommended.Select(skill => skill with { RecommendationAction = missing.Contains(skill) ? "install" : "re-install" })]
-            : BuildStableSkillActions(recommended, missing, stableSwitchSkills);
+            : BuildSkillActions(recommended, missing, stableSwitchSkills, metadataReinstallSkills);
         ToolVersion? repairRequirement = null;
         string? installedCompanion = null;
         bool restoreOnly = false;
@@ -518,7 +526,7 @@ sealed class CheckWorkflow(
         IReadOnlyList<SkillManifestEntry> selectedSkills = [];
         if (!options.DryRun && !options.Preview)
         {
-            ReportUpToDateItems(directivePlan.Directives, recommended, missing, skillUpdates, stableSwitchSkills);
+            ReportUpToDateItems(directivePlan.Directives, recommended, missing, skillUpdates, [.. stableSwitchSkills, .. metadataReinstallSkills]);
         }
 
         if (!options.DryRun && currentTools.Count > 0)
@@ -922,11 +930,41 @@ sealed class CheckWorkflow(
             ReportCommandOutput(updateReport);
         }
 
+        foreach (string notice in report.SkillUpdates.SelectMany(ExtractNotices).Distinct(StringComparer.Ordinal))
+        {
+            reporter.Warning(FormatNotice(notice));
+        }
+
         if (failures.Count == 0 && !skippedPrerequisite)
         {
-            reporter.Success(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Updated {skillUpdates.Count} skill(s) successfully."));
+            int updatedCount = CountUpdatedSkills(report.SkillUpdates, skillUpdates.Count);
+            if (updatedCount == 0)
+            {
+                reporter.Warning("gh skill update changed no skills.");
+            }
+            else
+            {
+                reporter.Success(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Updated {updatedCount} skill(s) successfully."));
+            }
         }
     }
+
+    // gh names each skill it updated on its own line; without such lines a run that only
+    // printed notices updated nothing, and any other output keeps the planned count.
+    static int CountUpdatedSkills(IReadOnlyList<CommandReport> updateReports, int plannedCount)
+    {
+        string[] updated = [.. updateReports.SelectMany(ExtractUpdatedSkillNames).Distinct(StringComparer.OrdinalIgnoreCase)];
+        return updated.Length > 0
+            ? updated.Length
+            : updateReports.Any(updateReport => ExtractNotices(updateReport).Count > 0) ? 0 : plannedCount;
+    }
+
+    static IEnumerable<string> ExtractUpdatedSkillNames(CommandReport updateReport)
+        => OutputLines(updateReport)
+            .Select(TrimListMarker)
+            .Where(line => line.StartsWith("Updated ", StringComparison.Ordinal))
+            .Select(line => line["Updated ".Length..].Trim())
+            .Where(name => name.Length > 0 && !name.Any(char.IsWhiteSpace));
 
     async Task RunSkillUpdateDryRunAsync(
         ICommandRunner githubRunner,
@@ -1025,7 +1063,7 @@ sealed class CheckWorkflow(
         IReadOnlyList<SkillManifestEntry> recommendedSkills,
         IReadOnlyList<SkillManifestEntry> missingSkills,
         IReadOnlyList<SkillUpdateCandidate> skillUpdates,
-        IReadOnlyList<SkillManifestEntry> stableSwitchSkills)
+        IReadOnlyList<SkillManifestEntry> reinstallSkills)
     {
         DirectivePlanItem[] currentDirectives = [.. directives
             .Where(directive => directive.Status == DirectiveStatuses.Current)
@@ -1033,7 +1071,7 @@ sealed class CheckWorkflow(
         var missingSkillKeys = missingSkills
             .Select(SkillKey)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var stableSwitchSkillKeys = stableSwitchSkills
+        var reinstallSkillKeys = reinstallSkills
             .Select(SkillKey)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var updateSkillKeys = skillUpdates
@@ -1041,7 +1079,7 @@ sealed class CheckWorkflow(
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         SkillManifestEntry[] upToDateSkills = [.. recommendedSkills
             .Where(skill => !missingSkillKeys.Contains(SkillKey(skill))
-                && !stableSwitchSkillKeys.Contains(SkillKey(skill))
+                && !reinstallSkillKeys.Contains(SkillKey(skill))
                 && !updateSkillKeys.Contains(SkillKey(skill)))
         ];
         if (currentDirectives.Length == 0 && upToDateSkills.Length == 0)
@@ -1232,10 +1270,11 @@ sealed class CheckWorkflow(
     static string SkillKey(string sourceRepo, string skillName)
         => $"{sourceRepo}\n{skillName}";
 
-    static IReadOnlyList<SkillManifestEntry> BuildStableSkillActions(
+    static IReadOnlyList<SkillManifestEntry> BuildSkillActions(
         IReadOnlyList<SkillManifestEntry> recommendedSkills,
         IReadOnlyList<SkillManifestEntry> missingSkills,
-        IReadOnlyList<SkillManifestEntry> stableSwitchSkills)
+        IReadOnlyList<SkillManifestEntry> stableSwitchSkills,
+        IReadOnlyList<SkillManifestEntry> metadataReinstallSkills)
     {
         var missingSkillKeys = missingSkills
             .Select(SkillKey)
@@ -1243,17 +1282,28 @@ sealed class CheckWorkflow(
         var stableSwitchSkillKeys = stableSwitchSkills
             .Select(SkillKey)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var metadataReinstallSkillKeys = metadataReinstallSkills
+            .Select(SkillKey)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         return
         [
             .. recommendedSkills
-                .Where(skill => missingSkillKeys.Contains(SkillKey(skill)) || stableSwitchSkillKeys.Contains(SkillKey(skill)))
+                .Where(skill => missingSkillKeys.Contains(SkillKey(skill))
+                    || stableSwitchSkillKeys.Contains(SkillKey(skill))
+                    || metadataReinstallSkillKeys.Contains(SkillKey(skill)))
                 .Select(skill => stableSwitchSkillKeys.Contains(SkillKey(skill))
                     ? skill with
                     {
-                        RecommendationAction = "switch to stable",
+                        RecommendationAction = SkillInstaller.StableSwitchAction,
                         ForceInstall = true
                     }
-                    : skill)
+                    : metadataReinstallSkillKeys.Contains(SkillKey(skill))
+                        ? skill with
+                        {
+                            RecommendationAction = SkillInstaller.MetadataReinstallAction,
+                            ForceInstall = true
+                        }
+                        : skill)
         ];
     }
 
@@ -1262,6 +1312,15 @@ sealed class CheckWorkflow(
         IReadOnlyList<SkillManifestEntry> recommendedSkills,
         IReadOnlyList<string> skillsDirectories)
         => preview ? [] : SkillInstaller.FindRequiringStableSwitch(recommendedSkills, skillsDirectories);
+
+    // gh reports the skill folder name, which is the manifest's local folder.
+    static IReadOnlyList<SkillManifestEntry> FindMetadataReinstallSkillActions(
+        bool preview,
+        IReadOnlyList<SkillManifestEntry> recommendedSkills,
+        IReadOnlyList<string> skillsWithoutMetadata)
+        => preview
+            ? []
+            : [.. recommendedSkills.Where(skill => skillsWithoutMetadata.Contains(skill.LocalFolder, StringComparer.OrdinalIgnoreCase))];
 
     internal static RecommendationSelectionResult CloseDependencies(
         IReadOnlyList<DirectivePlanItem> directives,
@@ -1330,13 +1389,13 @@ sealed class CheckWorkflow(
             return [];
         }
 
-        string output = $"{updateReport.StandardOutput}\n{updateReport.StandardError}";
-        if (string.IsNullOrWhiteSpace(output))
+        string[] lines = [.. OutputLines(updateReport).Where(line => !IsNoticeLine(line))];
+        if (lines.Length == 0)
         {
             return [];
         }
 
-        string normalized = output.Trim();
+        string normalized = string.Join('\n', lines);
         string[] noUpdateMarkers =
         [
             "No installed skills found.",
@@ -1360,8 +1419,7 @@ sealed class CheckWorkflow(
             "dry run",
             "dry-run"
         ];
-        SkillUpdateCandidate[] updateLines = [.. normalized
-            .Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+        SkillUpdateCandidate[] updateLines = [.. lines
             .Where(line => !IsIgnoredOutdatedSkillLine(line, ignoredLineFragments))
             .Select(ParseSkillUpdateLine)
             .OfType<SkillUpdateCandidate>()];
@@ -1369,6 +1427,29 @@ sealed class CheckWorkflow(
             ? [new SkillUpdateCandidate(ExtractSkillNameFromUpdateLine(normalized), "unknown source")]
             : updateLines;
     }
+
+    static string[] OutputLines(CommandReport report)
+        => $"{report.StandardOutput}\n{report.StandardError}"
+            .Split('\n', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+
+    static bool IsNoticeLine(string line)
+        => line.StartsWith('!');
+
+    internal static IReadOnlyList<string> ExtractNotices(CommandReport report)
+        => !report.Success
+            ? []
+            : [.. OutputLines(report).Where(IsNoticeLine).Select(line => line.TrimStart('!').Trim()).Distinct(StringComparer.Ordinal)];
+
+    const string NoMetadataMarker = " has no GitHub metadata";
+
+    internal static string? ParseSkillWithoutMetadata(string notice)
+    {
+        int index = notice.IndexOf(NoMetadataMarker, StringComparison.OrdinalIgnoreCase);
+        return index > 0 ? notice[..index].Trim() : null;
+    }
+
+    static string FormatNotice(string notice)
+        => $"gh skill update: {notice}";
 
     static bool IsIgnoredOutdatedSkillLine(string line, IReadOnlyList<string> ignoredLineFragments)
     {

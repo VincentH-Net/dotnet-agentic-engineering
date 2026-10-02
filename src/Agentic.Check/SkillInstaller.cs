@@ -2,6 +2,12 @@
 
 sealed class SkillInstaller(ICommandRunner commandRunner, IReporter reporter)
 {
+    internal const string StableSwitchAction = "switch to stable";
+
+    // gh skill update skips a skill whose SKILL.md carries no GitHub metadata; a forced
+    // re-install from the manifest source writes that metadata so later updates work.
+    internal const string MetadataReinstallAction = "re-install to enable updates";
+
     internal static IReadOnlyList<SkillManifestEntry> FindMissing(IReadOnlyList<SkillManifestEntry> skills, string skillsDirectory)
         => [.. skills.Where(skill => !File.Exists(Path.Combine(skillsDirectory, skill.LocalFolder, "SKILL.md")))];
 
@@ -155,9 +161,7 @@ sealed class SkillInstaller(ICommandRunner commandRunner, IReporter reporter)
             return FormatPreviewChangeAction(beforeSha, afterSha);
         }
 
-        return skill.ForceInstall && skill.RecommendationAction.Equals("switch to stable", StringComparison.Ordinal)
-            ? "Switch to stable skill"
-            : "Installed skill";
+        return FormatForcedAction(skill) ?? "Installed skill";
     }
 
     static string FormatCopyAction(
@@ -171,10 +175,18 @@ sealed class SkillInstaller(ICommandRunner commandRunner, IReporter reporter)
             return FormatPreviewChangeAction(beforeSha, afterSha);
         }
 
-        return skill.ForceInstall && skill.RecommendationAction.Equals("switch to stable", StringComparison.Ordinal)
-            ? "Switch to stable skill"
-            : "Copied skill";
+        return FormatForcedAction(skill) ?? "Copied skill";
     }
+
+    static string? FormatForcedAction(SkillManifestEntry skill)
+        => !skill.ForceInstall
+            ? null
+            : skill.RecommendationAction switch
+            {
+                StableSwitchAction => "Switch to stable skill",
+                MetadataReinstallAction => "Re-installed skill",
+                _ => null
+            };
 
     static string FormatPreviewChangeAction(string? beforeSha, string? afterSha)
     {
