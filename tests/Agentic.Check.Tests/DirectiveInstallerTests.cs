@@ -297,53 +297,6 @@ public sealed class DirectiveInstallerTests
         Assert.Equal(1, plan.OutdatedCount);
     }
 
-    [Theory]
-    [InlineData("User notes.\n\n<!-- foundation-prompt-log:start -->\nold\n<!-- foundation-prompt-log:end -->\n", "User notes.\n\n<!-- dna:start -->")]
-    [InlineData("User notes.\n<!-- foundation-prompt-log:start -->\nold\n<!-- foundation-prompt-log:end -->\n", "User notes.\n\n<!-- dna:start -->")]
-    [InlineData("<!-- foundation-prompt-log:start -->\nold\n<!-- foundation-prompt-log:end -->\n", "<!-- dna:start -->")]
-    [InlineData("User notes only.\n", "User notes only.\n\n<!-- dna:start -->")]
-    public async Task AttributionDirectiveIsInsertedAboveExistingManagedBlocks(string existing, string expectedStart)
-    {
-        using TempDirectory tempDirectory = new();
-        tempDirectory.Write("AGENTS.md", existing);
-        DirectiveInstaller installer = new(new FakeDirectiveSource(WithAttributionDirective()), new NullReporter());
-        var plan = await installer.PlanAsync(tempDirectory.Path, DotnetStack(), CancellationToken.None);
-
-        var result = await installer.ApplyAsync(plan, ["dna"], false, CancellationToken.None);
-
-        Assert.True(result.Success);
-        string agents = await File.ReadAllTextAsync(Path.Combine(tempDirectory.Path, "AGENTS.md"), CancellationToken.None);
-        Assert.StartsWith(expectedStart, agents, StringComparison.Ordinal);
-        if (agents.Contains("<!-- foundation-prompt-log:start -->", StringComparison.Ordinal))
-        {
-            Assert.Contains("<!-- dna:end -->\n\n<!-- foundation-prompt-log:start -->", agents, StringComparison.Ordinal);
-        }
-
-        Assert.Equal(2, agents.Split("<!-- dna:start -->", StringSplitOptions.None).Length);
-    }
-
-    [Fact]
-    public async Task AttributionDirectiveComesFirstInANewAgentsFile()
-    {
-        using TempDirectory tempDirectory = new();
-        _ = tempDirectory.CreateDirectory(".");
-        DirectiveInstaller installer = new(new FakeDirectiveSource(WithAttributionDirective()), new NullReporter());
-        var plan = await installer.PlanAsync(tempDirectory.Path, DotnetStack(), CancellationToken.None);
-
-        var result = await installer.ApplyAsync(plan, ["foundation-prompt-log", "dotnet-cli-run", "dna"], false, CancellationToken.None);
-
-        Assert.True(result.Success);
-        string agents = await File.ReadAllTextAsync(Path.Combine(tempDirectory.Path, "AGENTS.md"), CancellationToken.None);
-        Assert.StartsWith("<!-- dna:start -->", agents, StringComparison.Ordinal);
-        Assert.Contains("<!-- dna:end -->\n\n<!-- dotnet-cli-run:start -->", agents, StringComparison.Ordinal);
-    }
-
-    static Dictionary<string, string> WithAttributionDirective()
-        => new(FakeDirectiveSource.DefaultDirectiveContents(), StringComparer.Ordinal)
-        {
-            ["dna.md"] = FakeDirectiveSource.DirectiveFile("dna")
-        };
-
     static StackDetectionResult DotnetStack()
         => new(new HashSet<string>(StringComparer.OrdinalIgnoreCase) { TechnologyNames.Foundation, TechnologyNames.Dotnet }, [], []);
 

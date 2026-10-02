@@ -27,7 +27,7 @@ public sealed class ReadmeBadgeInstallerTests
         Assert.Equal(fileName, plan.Display);
         var action = ReadmeBadgeInstaller.Action(plan);
         Assert.True(action.IsReadmeBadge);
-        Assert.Equal("README badge: agentic engineering with dna (add)", RecommendationSelectionPrompt.FormatSkillListItem(action));
+        Assert.Equal("README badge: built with dna (add)", RecommendationSelectionPrompt.FormatSkillListItem(action));
     }
 
     [Theory]

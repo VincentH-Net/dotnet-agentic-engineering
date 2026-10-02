@@ -660,7 +660,7 @@ public sealed class SkillSelectionStateTests
         RecommendationSelectionState state = new(items);
 
         Assert.Equal(RecommendationSelectionKind.Tool, badgeItem.Kind);
-        Assert.Equal("README badge: agentic engineering with dna (add)", badgeItem.Display);
+        Assert.Equal("README badge: built with dna (add)", badgeItem.Display);
         Assert.True(state.IsSelected(badgeItem));
         var defaults = RecommendationSelectionPrompt.DefaultSelection([], [badge], new(new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)));
         Assert.Contains(badge, defaults.SelectedSkills);

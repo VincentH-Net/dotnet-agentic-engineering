@@ -149,8 +149,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
         workspace.WriteRepoFile("README.md", "# Sample\n\nHello.\n");
         _ = await RunInteractiveCommandAsync(workspace, $"--agents codex {Quote(workspace.RepoPath)}", async auto =>
         {
-            await auto.WaitUntilTextAsync("[x] README badge: agentic engineering with dna (add)").ConfigureAwait(true);
-            await auto.WaitUntilTextAsync("[x] dna (install)").ConfigureAwait(true);
+            await auto.WaitUntilTextAsync("[x] README badge: built with dna (add)").ConfigureAwait(true);
             // Keep only the badge: deselect everything, then check it back through the filter.
             await auto.LeftAsync().ConfigureAwait(true);
             await auto.TypeAsync("README").ConfigureAwait(true);

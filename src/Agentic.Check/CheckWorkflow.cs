@@ -342,11 +342,6 @@ sealed class CheckWorkflow(
             ? CodexRulesInstaller.Plan(targetDirectory)
             : null;
 
-        // Offered once: in the run that installs the attribution directive, when the README does not link here yet.
-        var readmeBadgePlan = directivePlan.Directives.Any(directive => directive.Name == DirectiveInstaller.AttributionDirectiveName && directive.Status == DirectiveStatuses.Missing)
-            ? ReadmeBadgeInstaller.Plan(targetDirectory)
-            : null;
-
         report.AgentsFile = directivePlan.AgentsFile;
         report.ClaudeFile = directivePlan.ClaudeFile;
         report.Directives.AddRange(directivePlan.Directives.Select(directive => new DirectiveReportItem(directive.Name, directive.Status)));
@@ -547,6 +542,9 @@ sealed class CheckWorkflow(
             recommendedSkillActions = [.. recommendedSkillActions, CodexRulesInstaller.Action(codexRulesPlan)];
         }
 
+        // Offered whenever this run has something else to apply, while the README does not link here yet.
+        bool hasOtherActions = recommendedDirectives.Count > 0 || recommendedSkillActions.Count > 0 || skillUpdates.Count > 0;
+        var readmeBadgePlan = hasOtherActions ? ReadmeBadgeInstaller.Plan(targetDirectory) : null;
         if (readmeBadgePlan is { IsCurrent: false })
         {
             recommendedSkillActions = [.. recommendedSkillActions, ReadmeBadgeInstaller.Action(readmeBadgePlan)];

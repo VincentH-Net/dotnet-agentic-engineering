@@ -417,7 +417,7 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
     }
 
     // The README is dna-owned only for the badge: a declined run leaves it alone, and every other run
-    // that installs the dna directive adds the badge unless the README already links to the repository.
+    // with work to apply adds the badge unless the README already links to the repository.
     async Task VerifyReadmeAsync(SortedDictionary<string, string> after)
     {
         string? readme = after.Keys.FirstOrDefault(IsReadme);

@@ -90,50 +90,57 @@ public sealed class WorkflowTests
     }
 
     [Fact]
-    public async Task ReadmeBadgeIsOfferedOnceSelectedByDefaultAndAddedByYes()
+    public async Task ReadmeBadgeIsOfferedWheneverThereIsOtherWorkUntilTheReadmeLinksHere()
     {
         using TempDirectory tempDirectory = new();
         tempDirectory.Write("App.csproj", "<Project />");
         tempDirectory.Write("README.md", "# Sample\n\nHello.\n");
-        Dictionary<string, string> directives = new(FakeDirectiveSource.DefaultDirectiveContents(), StringComparer.Ordinal)
-        {
-            ["dna.md"] = FakeDirectiveSource.DirectiveFile("dna")
-        };
-        FakePrompts prompts = new() { SelectedDirectiveNames = ["dna"], SelectedSkillInstallArgs = ["readme-badge"] };
+        FakePrompts prompts = new() { SelectedDirectiveNames = [], SelectedSkillInstallArgs = ["readme-badge"] };
         AgenticCheckOptions options = new(tempDirectory.Path, false, false, null, null, "codex", false);
 
-        var chosen = await Workflow(prompts, directives).RunAsync(options, CancellationToken.None);
+        var chosen = await Workflow(prompts).RunAsync(options, CancellationToken.None);
 
         Assert.Equal(0, chosen.ExitCode);
         var offer = Assert.Single(prompts.RecommendedSkillActions, skill => skill.IsReadmeBadge);
         Assert.Equal("add", offer.RecommendationAction);
         Assert.True(chosen.Report.ReadmeBadge?.Success);
         Assert.Equal($"# Sample\n\n{ReadmeBadgeInstaller.Badge}\n\nHello.\n", await File.ReadAllTextAsync(Path.Combine(tempDirectory.Path, "README.md"), CancellationToken.None));
-        Assert.Contains("<!-- dna:start -->", await File.ReadAllTextAsync(Path.Combine(tempDirectory.Path, "AGENTS.md"), CancellationToken.None), StringComparison.Ordinal);
 
         FakePrompts repeatedPrompts = new() { SelectedDirectiveNames = [], SelectedSkillInstallArgs = [] };
-        _ = await Workflow(repeatedPrompts, directives).RunAsync(options, CancellationToken.None);
+        _ = await Workflow(repeatedPrompts).RunAsync(options, CancellationToken.None);
 
         Assert.DoesNotContain(repeatedPrompts.RecommendedSkillActions, skill => skill.IsReadmeBadge);
 
-        // A target without a .NET project recommends no skills, so --yes installs only directives and tools here.
-        using TempDirectory unattended = new();
-        unattended.Write("README.md", "# Sample\n\nHello.\n");
+        // Skills alone are work too: every directive current, only skills missing.
+        using TempDirectory skillsOnly = new();
+        skillsOnly.Write("App.csproj", "<Project />");
+        skillsOnly.Write("README.md", "# Sample\n\nHello.\n");
+        skillsOnly.Write("AGENTS.md", FakeBlock("foundation-prompt-log") + "\n\n" + FakeBlock("dotnet-cli-run") + "\n");
+        CompanionTests.WriteManifest(skillsOnly.Path, "2.3.0");
+        FakePrompts skillsOnlyPrompts = new() { SelectedDirectiveNames = [], SelectedSkillInstallArgs = [] };
 
-        var yes = await Workflow(new FakePrompts(), directives).RunAsync(new(unattended.Path, false, true, null, null, "codex", false), CancellationToken.None);
+        var skillsRun = await Workflow(skillsOnlyPrompts).RunAsync(new(skillsOnly.Path, false, false, null, null, "codex", false), CancellationToken.None);
 
-        Assert.Equal(0, yes.ExitCode);
-        Assert.True(yes.Report.ReadmeBadge?.Success);
-        Assert.Equal($"# Sample\n\n{ReadmeBadgeInstaller.Badge}\n\nHello.\n", await File.ReadAllTextAsync(Path.Combine(unattended.Path, "README.md"), CancellationToken.None));
-        Assert.Contains("<!-- dna:start -->", await File.ReadAllTextAsync(Path.Combine(unattended.Path, "AGENTS.md"), CancellationToken.None), StringComparison.Ordinal);
+        Assert.Equal(0, skillsRun.ExitCode);
+        Assert.DoesNotContain(skillsRun.Report.Directives, directive => directive.Status != DirectiveStatuses.Current);
+        Assert.NotEmpty(skillsRun.Report.MissingSkills);
+        _ = Assert.Single(skillsOnlyPrompts.RecommendedSkillActions, skill => skill.IsReadmeBadge);
 
-        static CheckWorkflow Workflow(FakePrompts prompts, Dictionary<string, string> directives)
+        static CheckWorkflow Workflow(FakePrompts prompts)
         {
             FakeCommandRunner runner = new();
             runner.Enqueue(new CommandResult(0, "gh version 2.101.0", string.Empty));
             runner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
             runner.Enqueue(new CommandResult(0, "No updates available.", string.Empty));
-            return new(runner, prompts, new RecordingReporter(), new FakeDirectiveSource(directives), new FakeSourceVersionResolver());
+            return new(runner, prompts, new RecordingReporter(), new FakeDirectiveSource(), new FakeSourceVersionResolver());
+        }
+
+        static string FakeBlock(string name)
+        {
+            string file = FakeDirectiveSource.DefaultDirectiveContents()[name + ".md"];
+            int start = file.IndexOf("~~~md\n", StringComparison.Ordinal) + "~~~md\n".Length;
+            int end = file.IndexOf("\n~~~", start, StringComparison.Ordinal);
+            return file[start..end].Trim();
         }
     }
 

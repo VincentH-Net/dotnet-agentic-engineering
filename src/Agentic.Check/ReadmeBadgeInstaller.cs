@@ -10,14 +10,15 @@ sealed record ReadmeBadgePlan(string File, bool IsCurrent, string Display)
 sealed record ReadmeBadgeReport(string File, string Action, bool Success, string? Error);
 
 // A README badge that links to this repository shows, on the page people look at first and at no
-// cost in agent context, that a repository follows the dna way of working. It is offered once, in
-// the dna check that installs the attribution directive, selected like every other recommendation
-// and deselectable there. A README that already links to the repository counts as covered.
+// cost in agent context, that a repository is built with dna. It is offered whenever a check has
+// something else to apply, selected like every other recommendation and deselectable there, so a
+// declined offer returns only with the next piece of work. A README that already links to the
+// repository counts as covered.
 static class ReadmeBadgeInstaller
 {
     internal static SkillDependency Identity { get; } = new(string.Empty, "readme-badge");
 
-    internal const string Badge = "[![agentic engineering: dna](https://img.shields.io/badge/agentic%20engineering-dna-512BD4)](" + ToolHeader.RepositoryUrl + ")";
+    internal const string Badge = "[![built with: dna](https://img.shields.io/badge/built%20with-dna-512BD4)](" + ToolHeader.RepositoryUrl + ")";
 
     internal static ReadmeBadgePlan? Plan(string targetDirectory)
     {
@@ -34,7 +35,7 @@ static class ReadmeBadgeInstaller
     }
 
     internal static SkillManifestEntry Action(ReadmeBadgePlan plan)
-        => new(string.Empty, Identity.InstallArg, "README badge: agentic engineering with dna", string.Empty, [],
+        => new(string.Empty, Identity.InstallArg, "README badge: built with dna", string.Empty, [],
             recommendationAction: ReadmeBadgePlan.Action,
             version: plan.Display);
 
