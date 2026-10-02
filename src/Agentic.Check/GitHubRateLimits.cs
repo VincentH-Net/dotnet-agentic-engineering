@@ -10,6 +10,13 @@ sealed class GitHubRateLimitException : Exception
     public GitHubRateLimitException(string message) : base(message) { }
 
     public GitHubRateLimitException(string message, Exception innerException) : base(message, innerException) { }
+
+    public GitHubRateLimitException(string message, bool isSecondary) : base(message)
+        => IsSecondary = isSecondary;
+
+    // A secondary limit clears within minutes, so installs retry once after a wait; a primary
+    // limit resets on the hour and is reported instead.
+    public bool IsSecondary { get; }
 }
 
 static class GitHubRateLimits
@@ -46,11 +53,11 @@ sealed class GitHubRateLimitRunner(ICommandRunner runner, bool authenticated) : 
             return result;
         string output = result.StandardError + "\n" + result.StandardOutput;
         if (GitHubRateLimits.IsSecondary(output))
-            throw new GitHubRateLimitException(GitHubRateLimits.SecondaryMessage);
+            throw new GitHubRateLimitException(GitHubRateLimits.SecondaryMessage, isSecondary: true);
         if ((output.Contains("HTTP 403:", StringComparison.OrdinalIgnoreCase) || output.Contains("HTTP 429:", StringComparison.OrdinalIgnoreCase))
             && output.Contains("API rate limit exceeded", StringComparison.OrdinalIgnoreCase))
         {
-            throw new GitHubRateLimitException(GitHubRateLimits.PrimaryMessage(authenticated));
+            throw new GitHubRateLimitException(GitHubRateLimits.PrimaryMessage(authenticated), isSecondary: false);
         }
         return result;
     }

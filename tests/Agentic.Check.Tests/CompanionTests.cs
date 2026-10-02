@@ -779,6 +779,8 @@ sealed class ToolRunner : ICommandRunner
             return Task.FromResult(new CommandResult(0, arguments[1] == "run" ? Resolved : "localized SDK output", ""));
         }
 
+        if (FakeGh.IsInstall(Calls[^1]))
+            FakeGh.WriteInstalledSkill(Calls[^1], "# Installed");
         return Task.FromResult(new CommandResult(0, arguments.Contains("--version") ? "gh version 2.93.0" : UpdateCandidate && arguments.Contains("--dry-run") ? $"Would update fixture-consumer ({CompanionDependency.SourceRepo})" : "ok", ""));
     }
 }

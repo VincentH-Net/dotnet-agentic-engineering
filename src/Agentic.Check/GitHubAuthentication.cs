@@ -190,7 +190,7 @@ sealed class GitHubAuthenticationHandler : DelegatingHandler
             if (rateLimit is not null)
             {
                 response.Dispose();
-                throw new GitHubRateLimitException(rateLimit);
+                throw new GitHubRateLimitException(rateLimit, rateLimit == GitHubRateLimits.SecondaryMessage);
             }
             if (response.StatusCode is not (HttpStatusCode.MovedPermanently or HttpStatusCode.Found or HttpStatusCode.SeeOther or HttpStatusCode.TemporaryRedirect or HttpStatusCode.PermanentRedirect)
                 || response.Headers.Location is not { } location)

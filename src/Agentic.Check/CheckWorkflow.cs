@@ -28,7 +28,8 @@ sealed class CheckWorkflow(
     IReadOnlyList<SkillManifestEntry>? skillManifest = null,
     DnaInstaller? dnaInstaller = null,
     Func<string, string?>? readEnvironment = null,
-    INuGetVersionSource? versionSource = null)
+    INuGetVersionSource? versionSource = null,
+    Func<TimeSpan, CancellationToken, Task>? rateLimitDelay = null)
 {
     // A manual test shell sets this so every check it starts, including dna check and dnx, reads pinned content.
     internal const string PreviewSourceRefVariable = "AGENTIC_CHECK_PREVIEW_SOURCE_REF";
@@ -731,7 +732,7 @@ sealed class CheckWorkflow(
 
         if (selectedSkills.Count > 0)
         {
-            SkillInstaller skillInstaller = new(githubRunner, reporter);
+            SkillInstaller skillInstaller = new(githubRunner, reporter, delay: rateLimitDelay);
             var firstDirectoryInstallSkills = options.Preview
                 ? selectedSkills
                 : [.. selectedSkills.Where(skill => skill.ForceInstall || SkillInstaller.IsMissing(skill, firstSkillsDirectory))];
@@ -753,7 +754,8 @@ sealed class CheckWorkflow(
                             cancellationToken,
                             advance,
                             reportPreviewChangeStatus: options.Preview,
-                            reportResult: report.InstallResults.Add)
+                            reportResult: report.InstallResults.Add,
+                            recordWarning: report.Warnings.Add)
                         .ConfigureAwait(false);
 
                     if (skillsDirectories.Count > 1)

@@ -1,12 +1,38 @@
-﻿namespace Agentic.Check;
+﻿using System.Runtime.ExceptionServices;
 
-sealed class SkillInstaller(ICommandRunner commandRunner, IReporter reporter)
+namespace Agentic.Check;
+
+sealed class SkillInstaller(
+    ICommandRunner commandRunner,
+    IReporter reporter,
+    int maxConcurrentInstalls = SkillInstaller.DefaultMaxConcurrentInstalls,
+    Func<TimeSpan, CancellationToken, Task>? delay = null)
 {
     internal const string StableSwitchAction = "switch to stable";
 
     // gh skill update skips a skill whose SKILL.md carries no GitHub metadata; a forced
     // re-install from the manifest source writes that metadata so later updates work.
     internal const string MetadataReinstallAction = "re-install to enable updates";
+
+    // Each gh skill install spends its time on about nine serial GitHub round trips, so installs
+    // run concurrently. Measured on 2026-10-02: 84 installs launched at once finished in 7 s with
+    // no rate-limit response. 48 keeps the largest manifest batch near 10 s while bounding the
+    // number of gh processes and staying clear of GitHub's documented 100 concurrent requests.
+    internal const int DefaultMaxConcurrentInstalls = 48;
+
+    // gh writes each skill file straight into its target, so a failed install would leave a
+    // partial folder that later runs mistake for an installed skill. Installing into a sibling
+    // staging folder and moving the finished skill keeps the live directory whole; a sibling
+    // keeps that move a same-volume rename.
+    internal const string StagingFolderName = ".agentic-check-staging";
+
+    // GitHub documents no wait for a secondary limit beyond "at least one minute, then back off
+    // exponentially", and gh does not surface a retry-after value, so the waits are fixed.
+    internal static IReadOnlyList<TimeSpan> SecondaryLimitWaits { get; } = [TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(120)];
+
+    readonly ICommandRunner commandRunner = commandRunner;
+    readonly IReporter reporter = reporter;
+    readonly Func<TimeSpan, CancellationToken, Task> delay = delay ?? Task.Delay;
 
     internal static IReadOnlyList<SkillManifestEntry> FindMissing(IReadOnlyList<SkillManifestEntry> skills, string skillsDirectory)
         => [.. skills.Where(skill => !File.Exists(Path.Combine(skillsDirectory, skill.LocalFolder, "SKILL.md")))];
@@ -41,6 +67,15 @@ sealed class SkillInstaller(ICommandRunner commandRunner, IReporter reporter)
             || !gitHubRef.Equals($"refs/heads/{stableSource.Ref}", StringComparison.Ordinal);
     }
 
+    internal static string StagingRoot(string skillsDirectory)
+    {
+        string trimmed = Path.TrimEndingDirectorySeparator(skillsDirectory);
+        return Path.Combine(Path.GetDirectoryName(trimmed) ?? trimmed, StagingFolderName);
+    }
+
+    internal static string StagingDirectory(string skillsDirectory, string localFolder)
+        => Path.Combine(StagingRoot(skillsDirectory), localFolder);
+
     public async Task<IReadOnlyList<SkillInstallResult>> InstallAsync(
         IReadOnlyList<SkillManifestEntry> skills,
         string skillsDirectory,
@@ -48,60 +83,45 @@ sealed class SkillInstaller(ICommandRunner commandRunner, IReporter reporter)
         CancellationToken cancellationToken,
         Action? progressAdvance = null,
         bool reportPreviewChangeStatus = false,
-        Action<SkillInstallResult>? reportResult = null)
+        Action<SkillInstallResult>? reportResult = null,
+        Action<string>? recordWarning = null)
     {
         _ = Directory.CreateDirectory(skillsDirectory);
-        List<SkillInstallResult> results = [];
-        foreach (var skill in skills)
+        string stagingRoot = StagingRoot(skillsDirectory);
+        DeleteDirectory(stagingRoot);
+        InstallBatch batch = new(this, skills, skillsDirectory, workingDirectory, reportPreviewChangeStatus, progressAdvance, reportResult);
+        try
         {
-            string skillFile = Path.Combine(skillsDirectory, skill.LocalFolder, "SKILL.md");
-            string? beforeSha = reportPreviewChangeStatus ? ReadTreeSha(skillFile) : null;
-            List<string> arguments = ["skill", "install", skill.SourceRepo, skill.InstallArg, "--dir", skillsDirectory];
-            if (!string.IsNullOrWhiteSpace(skill.SourceRef))
+            var remaining = await batch.RunAsync([.. Enumerable.Range(0, skills.Count)], maxConcurrentInstalls, cancellationToken).ConfigureAwait(false);
+            for (int attempt = 0; remaining.Count > 0; attempt++)
             {
-                arguments.AddRange(["--pin", skill.SourceRef]);
+                if (attempt == SecondaryLimitWaits.Count)
+                {
+                    throw new GitHubRateLimitException(GitHubRateLimits.SecondaryMessage, isSecondary: true);
+                }
+
+                var wait = SecondaryLimitWaits[attempt];
+                string notice = string.Create(
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    $"GitHub temporarily limited requests. Waiting {wait.TotalSeconds:0} seconds, then retrying {remaining.Count} skill install(s) one at a time.");
+                reporter.Warning(notice);
+                recordWarning?.Invoke(notice);
+                await delay(wait, cancellationToken).ConfigureAwait(false);
+                remaining = await batch.RunAsync(remaining, 1, cancellationToken).ConfigureAwait(false);
             }
 
-            if (skill.ForceInstall || !string.IsNullOrWhiteSpace(skill.SourceRef))
-            {
-                arguments.Add("--force");
-            }
-
-            var result = await commandRunner.RunAsync(
-                "gh",
-                arguments,
-                workingDirectory,
-                cancellationToken).ConfigureAwait(false);
-
-            SkillInstallResult installResult = new(
-                skill.SourceRepo,
-                skill.InstallArg,
-                skill.LocalFolder,
-                result.Success,
-                result.ExitCode,
-                result.StandardOutput,
-                result.StandardError);
-            results.Add(installResult);
-            reportResult?.Invoke(installResult);
-
-            if (result.Success)
-            {
-                reporter.Success(ActionOutputFormatter.FormatLine(
-                    FormatInstallAction(skill, reportPreviewChangeStatus, beforeSha, ReadTreeSha(skillFile)),
-                    ActionOutputFormatter.FormatSkillName(workingDirectory, skillsDirectory, skill.LocalFolder)));
-            }
-            else
-            {
-                reporter.Error(ActionOutputFormatter.FormatLine(
-                    "Failed skill install",
-                    ActionOutputFormatter.FormatSkillName(workingDirectory, skillsDirectory, skill.LocalFolder)));
-                reporter.Error(ActionOutputFormatter.FormatDetail(result.StandardError.Trim()));
-            }
-
-            progressAdvance?.Invoke();
+            return batch.Results;
         }
-
-        return results;
+        catch
+        {
+            // Whatever finished before the failure stays installed and belongs in the report.
+            batch.FlushCompleted();
+            throw;
+        }
+        finally
+        {
+            DeleteDirectory(stagingRoot);
+        }
     }
 
     public IReadOnlyList<SkillCopyResult> CopyInstalledSkills(
@@ -263,6 +283,232 @@ sealed class SkillInstaller(ICommandRunner commandRunner, IReporter reporter)
             string targetChildDirectory = Path.Combine(targetDirectory, Path.GetFileName(sourceChildDirectory));
             CopyDirectory(sourceChildDirectory, targetChildDirectory);
         }
+    }
+
+    // Staging folders are disposable: a leftover is removed on the next run, so cleanup never fails a run.
+    static void DeleteDirectory(string directory)
+    {
+        try
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+        }
+    }
+
+    sealed record InstallAttempt(CommandResult? Result, GitHubRateLimitException? RateLimit);
+
+    // Runs the gh installs of one skills directory. gh processes run concurrently, but results are
+    // emitted in manifest order so output and reports stay deterministic.
+    sealed class InstallBatch(
+        SkillInstaller installer,
+        IReadOnlyList<SkillManifestEntry> skills,
+        string skillsDirectory,
+        string workingDirectory,
+        bool reportPreviewChangeStatus,
+        Action? progressAdvance,
+        Action<SkillInstallResult>? reportResult)
+    {
+        readonly SkillInstallResult?[] results = new SkillInstallResult?[skills.Count];
+        readonly bool[] emitted = new bool[skills.Count];
+        readonly string?[] beforeShas = [.. skills.Select(skill => reportPreviewChangeStatus ? ReadTreeSha(SkillFile(skillsDirectory, skill)) : null)];
+        int nextToEmit;
+
+        public IReadOnlyList<SkillInstallResult> Results
+            => [.. results.Select(result => result ?? throw new InvalidOperationException("A skill install did not complete."))];
+
+        // Returns the indexes to retry: those that met a secondary rate limit, plus any not launched
+        // because one was met. A primary limit cannot clear within a run, so it ends the batch.
+        public async Task<List<int>> RunAsync(List<int> indexes, int maxConcurrency, CancellationToken cancellationToken)
+        {
+            Dictionary<Task<InstallAttempt>, int> running = [];
+            List<int> retry = [];
+            GitHubRateLimitException? primaryLimit = null;
+            bool launching = true;
+            int next = 0;
+            try
+            {
+                while (running.Count > 0 || (launching && next < indexes.Count))
+                {
+                    while (launching && next < indexes.Count && running.Count < maxConcurrency)
+                    {
+                        int index = indexes[next++];
+                        running[AttemptAsync(index, cancellationToken)] = index;
+                    }
+
+                    var completed = await Task.WhenAny(running.Keys).ConfigureAwait(false);
+                    int completedIndex = running[completed];
+                    _ = running.Remove(completed);
+                    var attempt = await completed.ConfigureAwait(false);
+                    if (attempt.RateLimit is { IsSecondary: true })
+                    {
+                        retry.Add(completedIndex);
+                        launching = false;
+                    }
+                    else if (attempt.RateLimit is not null)
+                    {
+                        primaryLimit ??= attempt.RateLimit;
+                        launching = false;
+                    }
+                    else
+                    {
+                        Complete(completedIndex, attempt.Result!);
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // Let the cancelled installs finish shutting down before their staging folders go.
+                try
+                {
+                    _ = await Task.WhenAll(running.Keys).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                }
+
+                throw;
+            }
+
+            if (primaryLimit is not null)
+            {
+                ExceptionDispatchInfo.Capture(primaryLimit).Throw();
+            }
+
+            retry.AddRange(indexes.Skip(next));
+            retry.Sort();
+            return retry;
+        }
+
+        public void FlushCompleted()
+        {
+            for (int index = 0; index < results.Length; index++)
+            {
+                if (results[index] is { } result && !emitted[index])
+                {
+                    Emit(index, result);
+                }
+            }
+        }
+
+        async Task<InstallAttempt> AttemptAsync(int index, CancellationToken cancellationToken)
+        {
+            var skill = skills[index];
+            string stagingDirectory = StagingDirectory(skillsDirectory, skill.LocalFolder);
+            DeleteDirectory(stagingDirectory);
+            List<string> arguments = ["skill", "install", skill.SourceRepo, skill.InstallArg, "--dir", stagingDirectory];
+            if (!string.IsNullOrWhiteSpace(skill.SourceRef))
+            {
+                arguments.AddRange(["--pin", skill.SourceRef]);
+            }
+
+            if (skill.ForceInstall || !string.IsNullOrWhiteSpace(skill.SourceRef))
+            {
+                arguments.Add("--force");
+            }
+
+            try
+            {
+                var result = await installer.commandRunner.RunAsync("gh", arguments, workingDirectory, cancellationToken).ConfigureAwait(false);
+                return new InstallAttempt(result, null);
+            }
+            catch (GitHubRateLimitException exception)
+            {
+                return new InstallAttempt(null, exception);
+            }
+        }
+
+        void Complete(int index, CommandResult result)
+        {
+            var skill = skills[index];
+            string stagingDirectory = StagingDirectory(skillsDirectory, skill.LocalFolder);
+            string? error = result.Success
+                ? MoveIntoPlace(
+                    Path.Combine(stagingDirectory, skill.LocalFolder),
+                    Path.Combine(skillsDirectory, skill.LocalFolder),
+                    Path.Combine(StagingRoot(skillsDirectory), skill.LocalFolder + ".previous"))
+                : null;
+            DeleteDirectory(stagingDirectory);
+            bool success = result.Success && error is null;
+            results[index] = new SkillInstallResult(
+                skill.SourceRepo,
+                skill.InstallArg,
+                skill.LocalFolder,
+                success,
+                result.ExitCode,
+                result.StandardOutput,
+                error ?? result.StandardError);
+            while (nextToEmit < results.Length && results[nextToEmit] is { } ready)
+            {
+                Emit(nextToEmit, ready);
+                nextToEmit++;
+            }
+        }
+
+        void Emit(int index, SkillInstallResult result)
+        {
+            emitted[index] = true;
+            var skill = skills[index];
+            reportResult?.Invoke(result);
+            string skillName = ActionOutputFormatter.FormatSkillName(workingDirectory, skillsDirectory, skill.LocalFolder);
+            if (result.Success)
+            {
+                installer.reporter.Success(ActionOutputFormatter.FormatLine(
+                    FormatInstallAction(skill, reportPreviewChangeStatus, beforeShas[index], ReadTreeSha(SkillFile(skillsDirectory, skill))),
+                    skillName));
+            }
+            else
+            {
+                installer.reporter.Error(ActionOutputFormatter.FormatLine("Failed skill install", skillName));
+                installer.reporter.Error(ActionOutputFormatter.FormatDetail(result.StandardError.Trim()));
+            }
+
+            progressAdvance?.Invoke();
+        }
+
+        // Replaces the live skill folder only once the staged install is complete; the previous
+        // content is held aside until the replacement is in place and restored if it fails.
+        static string? MoveIntoPlace(string stagedSkill, string target, string previous)
+        {
+            if (!Directory.Exists(stagedSkill))
+            {
+                return $"gh did not produce the expected skill folder {stagedSkill}.";
+            }
+
+            try
+            {
+                DeleteDirectory(previous);
+                bool hadPrevious = Directory.Exists(target);
+                if (hadPrevious)
+                {
+                    Directory.Move(target, previous);
+                }
+
+                try
+                {
+                    Directory.Move(stagedSkill, target);
+                }
+                catch (Exception exception) when (hadPrevious && !Directory.Exists(target) && exception is IOException or UnauthorizedAccessException)
+                {
+                    Directory.Move(previous, target);
+                    throw;
+                }
+
+                DeleteDirectory(previous);
+                return null;
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                return $"Could not move the installed skill into {target}: {exception.Message}";
+            }
+        }
+
+        static string SkillFile(string skillsDirectory, SkillManifestEntry skill)
+            => Path.Combine(skillsDirectory, skill.LocalFolder, "SKILL.md");
     }
 }
 

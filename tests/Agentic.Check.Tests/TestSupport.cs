@@ -1,4 +1,4 @@
-namespace Agentic.Check.Tests;
+﻿namespace Agentic.Check.Tests;
 
 static class AuthenticationTestCommands
 {
@@ -416,5 +416,57 @@ static class CompanionTestCommands
         }
 
         return new(0, arguments[1] == "run" ? "2.3.0" : string.Empty, string.Empty);
+    }
+}
+
+static class FakeGh
+{
+    // Writes what gh would install below the --dir of an install call: <dir>/<skill folder>/<file>.
+    internal static void WriteInstalledSkill(CommandCall call, string content, string fileName = "SKILL.md")
+    {
+        int directoryIndex = call.Arguments.ToList().IndexOf("--dir");
+        if (call.Arguments is not ["skill", "install", _, var installArg, ..] || directoryIndex < 0)
+            throw new InvalidOperationException($"Not a gh skill install call: {string.Join(' ', call.Arguments)}");
+        string path = Path.Combine(call.Arguments[directoryIndex + 1], installArg.Split('/')[^1], fileName);
+        _ = Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, content);
+    }
+
+    internal static bool IsInstall(CommandCall call)
+        => call.FileName == "gh" && call.Arguments is ["skill", "install", ..];
+}
+
+// Answers each command through a handler; safe to call from concurrently running installs.
+sealed class ScriptedCommandRunner(Func<CommandCall, Task<CommandResult>?> handler) : ICommandRunner
+{
+    readonly Lock gate = new();
+    readonly List<CommandCall> calls = [];
+
+    public IReadOnlyList<CommandCall> Calls
+    {
+        get
+        {
+            lock (gate)
+                return [.. calls];
+        }
+    }
+
+    public Task<CommandResult> RunAsync(
+        string fileName,
+        IReadOnlyList<string> arguments,
+        string workingDirectory,
+        CancellationToken cancellationToken, IReadOnlyDictionary<string, string?>? environment = null)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        CommandCall call = new(fileName, [.. arguments], workingDirectory) { Environment = environment };
+        lock (gate)
+            calls.Add(call);
+        if (handler(call) is { } scripted)
+            return scripted;
+        if (AuthenticationTestCommands.Response(fileName, arguments) is { } authentication)
+            return Task.FromResult(authentication);
+        if (fileName == "dotnet" && arguments[0] == "tool")
+            return Task.FromResult(CompanionTestCommands.Succeed(arguments, workingDirectory));
+        return Task.FromResult(new CommandResult(127, string.Empty, "command not found"));
     }
 }

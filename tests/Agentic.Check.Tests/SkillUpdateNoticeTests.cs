@@ -94,8 +94,8 @@ public sealed class SkillUpdateNoticeTests
         {
             OnRun = call =>
             {
-                if (call.Arguments is ["skill", "install", ..])
-                    temp.Write($".agents/skills/{NoMetadataSkill}/SKILL.md", SkillWithMetadata);
+                if (FakeGh.IsInstall(call))
+                    FakeGh.WriteInstalledSkill(call, SkillWithMetadata);
             }
         };
         QueueChecks(runner, string.Empty, $"{NoMetadataNotice}\nAll skills are up to date.\n");
@@ -112,7 +112,7 @@ public sealed class SkillUpdateNoticeTests
         Assert.Equal(SkillInstaller.MetadataReinstallAction, action.RecommendationAction);
         Assert.True(action.ForceInstall);
         var install = Assert.Single(runner.Calls, call => call.Arguments is ["skill", "install", ..]);
-        Assert.Equal(["skill", "install", Repository, NoMetadataSkill, "--dir", agentsSkills, "--force"], install.Arguments);
+        Assert.Equal(["skill", "install", Repository, NoMetadataSkill, "--dir", SkillInstaller.StagingDirectory(agentsSkills, NoMetadataSkill), "--force"], install.Arguments);
         Assert.True(Assert.Single(reinstalled.Report.InstallResults).Success);
         Assert.True(Assert.Single(reinstalled.Report.SkillCopyResults).Success);
         foreach (string agent in new[] { ".agents", ".claude" })

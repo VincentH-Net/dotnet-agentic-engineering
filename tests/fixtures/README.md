@@ -268,8 +268,9 @@ Skill verification requires every file from the selected source, with correct as
 authored `SKILL.md` content, and source/pin metadata. Fresh installations and baseline preparation
 require exact file inventories. For migrations and repeat installations, an extra file is allowed
 only when the same path existed before that particular operation and its SHA256 is unchanged.
-This accommodates `gh skill install --force` retaining files from an earlier version; Agentic.Check
-does not promise to remove obsolete assets. Missing source files, incorrect expected contents,
+This accommodates `gh skill update` retaining files from an earlier version; Agentic.Check
+installs each skill through a staging folder and replaces the skill folder whole, but it
+does not promise that updates remove obsolete assets. Missing source files, incorrect expected contents,
 new extra files, and modified retained files still fail. Each setup, apply, and subsequent-stable
 phase captures its own pre-operation inventory. Accepted retained files are logged with their
 paths/hashes and saved in `<run>-<phase>-retained-assets.json`; they are not treated as files from

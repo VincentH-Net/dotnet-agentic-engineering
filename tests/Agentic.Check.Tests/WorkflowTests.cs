@@ -259,10 +259,10 @@ public sealed class WorkflowTests
         {
             OnRun = call =>
             {
-                if (call.FileName == "gh" && call.Arguments.Contains("install"))
+                if (FakeGh.IsInstall(call))
                 {
-                    tempDirectory.Write(
-                        ".agents/skills/dotnet-webapi/SKILL.md",
+                    FakeGh.WriteInstalledSkill(
+                        call,
                         """
                         ---
                         github-tree-sha: new-sha
@@ -297,7 +297,7 @@ public sealed class WorkflowTests
             "dotnet/skills",
             "plugins/dotnet-aspnetcore/skills/dotnet-webapi",
             "--dir",
-            Path.Combine(tempDirectory.Path, ".agents", "skills"),
+            SkillInstaller.StagingDirectory(Path.Combine(tempDirectory.Path, ".agents", "skills"), "dotnet-webapi"),
             "--pin",
             "main",
             "--force"]));
@@ -322,7 +322,14 @@ public sealed class WorkflowTests
             ---
             # dotnet-livecharts2
             """);
-        FakeCommandRunner commandRunner = new();
+        FakeCommandRunner commandRunner = new()
+        {
+            OnRun = call =>
+            {
+                if (FakeGh.IsInstall(call))
+                    FakeGh.WriteInstalledSkill(call, "---\ngithub-ref: refs/tags/v1.2.3\n---\n# dotnet-livecharts2\n");
+            }
+        };
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
         commandRunner.Enqueue(new CommandResult(0, "No updates available.", string.Empty));
@@ -350,7 +357,7 @@ public sealed class WorkflowTests
             "VincentH-Net/dotnet-agentic-engineering",
             "dotnet-livecharts2",
             "--dir",
-            Path.Combine(tempDirectory.Path, ".agents", "skills"),
+            SkillInstaller.StagingDirectory(Path.Combine(tempDirectory.Path, ".agents", "skills"), "dotnet-livecharts2"),
             "--force"]));
         Assert.DoesNotContain(commandRunner.Calls, call => call.Arguments.Contains("--pin"));
         Assert.Contains("1 action selected", reporter.InfoMessages);
@@ -979,8 +986,7 @@ public sealed class WorkflowTests
                     return;
                 }
 
-                string localFolder = call.Arguments[3].Split('/')[^1];
-                tempDirectory.Write(Path.Combine(".agents", "skills", localFolder, "SKILL.md"), "# Installed");
+                FakeGh.WriteInstalledSkill(call, "# Installed");
             }
         };
         commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
@@ -1011,21 +1017,21 @@ public sealed class WorkflowTests
             "dotnet/skills",
             "plugins/dotnet-test/skills/filter-syntax",
             "--dir",
-            Path.Combine(tempDirectory.Path, ".agents", "skills")]));
+            SkillInstaller.StagingDirectory(Path.Combine(tempDirectory.Path, ".agents", "skills"), "filter-syntax")]));
         Assert.Contains(commandRunner.Calls, call => call.Arguments.SequenceEqual([
             "skill",
             "install",
             "dotnet/skills",
             "plugins/dotnet-test/skills/platform-detection",
             "--dir",
-            Path.Combine(tempDirectory.Path, ".agents", "skills")]));
+            SkillInstaller.StagingDirectory(Path.Combine(tempDirectory.Path, ".agents", "skills"), "platform-detection")]));
         Assert.Contains(commandRunner.Calls, call => call.Arguments.SequenceEqual([
             "skill",
             "install",
             "dotnet/skills",
             "plugins/dotnet-test/skills/run-tests",
             "--dir",
-            Path.Combine(tempDirectory.Path, ".agents", "skills")]));
+            SkillInstaller.StagingDirectory(Path.Combine(tempDirectory.Path, ".agents", "skills"), "run-tests")]));
     }
 
     [Fact]
@@ -1039,9 +1045,9 @@ public sealed class WorkflowTests
         {
             OnRun = call =>
             {
-                if (call.FileName == "gh" && call.Arguments.Contains("install"))
+                if (FakeGh.IsInstall(call))
                 {
-                    tempDirectory.Write(".claude/skills/dotnet-modern-csharp-editorconfig/SKILL.md", "# Installed");
+                    FakeGh.WriteInstalledSkill(call, "# Installed");
                 }
             }
         };

@@ -112,47 +112,126 @@ public sealed class GitHubRateLimitTests
         Assert.Equal(1, transport.Requests);
     }
 
-    [Theory]
-    [InlineData(PrimaryError, AnonymousMessage)]
-    [InlineData("HTTP 403: secondary rate limit", GitHubRateLimits.SecondaryMessage)]
-    public async Task WorkflowStopsInstallingAndReportsCompletedWorkBeforeQuotaFailure(string failure, string expectedMessage)
+    // Installs run concurrently, so the skills launched alongside the limited one still finish and are reported.
+    [Fact]
+    public async Task WorkflowStopsAtAPrimaryLimitWithoutWaitingAndReportsCompletedInstalls()
     {
         using TempDirectory temp = new();
         temp.Write("App.csproj", "<Project />");
         temp.Write("AGENTS.md", "Keep these instructions.\n");
         string skills = Path.Combine(temp.Path, ".agents", "skills");
-        MappedCommandRunner commands = new()
-        {
-            OnRun = call =>
-            {
-                if (call.Arguments is ["skill", "install", "owner/repo", "first", ..])
-                    temp.Write(".agents/skills/first/SKILL.md", "Completed installation");
-            }
-        };
-        ConfigureAnonymousPrerequisites(commands);
-        commands.Set("gh", ["skill", "update", "--dir", skills, "--all", "--dry-run"], new(0, "All skills are up to date.", ""));
-        commands.Set("gh", ["skill", "install", "owner/repo", "first", "--dir", skills], new(0, "installed", ""));
-        commands.Set("gh", ["skill", "install", "owner/repo", "second", "--dir", skills], new(1, "", failure));
+        List<TimeSpan> waits = [];
+        var commands = LimitedCommands((_, _) => new(1, "", PrimaryError));
         RecordingReporter reporter = new();
-        CheckWorkflow workflow = new(commands, new FakePrompts(), reporter, new FakeDirectiveSource(new Dictionary<string, string>()), new FakeSourceVersionResolver(),
-            [new("owner/repo", "first", "first", TechnologyNames.Dotnet, []), new("owner/repo", "second", "second", TechnologyNames.Dotnet, []),
-             new("owner/repo", "third", "third", TechnologyNames.Dotnet, [])], readEnvironment: _ => null);
+        var workflow = LimitedWorkflow(commands, reporter, waits);
         string reportPath = Path.Combine(temp.Path, "report.json");
 
         var result = await workflow.RunAsync(new(temp.Path, false, true, reportPath, null, "codex", false), CancellationToken.None);
 
         Assert.Equal(1, result.ExitCode);
-        Assert.Contains(expectedMessage, reporter.Errors);
-        var completed = Assert.Single(result.Report.InstallResults);
-        Assert.True(completed.Success);
-        Assert.Equal("first", completed.InstallArg);
+        Assert.Contains(AnonymousMessage, reporter.Errors);
+        Assert.Empty(waits);
+        Assert.Equal(["first", "third"], result.Report.InstallResults.Select(install => install.InstallArg));
+        Assert.All(result.Report.InstallResults, install => Assert.True(install.Success));
         Assert.Equal("Completed installation", await File.ReadAllTextAsync(Path.Combine(skills, "first", "SKILL.md")));
+        Assert.False(Directory.Exists(Path.Combine(skills, "second")));
+        Assert.False(Directory.Exists(SkillInstaller.StagingRoot(skills)));
         Assert.Equal("Keep these instructions.\n", await File.ReadAllTextAsync(Path.Combine(temp.Path, "AGENTS.md")));
-        Assert.DoesNotContain(commands.Calls, call => call.Arguments.Contains("third"));
+        Assert.Equal(1, commands.Calls.Count(call => call.Arguments is ["skill", "install", "owner/repo", "second", ..]));
         Assert.DoesNotContain(commands.Calls, call => call.Arguments is ["skill", "update", ..] && !call.Arguments.Contains("--dry-run"));
         using var json = System.Text.Json.JsonDocument.Parse(await File.ReadAllTextAsync(reportPath));
         Assert.Equal("first", json.RootElement.GetProperty("installResults")[0].GetProperty("installArg").GetString());
         Assert.Contains(result.Report.Warnings, warning => warning.Contains("run is incomplete", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task WorkflowWaitsAndRetriesASecondaryLimitTwiceBeforeStopping()
+    {
+        using TempDirectory temp = new();
+        temp.Write("App.csproj", "<Project />");
+        string skills = Path.Combine(temp.Path, ".agents", "skills");
+        List<TimeSpan> waits = [];
+        var commands = LimitedCommands((_, _) => new(1, "", "HTTP 403: secondary rate limit"));
+        RecordingReporter reporter = new();
+        var workflow = LimitedWorkflow(commands, reporter, waits);
+
+        var result = await workflow.RunAsync(new(temp.Path, false, true, null, null, "codex", false), CancellationToken.None);
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains(GitHubRateLimits.SecondaryMessage, reporter.Errors);
+        Assert.Equal(SkillInstaller.SecondaryLimitWaits, waits);
+        Assert.Equal(3, commands.Calls.Count(call => call.Arguments is ["skill", "install", "owner/repo", "second", ..]));
+        Assert.Equal(["first", "third"], result.Report.InstallResults.Select(install => install.InstallArg));
+        Assert.Contains(result.Report.Warnings, warning => warning.Contains("Waiting 60 seconds", StringComparison.Ordinal));
+        Assert.Contains(result.Report.Warnings, warning => warning.Contains("Waiting 120 seconds", StringComparison.Ordinal));
+        Assert.Contains(result.Report.Warnings, warning => warning.Contains("run is incomplete", StringComparison.Ordinal));
+        Assert.False(Directory.Exists(SkillInstaller.StagingRoot(skills)));
+    }
+
+    [Fact]
+    public async Task WorkflowCompletesWhenASecondaryLimitClearsAfterTheWait()
+    {
+        using TempDirectory temp = new();
+        temp.Write("App.csproj", "<Project />");
+        string skills = Path.Combine(temp.Path, ".agents", "skills");
+        List<TimeSpan> waits = [];
+        var commands = LimitedCommands((attempt, call) => attempt == 1
+            ? new(1, "", "HTTP 403: secondary rate limit")
+            : InstallSuccess(call));
+        RecordingReporter reporter = new();
+        var workflow = LimitedWorkflow(commands, reporter, waits);
+        string reportPath = Path.Combine(temp.Path, "report.json");
+
+        var result = await workflow.RunAsync(new(temp.Path, false, true, reportPath, null, "codex", false), CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Equal([TimeSpan.FromSeconds(60)], waits);
+        Assert.Equal(["first", "second", "third"], result.Report.InstallResults.Select(install => install.InstallArg));
+        Assert.All(result.Report.InstallResults, install => Assert.True(install.Success));
+        Assert.Equal(2, commands.Calls.Count(call => call.Arguments is ["skill", "install", "owner/repo", "second", ..]));
+        Assert.Contains(result.Report.Warnings, warning => warning.Contains("Waiting 60 seconds", StringComparison.Ordinal));
+        Assert.DoesNotContain(result.Report.Warnings, warning => warning.Contains("run is incomplete", StringComparison.Ordinal));
+        Assert.Empty(reporter.Errors);
+        foreach (string skill in new[] { "first", "second", "third" })
+            Assert.Equal("Completed installation", await File.ReadAllTextAsync(Path.Combine(skills, skill, "SKILL.md")));
+    }
+
+    static CheckWorkflow LimitedWorkflow(ICommandRunner commands, IReporter reporter, List<TimeSpan> waits)
+        => new(commands, new FakePrompts(), reporter, new FakeDirectiveSource(new Dictionary<string, string>()), new FakeSourceVersionResolver(),
+            [new("owner/repo", "first", "first", TechnologyNames.Dotnet, []), new("owner/repo", "second", "second", TechnologyNames.Dotnet, []),
+             new("owner/repo", "third", "third", TechnologyNames.Dotnet, [])], readEnvironment: _ => null,
+            rateLimitDelay: (wait, _) =>
+            {
+                waits.Add(wait);
+                return Task.CompletedTask;
+            });
+
+    // Answers the prerequisite checks and installs "first" and "third"; "second" is answered per attempt.
+    static ScriptedCommandRunner LimitedCommands(Func<int, CommandCall, CommandResult> second)
+    {
+        int attempts = 0;
+        return new(call => ScriptedInstall(call, () => second(Interlocked.Increment(ref attempts), call)));
+    }
+
+    static Task<CommandResult>? ScriptedInstall(CommandCall call, Func<CommandResult> second)
+    {
+        if (call.Arguments is ["--version"])
+            return Task.FromResult(new CommandResult(0, "gh version 2.101.0", ""));
+        if (call.Arguments is ["skill", "--help"])
+            return Task.FromResult(new CommandResult(0, "help", ""));
+        if (call.Arguments is ["auth", "token", "--hostname", "github.com"])
+            return Task.FromResult(new CommandResult(1, "", "no token"));
+        if (call.Arguments is ["skill", "update", "--dir", _, "--all", "--dry-run"])
+            return Task.FromResult(new CommandResult(0, "All skills are up to date.", ""));
+        if (call.Arguments is ["skill", "install", "owner/repo", "second", ..])
+            return Task.FromResult(second());
+        return FakeGh.IsInstall(call) ? Task.FromResult(InstallSuccess(call)) : null;
+    }
+
+    static CommandResult InstallSuccess(CommandCall call)
+    {
+        FakeGh.WriteInstalledSkill(call, "Completed installation");
+        return new CommandResult(0, "installed", "");
     }
 
     [Theory]

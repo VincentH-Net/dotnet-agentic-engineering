@@ -111,12 +111,19 @@ public sealed class GitHubAuthenticationTests
         temp.Write("AGENTS.md", "preserve me\n");
         string reportPath = Path.Combine(temp.Path, "report.json");
         string skills = Path.Combine(temp.Path, ".agents", "skills");
-        MappedCommandRunner runner = new();
+        MappedCommandRunner runner = new()
+        {
+            OnRun = call =>
+            {
+                if (FakeGh.IsInstall(call))
+                    FakeGh.WriteInstalledSkill(call, "# Installed");
+            }
+        };
         runner.Set("gh", ["--version"], new(0, "gh version 2.101.0", ""));
         runner.Set("gh", ["skill", "--help"], new(0, "gh skill help", ""));
         runner.Set("gh", TokenArguments, new(1, "", "no oauth token found"));
         runner.Set("gh", ["skill", "update", "--dir", skills, "--all", "--dry-run"], new(0, "All skills are up to date.", ""));
-        runner.Set("gh", ["skill", "install", "owner/repo", "sample", "--dir", skills], new(0, "installed", ""));
+        runner.Set("gh", ["skill", "install", "owner/repo", "sample", "--dir", SkillInstaller.StagingDirectory(skills, "sample")], new(0, "installed", ""));
         FakeSourceVersionResolver resolver = new();
         RecordingReporter reporter = new();
         CheckWorkflow workflow = new(runner, new FakePrompts(), reporter, new FakeDirectiveSource(new Dictionary<string, string>()), resolver,

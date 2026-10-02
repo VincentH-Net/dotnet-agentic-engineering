@@ -68,8 +68,8 @@ public sealed class StableSkillSwitchTests
         {
             OnRun = call =>
             {
-                if (call.Arguments is ["skill", "install", ..])
-                    temp.Write($".agents/skills/{SkillName}/SKILL.md", stableMetadata);
+                if (FakeGh.IsInstall(call))
+                    FakeGh.WriteInstalledSkill(call, stableMetadata);
             }
         };
         QueueStableCheck(runner);
