@@ -14,6 +14,7 @@ interface IUserPrompts
         IReadOnlyList<SkillManifestEntry> missingSkills,
         ScopeDuplicateScanResult duplicates,
         PresentElsewhere presentElsewhere,
+        IRecommendationPreviewSource? previewSource,
         CancellationToken cancellationToken);
 
     Task WaitForHelpKeyAsync(string url, string purpose, CancellationToken cancellationToken);
@@ -42,10 +43,11 @@ sealed class SpectreUserPrompts(IAnsiConsole console) : IUserPrompts
         IReadOnlyList<SkillManifestEntry> missingSkills,
         ScopeDuplicateScanResult duplicates,
         PresentElsewhere presentElsewhere,
+        IRecommendationPreviewSource? previewSource,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return new RecommendationSelectionPrompt(console).PromptAsync(
+        return new RecommendationSelectionPrompt(console, previewSource).PromptAsync(
             recommendedDirectives,
             missingSkills,
             duplicates,

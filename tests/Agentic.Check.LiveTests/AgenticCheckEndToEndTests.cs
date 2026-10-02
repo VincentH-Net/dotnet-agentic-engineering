@@ -97,6 +97,48 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
 
     [Fact]
     [Trait("Category", "EndToEnd")]
+    public async Task F3PreviewsTheHighlightedDirectiveAndSkillThenReturnsToTheList()
+    {
+        if (IsUnsupportedPlatform())
+        {
+            return;
+        }
+
+        using var workspace = await TestWorkspace.CreateAsync(nameof(F3PreviewsTheHighlightedDirectiveAndSkillThenReturnsToTheList)).ConfigureAwait(true);
+        _ = await RunInteractiveCommandAsync(workspace, $"--agents codex {Quote(workspace.RepoPath)}", async auto =>
+        {
+            await auto.WaitUntilTextAsync("dotnet-livecharts2 (install)").ConfigureAwait(true);
+            await auto.TypeAsync("foundation-prompt-log").ConfigureAwait(true);
+            await auto.WaitUntilTextAsync("Filter: foundation-prompt-log").ConfigureAwait(true);
+            await auto.WaitUntilTextAsync("F3 view").ConfigureAwait(true);
+            await auto.KeyAsync(Hex1bKey.F3).ConfigureAwait(true);
+            // The directive comes from the plan, so no gh call: its content is the seeded directive.
+            await auto.WaitUntilTextAsync("Preview: foundation-prompt-log directive").ConfigureAwait(true);
+            await auto.WaitUntilTextAsync("## Prompt Log").ConfigureAwait(true);
+            await auto.WaitUntilTextAsync("Esc close preview").ConfigureAwait(true);
+            await auto.EscapeAsync().ConfigureAwait(true);
+            await auto.WaitUntilTextAsync("[x] foundation-prompt-log").ConfigureAwait(true);
+            await auto.EscapeAsync().ConfigureAwait(true);
+            await auto.TypeAsync("dotnet-livecharts2").ConfigureAwait(true);
+            await auto.WaitUntilTextAsync("Filter: dotnet-livecharts2").ConfigureAwait(true);
+            await auto.KeyAsync(Hex1bKey.F3).ConfigureAwait(true);
+            await auto.WaitUntilTextAsync("Preview: dotnet-livecharts2 from VincentH-Net/dotnet-agentic-engineering").ConfigureAwait(true);
+            await auto.WaitUntilTextAsync("Fake preview of dotnet-livecharts2").ConfigureAwait(true);
+            await auto.EscapeAsync().ConfigureAwait(true);
+            await auto.WaitUntilTextAsync("[x] dotnet-livecharts2 (install)").ConfigureAwait(true);
+            await auto.EscapeAsync().ConfigureAwait(true);
+            await auto.WaitUntilTextAsync("Type to filter").ConfigureAwait(true);
+            await auto.LeftAsync().ConfigureAwait(true);
+            await auto.EnterAsync().ConfigureAwait(true);
+        }).ConfigureAwait(true);
+        string[] ghLog = (await workspace.ReadGhLogAsync().ConfigureAwait(true)).Split('\n');
+        _ = Assert.Single(ghLog, line => line.StartsWith("skill preview VincentH-Net/dotnet-agentic-engineering dotnet-livecharts2@", StringComparison.Ordinal));
+        Assert.DoesNotContain(ghLog, line => line.StartsWith("skill install", StringComparison.Ordinal));
+        AssertRecordingWasWritten(workspace);
+    }
+
+    [Fact]
+    [Trait("Category", "EndToEnd")]
     public async Task DirectiveSelectionIncludesCompanionAndDryRunDoesNotInstall()
     {
         if (IsUnsupportedPlatform())
@@ -1495,6 +1537,18 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
                   mkdir -p "$target_dir/$skill_name"
                   printf '# Installed by fake gh\n' > "$target_dir/$skill_name/SKILL.md"
                   echo "Installed ${3:-unknown} ${4:-unknown}"
+                  exit 0
+                fi
+
+                if [[ "${1:-}" == "skill" && "${2:-}" == "preview" ]]; then
+                  if [[ -f "$root/skill-preview-fails" ]]; then
+                    echo "! 1 skill(s) in hidden directories were excluded" >&2
+                    echo "skill \"${4:-}\" not found in ${3:-}" >&2
+                    exit 1
+                  fi
+                  skill_path="${4:-unknown}"
+                  skill_name="$(basename "${skill_path%%@*}")"
+                  printf '[plugins] fake/%s/\n\n# Fake preview of %s\n\nPreview body for %s.\n' "$skill_name" "$skill_name" "$skill_name"
                   exit 0
                 fi
 

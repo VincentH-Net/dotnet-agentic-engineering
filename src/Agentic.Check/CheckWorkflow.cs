@@ -545,7 +545,13 @@ sealed class CheckWorkflow(
             var selection = options.DryRun || options.Yes
                 ? RecommendationSelectionPrompt.DefaultSelection(recommendedDirectives, recommendedSkillActions, duplicates)
                 : await prompts
-                    .SelectRecommendationsAsync(recommendedDirectives, recommendedSkillActions, duplicates, presentElsewhere, cancellationToken)
+                    .SelectRecommendationsAsync(
+                        recommendedDirectives,
+                        recommendedSkillActions,
+                        duplicates,
+                        presentElsewhere,
+                        new RecommendationPreviewSource(githubRunner, targetDirectory),
+                        cancellationToken)
                     .ConfigureAwait(false);
             selectedDirectives = selection.SelectedDirectives;
             selectedSkills = selection.SelectedSkills;

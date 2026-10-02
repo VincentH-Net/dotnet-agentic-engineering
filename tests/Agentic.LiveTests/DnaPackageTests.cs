@@ -143,7 +143,8 @@ public sealed class DnaPackageTests
         public Task<bool> ConfirmAsync(string prompt, bool defaultValue, CancellationToken cancellationToken)
             => throw new InvalidOperationException("Unattended installation must not prompt.");
         public Task<RecommendationSelectionResult> SelectRecommendationsAsync(IReadOnlyList<DirectivePlanItem> recommendedDirectives,
-            IReadOnlyList<SkillManifestEntry> missingSkills, ScopeDuplicateScanResult duplicates, PresentElsewhere presentElsewhere, CancellationToken cancellationToken)
+            IReadOnlyList<SkillManifestEntry> missingSkills, ScopeDuplicateScanResult duplicates, PresentElsewhere presentElsewhere,
+            IRecommendationPreviewSource? previewSource, CancellationToken cancellationToken)
             => throw new InvalidOperationException("Unexpected recommendation prompt.");
         public Task WaitForHelpKeyAsync(string url, string purpose, CancellationToken cancellationToken)
             => throw new InvalidOperationException("Unexpected help prompt.");

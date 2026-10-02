@@ -149,6 +149,8 @@ sealed class FakePrompts : IUserPrompts
 
     public PresentElsewhere? PresentElsewhere { get; private set; }
 
+    public IRecommendationPreviewSource? PreviewSource { get; private set; }
+
     public Task<bool> ConfirmAsync(string prompt, bool defaultValue, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -161,9 +163,11 @@ sealed class FakePrompts : IUserPrompts
         IReadOnlyList<SkillManifestEntry> missingSkills,
         ScopeDuplicateScanResult duplicates,
         PresentElsewhere presentElsewhere,
+        IRecommendationPreviewSource? previewSource,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        PreviewSource = previewSource;
         RecommendedSkillActions = missingSkills;
         Duplicates = duplicates;
         PresentElsewhere = presentElsewhere;

@@ -16,7 +16,8 @@ enum SkillSelectionCommand
     Specialize,
     OpenHelp,
     Character,
-    ToggleView
+    ToggleView,
+    Preview
 }
 
 enum RecommendationSelectionKind
@@ -170,6 +171,7 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
             case SkillSelectionCommand.Confirm:
             case SkillSelectionCommand.Specialize:
             case SkillSelectionCommand.OpenHelp:
+            case SkillSelectionCommand.Preview:
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(input), input.Command, "Unsupported selection input.");
@@ -439,11 +441,20 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
         => $"directive:{name}";
 }
 
-sealed class RecommendationSelectionPrompt(IAnsiConsole console)
+sealed class RecommendationSelectionPrompt(IAnsiConsole console, IRecommendationPreviewSource? previewSource = null)
 {
     internal const int MaxVisibleItems = 24;
 
+    // The preview shows as many rows as the list, so opening and closing it keeps one screen region.
+    internal const int PreviewPageSize = MaxVisibleItems;
+
     int previousRenderLineCount;
+
+    // One fetch per row for the life of the prompt; a failed fetch is retried on the next F3.
+    readonly Dictionary<string, RecommendationPreview> previews = new(StringComparer.Ordinal);
+
+    // A one-line message under the key help, shown until the next key.
+    string? notice;
 
     public async Task<RecommendationSelectionResult> PromptAsync(
         IReadOnlyList<DirectivePlanItem> recommendedDirectives,
@@ -467,6 +478,7 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
             }
 
             var input = MapKey(key.Value);
+            notice = null;
             if (input.Command == SkillSelectionCommand.Confirm)
             {
                 if (!state.CanConfirm)
@@ -475,6 +487,12 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
                 }
 
                 return new RecommendationSelectionResult(state.SelectedDirectives, state.SelectedSkills);
+            }
+
+            if (input.Command == SkillSelectionCommand.Preview)
+            {
+                await PreviewAsync(heading, state, cancellationToken).ConfigureAwait(false);
+                continue;
             }
 
             if (input.Command == SkillSelectionCommand.Specialize)
@@ -614,7 +632,7 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
     static string StyleSegment(string markup, string? style)
         => markup.Length == 0 || style is null ? markup : $"[{style}]{markup}[/]";
 
-    static SkillSelectionInput MapKey(ConsoleKeyInfo key)
+    internal static SkillSelectionInput MapKey(ConsoleKeyInfo key)
         => key.Key switch
         {
             ConsoleKey.UpArrow => new(SkillSelectionCommand.Up),
@@ -628,8 +646,157 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
             ConsoleKey.Tab => new(SkillSelectionCommand.Specialize),
             ConsoleKey.F1 => new(SkillSelectionCommand.OpenHelp),
             ConsoleKey.F2 => new(SkillSelectionCommand.ToggleView),
+            ConsoleKey.F3 => new(SkillSelectionCommand.Preview),
             _ => new(SkillSelectionCommand.Character, key.KeyChar)
         };
+
+    static RecommendationSelectionItem? CurrentItem(RecommendationSelectionState state)
+        => state.CursorIndex < state.FilteredItems.Count ? state.FilteredItems[state.CursorIndex] : null;
+
+    bool CanPreview(RecommendationSelectionState state)
+        => previewSource is not null && CurrentItem(state) is { } item && RecommendationPreviewSource.CanPreview(item);
+
+    async Task PreviewAsync(string heading, RecommendationSelectionState state, CancellationToken cancellationToken)
+    {
+        if (!CanPreview(state) || CurrentItem(state) is not { } item)
+        {
+            return;
+        }
+
+        if (!previews.TryGetValue(item.Key, out var preview))
+        {
+            notice = $"Loading preview of {Markup.Remove(item.Display)}…";
+            Render(heading, state);
+            notice = null;
+            preview = await previewSource!.LoadAsync(item, cancellationToken).ConfigureAwait(false);
+            if (preview.Success)
+            {
+                previews[item.Key] = preview;
+            }
+        }
+
+        if (!preview.Success)
+        {
+            notice = $"Preview unavailable: {preview.Error}";
+            return;
+        }
+
+        await ShowPreviewAsync(preview, cancellationToken).ConfigureAwait(false);
+    }
+
+    // Scrolls the preview in the same screen region as the list; closing it hands that region back.
+    async Task ShowPreviewAsync(RecommendationPreview preview, CancellationToken cancellationToken)
+    {
+        int width = Math.Max(20, console.Profile.Width - 1);
+        string[] lines = [.. WrapLines(preview.Lines, width)];
+        int offset = 0;
+        while (true)
+        {
+            RenderPreview(preview.Title, lines, offset);
+            var key = await console.Input.ReadKeyAsync(true, cancellationToken).ConfigureAwait(false);
+            if (key is null)
+            {
+                continue;
+            }
+
+            int? next = NextPreviewOffset(key.Value.Key, offset);
+            if (next is null)
+            {
+                return;
+            }
+
+            offset = ClampPreviewOffset(next.Value, lines.Length);
+        }
+    }
+
+    // null closes the preview; any other key keeps it open, scrolling when the key says so.
+    internal static int? NextPreviewOffset(ConsoleKey key, int offset)
+        => key switch
+        {
+            ConsoleKey.Escape or ConsoleKey.F3 or ConsoleKey.Enter or ConsoleKey.Q => null,
+            ConsoleKey.UpArrow => offset - 1,
+            ConsoleKey.DownArrow => offset + 1,
+            ConsoleKey.PageUp => offset - PreviewPageSize,
+            ConsoleKey.PageDown or ConsoleKey.Spacebar => offset + PreviewPageSize,
+            ConsoleKey.Home => 0,
+            ConsoleKey.End => int.MaxValue,
+            _ => offset
+        };
+
+    internal static int ClampPreviewOffset(int offset, int lineCount)
+        => Math.Clamp(offset, 0, Math.Max(0, lineCount - PreviewPageSize));
+
+    // Lines longer than the console wrap on screen, which would break the in-place line count;
+    // wrapping them up front keeps every rendered row one line.
+    internal static IEnumerable<string> WrapLines(IEnumerable<string> lines, int width)
+    {
+        foreach (string line in lines)
+        {
+            if (line.Length <= width)
+            {
+                yield return line;
+                continue;
+            }
+
+            for (int start = 0; start < line.Length; start += width)
+            {
+                yield return line.Substring(start, Math.Min(width, line.Length - start));
+            }
+        }
+    }
+
+    internal static string FormatPreviewPositionLine(int offset, int lineCount)
+        => lineCount <= PreviewPageSize
+            ? string.Empty
+            : string.Create(
+                System.Globalization.CultureInfo.InvariantCulture,
+                $"Lines {offset + 1}–{Math.Min(lineCount, offset + PreviewPageSize)} of {lineCount}");
+
+    internal static string FormatPreviewKeyHelpLine(int lineCount)
+        => (lineCount <= PreviewPageSize
+                ? string.Empty
+                : ToolHeader.KeyMarkup("↑") + InfoText(" ") + ToolHeader.KeyMarkup("↓") + InfoText(" scroll, ")
+                    + ToolHeader.KeyMarkup("PgUp") + InfoText(" ") + ToolHeader.KeyMarkup("PgDn") + InfoText(" page, "))
+            + ToolHeader.KeyMarkup("Esc") + InfoText(" close preview");
+
+    void RenderPreview(string title, string[] lines, int offset)
+    {
+        if (previousRenderLineCount > 0 && !Console.IsOutputRedirected)
+        {
+            Console.SetCursorPosition(0, Math.Max(0, Console.CursorTop - previousRenderLineCount));
+        }
+
+        int lineCount = 0;
+        void MarkupLine(string value)
+        {
+            ClearCurrentLine();
+            console.MarkupLine(value);
+            lineCount++;
+        }
+
+        ClearCurrentLine();
+        console.WriteLine();
+        lineCount++;
+        MarkupLine($"[bold]{Markup.Escape($"Preview: {title}")}[/]");
+        string position = FormatPreviewPositionLine(offset, lines.Length);
+        if (position.Length > 0)
+        {
+            MarkupLine($"[{SpectreReporter.InfoColor}]{Markup.Escape(position)}[/]");
+        }
+
+        MarkupLine(FormatPreviewKeyHelpLine(lines.Length));
+        if (lines.Length == 0)
+        {
+            MarkupLine("[grey]The preview is empty.[/]");
+        }
+
+        for (int index = offset; index < Math.Min(lines.Length, offset + PreviewPageSize); index++)
+        {
+            MarkupLine(lines[index].Length == 0 ? " " : Markup.Escape(lines[index]));
+        }
+
+        FinishRender(lineCount);
+    }
 
     void Render(string heading, RecommendationSelectionState state)
     {
@@ -655,7 +822,11 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
             MarkupLine(row);
         }
 
-        MarkupLine(FormatKeyHelpLine(state));
+        MarkupLine(FormatKeyHelpLine(state, CanPreview(state)));
+        if (notice is not null)
+        {
+            MarkupLine($"[yellow]{Markup.Escape(notice)}[/]");
+        }
 
         if (state.FilteredItems.Count == 0)
         {
@@ -843,7 +1014,8 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
 
     internal const string ClearFilterToConfirm = "clear the filter before confirming";
 
-    internal static string FormatKeyHelpLine(RecommendationSelectionState state)
+    // F3 is offered only while the highlighted row has something to show.
+    internal static string FormatKeyHelpLine(RecommendationSelectionState state, bool canPreview = false)
         => ToolHeader.KeyMarkup("↑")
             + InfoText(" ")
             + ToolHeader.KeyMarkup("↓")
@@ -854,6 +1026,7 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console)
             + InfoText(" none, ")
             + ToolHeader.KeyMarkup("→")
             + InfoText(" all, ")
+            + (canPreview ? ToolHeader.KeyMarkup("F3") + InfoText(" view, ") : string.Empty)
             + (state.CanConfirm ? ToolHeader.KeyMarkup("Enter") + InfoText(" confirm") : InfoText(ClearFilterToConfirm));
 
     static string InfoText(string value)
