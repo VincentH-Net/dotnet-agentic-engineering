@@ -384,6 +384,8 @@ sealed class CheckWorkflow(
             ? [.. recommended.Select(skill => skill with { RecommendationAction = missing.Contains(skill) ? "install" : "re-install" })]
             : BuildSkillActions(recommended, missing, stableSwitchSkills, metadataReinstallSkills);
         ToolVersion? repairRequirement = null;
+        // What the installed consumers need, kept even when the installed companion satisfies it.
+        ToolVersion? installedRequirement = null;
         string? installedCompanion = null;
         bool restoreOnly = false;
         string? repairError = null;
@@ -423,7 +425,8 @@ sealed class CheckWorkflow(
 
             if (installedConsumers.Count > 0)
             {
-                repairRequirement = CompanionDependency.ReadLocalRequirement(installedConsumers);
+                installedRequirement = CompanionDependency.ReadLocalRequirement(installedConsumers);
+                repairRequirement = installedRequirement;
                 string? installed = installedCompanion;
                 restoreOnly = installed is not null && ToolVersion.Parse(installed).Satisfies(repairRequirement);
                 if (restoreOnly && await CompanionRunsAsync().ConfigureAwait(false))
@@ -443,6 +446,7 @@ sealed class CheckWorkflow(
         if (hasDependentRecommendations || repairRequirement is not null || repairError is not null)
         {
             string status;
+            string? statusWithoutConsumers = null;
             bool current = false;
             ToolVersion? plannedRequirement = null;
             try
@@ -456,13 +460,24 @@ sealed class CheckWorkflow(
                     status = $"currently {installedCompanion}; {status}";
                 // Selected dependent content re-resolves the newest package in the major. nuget.org tells
                 // whether that is a version bump; when it cannot, say so instead of implying one.
+                string latestSuffix = string.Empty;
                 if (installedCompanion is not null && hasDependentRecommendations && plannedRequirement is not null)
                 {
                     var latest = repairRequirement is null && repairError is null
                         ? await LatestAsync(CompanionDependency.PackageId, plannedRequirement.Major, options.Preview).ConfigureAwait(false)
                         : null;
                     current = latest is not null && IsAtLeast(installedCompanion, latest) && await CompanionRunsAsync().ConfigureAwait(false);
-                    status += latest is null ? $"; refreshes to the latest {plannedRequirement.Pattern(options.Preview)}" : $"; latest {latest}";
+                    latestSuffix = latest is null ? $"; refreshes to the latest {plannedRequirement.Pattern(options.Preview)}" : $"; latest {latest}";
+                    status += latestSuffix;
+                }
+
+                // With the consuming update deselected, the installed consumers set the requirement.
+                if (hasDependentRecommendations && installedRequirement is not null && plannedRequirement is not null && installedRequirement.Minimum != plannedRequirement.Minimum)
+                {
+                    statusWithoutConsumers = $"required {installedRequirement.Minimum}";
+                    if (installedCompanion is not null)
+                        statusWithoutConsumers = $"currently {installedCompanion}; {statusWithoutConsumers}";
+                    statusWithoutConsumers += latestSuffix;
                 }
             }
             catch (Exception exception) when (exception is DirectiveException or FormatException or System.Xml.XmlException or IOException or UnauthorizedAccessException or JsonException or KeyNotFoundException)
@@ -486,6 +501,7 @@ sealed class CheckWorkflow(
                 recommendedSkillActions = [.. recommendedSkillActions, CompanionDependency.Action(action) with
                 {
                     Version = status,
+                    VersionWithoutConsumers = statusWithoutConsumers,
                     IsRequiredToolRepair = repairRequirement is not null || repairError is not null
                 }];
             }
@@ -592,7 +608,9 @@ sealed class CheckWorkflow(
                 reporter.Error(repairError);
                 report.Companion = new(CompanionInstaller.ManifestPath(targetDirectory), null, "unknown", "unknown", "repair", false, null, false, repairError);
             }
-            else if (!await EnsureCompanionAsync(selectedRef, selectedConsumer ? null : repairRequirement, !selectedConsumer && restoreOnly).ConfigureAwait(false))
+            // Without a selected consumer the installed consumers set the requirement. A companion that
+            // satisfies it but does not run is restored; one that runs is updated, as its row says.
+            else if (!await EnsureCompanionAsync(selectedRef, selectedConsumer ? null : installedRequirement ?? repairRequirement, !selectedConsumer && restoreOnly && repairRequirement is not null).ConfigureAwait(false))
             {
                 var failedItems = RecommendationSelectionPrompt.BuildItems(selectedDirectives, selectedSkills);
                 RecommendationSelectionState failedSelection = new(failedItems);

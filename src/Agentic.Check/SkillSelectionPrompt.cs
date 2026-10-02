@@ -35,7 +35,8 @@ sealed record RecommendationSelectionItem(
     RecommendationSelectionKind Kind,
     DirectivePlanItem? Directive,
     SkillManifestEntry? Skill,
-    string Version = "");
+    string Version = "",
+    string? VersionWithoutConsumers = null);
 
 sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionItem> items)
 {
@@ -91,6 +92,15 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
 
     public bool IsSelected(RecommendationSelectionItem item)
         => selectedKeys.Contains(item.Key);
+
+    // A tool row can carry two requirements: the one its selected consumers bring, and the one
+    // already installed, shown while no selected row depends on it. The shorthand is not a consumer.
+    public string VersionOf(RecommendationSelectionItem item)
+        => item.VersionWithoutConsumers is { } alternative && !HasSelectedConsumer(item) ? alternative : item.Version;
+
+    bool HasSelectedConsumer(RecommendationSelectionItem item)
+        => dependentKeysByKey.GetValueOrDefault(item.Key, [])
+            .Any(key => selectedKeys.Contains(key) && items.FirstOrDefault(candidate => candidate.Key == key)?.Skill?.IsDna != true);
 
     public IReadOnlyList<string> GetDuplicateLocations(RecommendationSelectionItem item)
         => DuplicateLocationsByKey.GetValueOrDefault(item.Key, []);
@@ -571,7 +581,8 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console, IRecommendation
             skill.IsCompanion || skill.IsDna || skill.IsCodexRules || skill.IsReadmeBadge ? RecommendationSelectionKind.Tool : RecommendationSelectionKind.Skill,
             null,
             skill,
-            skill.Version)));
+            skill.Version,
+            skill.VersionWithoutConsumers)));
         return items;
     }
 
@@ -942,7 +953,7 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console, IRecommendation
             if (showVersionColumn)
             {
                 int padding = Math.Max(1, versionColumnStart - (rowPrefix.Length + item.Display.Length));
-                MarkupLine(prefix + display + new string(' ', padding) + HighlightMatches(item.Version, state.Filter, matchStyle, restStyle));
+                MarkupLine(prefix + display + new string(' ', padding) + HighlightMatches(state.VersionOf(item), state.Filter, matchStyle, restStyle));
             }
             else
             {

@@ -46,6 +46,9 @@ sealed record SkillManifestEntry
 
     public string Version { get; init; }
 
+    // A tool row's version text when no selected row depends on it, if that differs from Version.
+    public string? VersionWithoutConsumers { get; init; }
+
     public string SourceRef { get; init; }
 
     public SourceVersionInfo? ResolvedSource { get; init; }

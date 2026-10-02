@@ -338,6 +338,40 @@ public sealed class CompanionTests
     static string PromptLogBlock(string commands, string prefix)
         => $"<!-- {prefix}foundation-prompt-log:start -->\n## Prompt log\n{commands}\n<!-- {prefix}foundation-prompt-log:end -->\n";
 
+    // The installed directive needs 2.3 and the companion 2.3.0 satisfies it; the offered directive
+    // update needs 2.4. Keeping the companion update while declining the directive update must update
+    // against 2.3, not restore, and the row must say so.
+    [Fact]
+    public async Task KeptCompanionUpdateFollowsTheInstalledRequirementWhenItsDirectiveUpdateIsDeselected()
+    {
+        using TempDirectory temp = new();
+        temp.Write("AGENTS.md", PromptLogBlock("dotnet agentic prompt-log show -m 2.3", ""));
+        WriteManifest(temp.Path, "2.3.0");
+        FakeDirectiveSource source = new(new Dictionary<string, string> { ["foundation-prompt-log.md"] = "~~~md\n" + PromptLogBlock("dotnet agentic prompt-log show -m 2.4", "") + "~~~\n" })
+        {
+            ProjectContent = "<Project><Version>2.4.0</Version></Project>"
+        };
+        ToolRunner runner = new();
+        FakePrompts prompts = new() { SelectedDirectiveNames = [], SelectedSkillInstallArgs = [CompanionDependency.PackageId] };
+
+        var result = await new CheckWorkflow(runner, prompts, new RecordingReporter(), source, new FakeSourceVersionResolver(), [], new DnaInstaller(runner, string.Empty))
+            .RunAsync(new(temp.Path, false, false, null, null, "codex", false), CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        var companion = Assert.Single(prompts.RecommendedSkillActions, skill => skill.IsCompanion);
+        Assert.Equal("update", companion.RecommendationAction);
+        Assert.StartsWith("currently 2.3.0; required 2.4", companion.Version, StringComparison.Ordinal);
+        Assert.StartsWith("currently 2.3.0; required 2.3", companion.VersionWithoutConsumers, StringComparison.Ordinal);
+        Assert.NotNull(result.Report.Companion);
+        Assert.True(result.Report.Companion.Success);
+        Assert.Equal("update", result.Report.Companion.Action);
+        Assert.Equal("2.3", result.Report.Companion.RequiredMinimum);
+        var update = Assert.Single(runner.Calls, call => call.FileName == "dotnet" && call.Arguments is ["tool", "update", ..] && !call.Arguments.Contains("--global"));
+        Assert.Contains("2.*", update.Arguments);
+        Assert.DoesNotContain(runner.Calls, call => call.Arguments is ["tool", "restore", ..]);
+        Assert.Contains("-m 2.3", await ReadIfExistsAsync(result.Report.AgentsFile), StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData(true, false)]
     [InlineData(false, false)]

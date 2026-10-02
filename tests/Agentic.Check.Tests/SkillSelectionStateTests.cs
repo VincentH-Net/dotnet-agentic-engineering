@@ -672,6 +672,38 @@ public sealed class SkillSelectionStateTests
         Assert.DoesNotContain(badge, state.SelectedSkills);
     }
 
+    [Fact]
+    public void ToolRowShowsTheInstalledRequirementWhileNoSelectedRowDependsOnIt()
+    {
+        DirectivePlanItem directive = new("foundation-prompt-log", DirectiveStatuses.Outdated, "dotnet agentic prompt-log show -m 2.4");
+        var companion = CompanionDependency.Action("update") with
+        {
+            Version = "currently 2.3.0; required 2.4",
+            VersionWithoutConsumers = "currently 2.3.0; required 2.3"
+        };
+        var items = RecommendationSelectionPrompt.BuildItems([directive], [companion, DnaInstaller.Action(new(null))]);
+        RecommendationSelectionState state = new(items);
+        var companionItem = Assert.Single(items, item => item.Skill?.IsCompanion == true);
+        var shorthandItem = Assert.Single(items, item => item.Skill?.IsDna == true);
+
+        Assert.Equal("currently 2.3.0; required 2.4", state.VersionOf(companionItem));
+
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Toggle));
+
+        Assert.Empty(state.SelectedDirectives);
+        Assert.True(state.IsSelected(companionItem));
+        Assert.True(state.IsSelected(shorthandItem));
+        Assert.Equal("currently 2.3.0; required 2.3", state.VersionOf(companionItem));
+
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.ToggleView));
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Up));
+        state.Apply(new SkillSelectionInput(SkillSelectionCommand.Toggle));
+
+        _ = Assert.Single(state.SelectedDirectives);
+        Assert.Equal("currently 2.3.0; required 2.4", state.VersionOf(companionItem));
+        Assert.Equal(shorthandItem.Version, state.VersionOf(shorthandItem));
+    }
+
     static IReadOnlyList<RecommendationSelectionItem> CreateItems(string[] directiveNames, string[] skillNames)
         => [.. directiveNames
             .Select(name => new RecommendationSelectionItem(
