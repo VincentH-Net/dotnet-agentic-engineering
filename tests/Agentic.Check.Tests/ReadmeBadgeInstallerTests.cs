@@ -46,6 +46,51 @@ public sealed class ReadmeBadgeInstallerTests
         Assert.Same(content, ReadmeBadgeInstaller.Insert(content));
     }
 
+    [Fact]
+    public void BadgeGoesToTheNearestReadmeUpToTheGitRoot()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
+        tempDirectory.Write("README.md", "# Root\n");
+        string frontend = tempDirectory.CreateDirectory("frontend");
+
+        var plan = ReadmeBadgeInstaller.Plan(frontend);
+
+        Assert.NotNull(plan);
+        Assert.False(plan.IsCurrent);
+        Assert.Equal(Path.Combine(tempDirectory.Path, "README.md"), plan.File);
+        Assert.Equal(Path.Combine("..", "README.md"), plan.Display);
+
+        tempDirectory.Write("frontend/README.md", "# Frontend\n");
+
+        Assert.Equal(Path.Combine(frontend, "README.md"), ReadmeBadgeInstaller.Plan(frontend)!.File);
+    }
+
+    [Fact]
+    public void AReadmeAboveThatAlreadyLinksHereCoversTheTarget()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
+        tempDirectory.Write("README.md", "# Root\n\n" + ReadmeBadgeInstaller.Badge + "\n");
+        tempDirectory.Write("frontend/README.md", "# Frontend\n");
+
+        var plan = ReadmeBadgeInstaller.Plan(Path.Combine(tempDirectory.Path, "frontend"));
+
+        Assert.NotNull(plan);
+        Assert.True(plan.IsCurrent);
+        Assert.Equal(Path.Combine(tempDirectory.Path, "README.md"), plan.File);
+    }
+
+    [Fact]
+    public void NoReadmeUpToTheGitRootMeansNoOffer()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
+        string frontend = tempDirectory.CreateDirectory("frontend");
+
+        Assert.Null(ReadmeBadgeInstaller.Plan(frontend));
+    }
+
     [Theory]
     [InlineData("# Sample\n\nHello.\n", "# Sample\n\n{badge}\n\nHello.\n")]
     [InlineData("# Sample\nHello.\n", "# Sample\n\n{badge}\n\nHello.\n")]

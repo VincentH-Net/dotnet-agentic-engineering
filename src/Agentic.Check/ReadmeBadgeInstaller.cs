@@ -20,19 +20,26 @@ static class ReadmeBadgeInstaller
 
     internal const string Badge = "[![built with: dna](https://img.shields.io/badge/built%20with-dna-512BD4)](" + ToolHeader.RepositoryUrl + ")";
 
+    // The badge belongs to the repository's README: a specialized subfolder usually has none of its
+    // own. The nearest README from the target up to the git root receives it, and any README on that
+    // path that already links here covers the target. No README is ever created.
     internal static ReadmeBadgePlan? Plan(string targetDirectory)
     {
-        string? file = Directory.Exists(targetDirectory)
-            ? Directory.EnumerateFiles(targetDirectory).FirstOrDefault(path => Path.GetFileName(path).Equals("README.md", StringComparison.OrdinalIgnoreCase))
-            : null;
-        if (file is null)
+        string[] readmes = [.. RepositoryScope.DirectoriesUpToGitRoot(targetDirectory).Select(FindReadme).OfType<string>()];
+        if (readmes.Length == 0)
         {
             return null;
         }
 
-        bool current = File.ReadAllText(file).Contains(ToolHeader.RepositoryUrl, StringComparison.OrdinalIgnoreCase);
-        return new(file, current, Path.GetRelativePath(targetDirectory, file));
+        string? linked = readmes.FirstOrDefault(file => File.ReadAllText(file).Contains(ToolHeader.RepositoryUrl, StringComparison.OrdinalIgnoreCase));
+        string file = linked ?? readmes[0];
+        return new(file, linked is not null, Path.GetRelativePath(targetDirectory, file));
     }
+
+    static string? FindReadme(string directory)
+        => Directory.Exists(directory)
+            ? Directory.EnumerateFiles(directory).FirstOrDefault(path => Path.GetFileName(path).Equals("README.md", StringComparison.OrdinalIgnoreCase))
+            : null;
 
     internal static SkillManifestEntry Action(ReadmeBadgePlan plan)
         => new(string.Empty, Identity.InstallArg, "README badge: built with dna", string.Empty, [],
