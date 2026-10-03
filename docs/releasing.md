@@ -19,17 +19,19 @@ only when it changed.
   out to need that; never bump for a dev build.
 - **Majors are independent too.** Nothing compares the version of `Agentic.Check` with the version
   of `InnoWvate.Agentic`: a check reads the companion's own `<Version>` from GitHub and resolves it
-  with `major.*` from that number, and the only link between the packages is the `-m` literal in the
-  Prompt Log directive, which is the companion's major.minor. So the two majors may differ, as they
-  already do for `InnoWvate.Dna`.
+  with `major.*` from that number, and the only link between the packages is the `-m` literal in
+  content that calls the companion, which names its major and the lowest minor that content needs. So
+  the two majors may differ, as they already do for `InnoWvate.Dna`.
 - **Which part to bump.**
   - `Agentic.Check`: it is published on every release because the release tag carries its version, so
     it always moves. Patch for fixes, minor for new capabilities such as new detection or a new
     install item, major for a changed contract with the directives, skills or companion.
   - `InnoWvate.Agentic`: patch for fixes that leave its commands unchanged. Minor whenever directives
-    or skills need a new or changed command: the `-m` values they carry are its major.minor and a test
-    keeps them equal, so a minor bump rewrites the Prompt Log directive in every consumer, which is the
-    intended signal that agents need the newer tool. Major for an incompatible change; a check accepts a
+    or skills need a new or changed command: only the content that uses it raises its `-m` to the new
+    major.minor, and content that was not touched keeps its value. `-m` is a minimum within the major,
+    so content at different minors is served by one tool at or above the highest, and a pinned tool
+    follows the newest version in its major on its own. A test keeps every `-m` in the tool's major and
+    not above its version. Major for an incompatible change, which moves every `-m`; a check accepts a
     companion only with the same major and an equal or higher minor.
   - `InnoWvate.Dna`: patch or minor as its own behavior changes, major only when the launch protocol
     changes, together with `DnaInstaller.MinimumLauncherVersion`.
@@ -57,8 +59,9 @@ only when it changed.
 1. **Finish the content.** Confirm the version of every package that changed since its last
    publication is bumped as described under Versions; unchanged packages keep their published number.
    The literal `<Version>` in `src/Agentic/Agentic.csproj` is what Agentic.Check reads from GitHub, and
-   the `-m` values in directives and skills must match its major.minor (a test enforces this). Fill the
-   README placeholders and, if it ships the same day, the article. Commit with a prompt log and push.
+   every `-m` in directives and skills must be in its major and not above its major.minor (a test
+   enforces this). Fill the README placeholders and, if it ships the same day, the article. Commit with
+   a prompt log and push.
 2. **Run the full suite on that commit.** `dotnet run --file tests/run-full-suite.cs`. Require zero
    failures; network and maintenance tests are enabled by the runner. Keep the run folder: its
    `candidates/` holds the packages and `candidate-build.json`.

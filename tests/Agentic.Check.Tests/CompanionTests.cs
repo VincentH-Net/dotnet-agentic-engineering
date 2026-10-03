@@ -21,7 +21,7 @@ public sealed class CompanionTests
             var invocations = CompanionDependency.Invocations(content);
             foreach (var (_, minimum) in invocations)
             {
-                Assert.Equal(version.Minimum, minimum);
+                AssertWithinToolVersion(version, minimum, path);
                 Assert.Contains(CompanionDependency.Identity, CompanionDependency.ForDirective(Path.GetFileNameWithoutExtension(path), content));
             }
 
@@ -46,7 +46,7 @@ public sealed class CompanionTests
             {
                 foreach (var (_, minimum) in CompanionDependency.Invocations(File.ReadAllText(asset)))
                 {
-                    Assert.Equal(version.Minimum, minimum);
+                    AssertWithinToolVersion(version, minimum, asset);
                     Assert.Contains(manifest, entry => entry.LocalFolder == Path.GetFileName(folder) && entry.SourceRepo == CompanionDependency.SourceRepo && entry.Dependencies.Contains(CompanionDependency.Identity));
                 }
             }
@@ -61,6 +61,19 @@ public sealed class CompanionTests
         temp.Write("plugin/skills/fixture-consumer/scripts/wrap.sh", "dotnet agentic --minver 2.3 prompt-log wrap \\\n --input entry --prompt-log block\n");
         ValidateSkillConsumers(temp.Path, ToolVersion.ParseMinimum("2.3"), [Consumer()]);
         _ = Assert.ThrowsAny<Xunit.Sdk.XunitException>(() => ValidateSkillConsumers(temp.Path, ToolVersion.ParseMinimum("2.3"), []));
+        // The content keeps its 2.3 while the tool moves on within the major; it may not ask for a
+        // minor the tool has not reached, nor for another major.
+        ValidateSkillConsumers(temp.Path, ToolVersion.ParseMinimum("2.4"), [Consumer()]);
+        _ = Assert.ThrowsAny<Xunit.Sdk.XunitException>(() => ValidateSkillConsumers(temp.Path, ToolVersion.ParseMinimum("2.2"), [Consumer()]));
+        _ = Assert.ThrowsAny<Xunit.Sdk.XunitException>(() => ValidateSkillConsumers(temp.Path, ToolVersion.ParseMinimum("3.0"), [Consumer()]));
+    }
+
+    // -m is the lowest minor of the tool's major that content needs: the tool being released with it
+    // must satisfy it, exactly as the tool itself decides at run time.
+    static void AssertWithinToolVersion(ToolVersion version, string? minimum, string source)
+    {
+        Assert.True(minimum is not null, $"{source} calls dotnet agentic without a literal -m / --minver.");
+        Assert.True(version.Satisfies(ToolVersion.ParseMinimum(minimum)), $"{source} asks for {minimum}, which the tool version {version} does not satisfy.");
     }
 
     internal static string CheckoutRoot()
@@ -571,6 +584,106 @@ public sealed class CompanionTests
         Assert.Equal(published, CompanionInstaller.InstalledVersion(temp.Path));
     }
 
+    // -m is the lowest minor of a major that content was written for, so content at different minors
+    // of one major is compatible and the tool must satisfy the highest.
+    [Theory]
+    [InlineData("2.3", "2.3", "2.3")]
+    [InlineData("2.3", "2.4", "2.4")]
+    [InlineData("2.4", "2.3", "2.4")]
+    [InlineData("2.10", "2.9", "2.10")]
+    public void InstalledContentAtDifferentMinorsOfOneMajorRequiresTheHighest(string directive, string skill, string expected)
+    {
+        var requirement = CompanionDependency.ReadLocalRequirement([
+            ("AGENTS.md (foundation-prompt-log)", $"dotnet agentic prompt-log show -m {directive}\ndotnet agentic prompt-log check -m {directive}"),
+            (".agents/skills/sample/SKILL.md", $"dotnet agentic --minver {skill} prompt-log wrap --input -")]);
+
+        Assert.Equal(expected, requirement.Minimum);
+    }
+
+    [Fact]
+    public void InstalledContentForDifferentMajorsNamesWhatDisagreesAndHowToResolveIt()
+    {
+        var error = Assert.Throws<FormatException>(() => CompanionDependency.ReadLocalRequirement([
+            ("AGENTS.md (foundation-prompt-log)", "dotnet agentic prompt-log show -m 3.0"),
+            (".agents/skills/sample/SKILL.md", "dotnet agentic prompt-log wrap --input - -m 2.4\ndotnet agentic prompt-log check -m 2.3")]));
+
+        Assert.Equal("The installed directives and skills ask for different major versions of InnoWvate.Agentic: AGENTS.md (foundation-prompt-log) 3.0; .agents/skills/sample/SKILL.md 2.4, 2.3. Run `dna check` and apply the pending updates for these items so they ask for the same major.", error.Message);
+    }
+
+    [Fact]
+    public void InstalledContentWithoutALiteralMinimumNamesTheFile()
+    {
+        var missing = Assert.Throws<FormatException>(() => CompanionDependency.ReadLocalRequirement([(".agents/skills/sample/SKILL.md", "dotnet agentic prompt-log show")]));
+        Assert.Equal(".agents/skills/sample/SKILL.md calls dotnet agentic without a literal -m / --minver.", missing.Message);
+        var none = Assert.Throws<FormatException>(() => CompanionDependency.ReadLocalRequirement([(".agents/skills/sample/SKILL.md", "No tool call here.")]));
+        Assert.Contains("state no -m / --minver", none.Message, StringComparison.Ordinal);
+    }
+
+    // The installed directive was written for 2.3 and an installed skill for 2.4. They share a major,
+    // so nothing conflicts: the pinned tool must satisfy the higher one, and is updated when it does not.
+    [Theory]
+    [InlineData("2.4.0", null, null)]
+    [InlineData("2.3.0", "update", "currently 2.3.0; required 2.4")]
+    public async Task InstalledContentAtDifferentMinorsIsServedByOneToolAtTheHighest(string installed, string? action, string? status)
+    {
+        using TempDirectory temp = new();
+        var (source, runner) = MixedConsumerRepository(temp, "2.3", "2.4", installed);
+        FakePrompts prompts = new() { SelectedDirectiveNames = [], SelectedSkillInstallArgs = [CompanionDependency.PackageId] };
+        RecordingReporter reporter = new();
+
+        var result = await new CheckWorkflow(runner, prompts, reporter, source, new FakeSourceVersionResolver(), [Consumer()], new DnaInstaller(runner, string.Empty))
+            .RunAsync(new(temp.Path, false, false, null, null, "codex", false), CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Empty(reporter.Errors);
+        var companion = prompts.RecommendedSkillActions.SingleOrDefault(skill => skill.IsCompanion);
+        Assert.Equal(action, companion?.RecommendationAction);
+        Assert.Equal(status, companion?.Version);
+        Assert.Equal(action, result.Report.Companion?.Action);
+        if (action is not null)
+        {
+            Assert.True(companion!.IsRequiredToolRepair);
+            Assert.Equal("2.4", result.Report.Companion!.RequiredMinimum);
+            var update = Assert.Single(runner.Calls, call => call.FileName == "dotnet" && call.Arguments is ["tool", "update", ..] && !call.Arguments.Contains("--global"));
+            Assert.Contains("2.*", update.Arguments);
+        }
+
+        Assert.Equal("2.4.0", CompanionInstaller.InstalledVersion(temp.Path));
+    }
+
+    // Content written for different majors cannot share one tool. The run names the files that
+    // disagree and what to do about it, and changes nothing.
+    [Fact]
+    public async Task InstalledContentForDifferentMajorsStopsTheToolRowWithAnActionableMessage()
+    {
+        using TempDirectory temp = new();
+        var (source, runner) = MixedConsumerRepository(temp, "3.0", "2.4", "2.4.0");
+        FakePrompts prompts = new() { SelectedDirectiveNames = [], SelectedSkillInstallArgs = [CompanionDependency.PackageId] };
+        RecordingReporter reporter = new();
+
+        var result = await new CheckWorkflow(runner, prompts, reporter, source, new FakeSourceVersionResolver(), [Consumer()], new DnaInstaller(runner, string.Empty))
+            .RunAsync(new(temp.Path, false, false, null, null, "codex", false), CancellationToken.None);
+
+        string message = $"The installed directives and skills ask for different major versions of InnoWvate.Agentic: AGENTS.md (foundation-prompt-log) 3.0; {Path.Combine(".agents", "skills", "fixture-consumer", "SKILL.md")} 2.4. Run `dna check` and apply the pending updates for these items so they ask for the same major.";
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains(message, reporter.Errors);
+        Assert.Equal("repair", Assert.Single(prompts.RecommendedSkillActions, skill => skill.IsCompanion).RecommendationAction);
+        Assert.Equal(message, result.Report.Companion?.Error);
+        Assert.DoesNotContain(runner.Calls, call => call.FileName == "dotnet" && call.Arguments is ["tool", "install" or "update" or "restore", ..] && !call.Arguments.Contains("--global"));
+        Assert.Equal("2.4.0", CompanionInstaller.InstalledVersion(temp.Path));
+    }
+
+    // A repository with the Prompt Log directive and one skill installed, each calling the tool with its own -m.
+    static (FakeDirectiveSource Source, ToolRunner Runner) MixedConsumerRepository(TempDirectory temp, string directiveMinimum, string skillMinimum, string installed)
+    {
+        string block = PromptLogBlock($"dotnet agentic prompt-log show -m {directiveMinimum}", "");
+        temp.Write("AGENTS.md", block);
+        temp.Write(".agents/skills/fixture-consumer/SKILL.md", $"---\nname: fixture-consumer\ndescription: Uses the tool.\n---\ndotnet agentic prompt-log check -m {skillMinimum}\n");
+        WriteManifest(temp.Path, installed);
+        FakeDirectiveSource source = new(new Dictionary<string, string> { ["foundation-prompt-log.md"] = "~~~md\n" + block + "~~~\n" });
+        return (source, new ToolRunner { Resolved = installed, Updated = "2.4.0" });
+    }
+
     // A repository whose Prompt Log directive is installed and identical to its source, with the companion pinned.
     static (FakeDirectiveSource Source, ToolRunner Runner, FakeVersionSource Versions) CurrentPromptLogRepository(TempDirectory temp, string installed, string published)
     {
@@ -740,7 +853,8 @@ public sealed class CompanionTests
         Assert.Equal(1, result.ExitCode);
         Assert.DoesNotContain(runner.Calls, call => call.FileName == "dotnet" && call.Arguments[1] != "list");
         Assert.DoesNotContain("foundation-prompt-log:start", await ReadIfExistsAsync(result.Report.AgentsFile), StringComparison.Ordinal);
-        _ = Assert.Throws<FormatException>(() => CompanionDependency.ReadLocalRequirement(["dotnet agentic prompt-log show -m 1.3", "dotnet agentic --minver 2.3 prompt-log check"]));
+        _ = Assert.Throws<FormatException>(() => CompanionDependency.ReadLocalRequirement([
+            ("AGENTS.md (foundation-prompt-log)", "dotnet agentic prompt-log show -m 1.3"), (".agents/skills/sample/SKILL.md", "dotnet agentic --minver 2.3 prompt-log check")]));
     }
 
     [Theory]

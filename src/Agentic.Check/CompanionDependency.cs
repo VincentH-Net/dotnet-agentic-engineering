@@ -21,12 +21,34 @@ static partial class CompanionDependency
         => [.. InvocationRegex().Matches(content.Replace("\\\r\n", " ", StringComparison.Ordinal).Replace("\\\n", " ", StringComparison.Ordinal))
             .Select(match => (match.Value, MinimumRegex().Matches(match.Value) is { Count: 1 } minimum ? minimum[0].Groups[1].Value : null))];
 
-    internal static ToolVersion ReadLocalRequirement(IEnumerable<string> contents)
+    // -m states the lowest minor of a major that content was written for, so content installed at
+    // different minors of one major is compatible and the tool must satisfy the highest. Content
+    // written for different majors cannot be served by one tool; the message names what disagrees.
+    internal static ToolVersion ReadLocalRequirement(IEnumerable<(string Source, string Content)> installed)
     {
-        string[] requirements = [.. contents.SelectMany(Invocations).Select(invocation => invocation.Minimum ?? throw new FormatException("Installed companion invocation is missing literal -m / --minver.")).Distinct(StringComparer.Ordinal)];
-        return requirements.Length == 1
-            ? ToolVersion.ParseMinimum(requirements[0])
-            : throw new FormatException("Installed companion requirements are missing or conflicting; repair consumers interactively.");
+        List<(string Source, ToolVersion Minimum)> requirements = [];
+        foreach (var (source, content) in installed)
+        {
+            foreach (var (_, minimum) in Invocations(content))
+            {
+                requirements.Add((source, ToolVersion.ParseMinimum(minimum
+                    ?? throw new FormatException($"{source} calls dotnet agentic without a literal -m / --minver."))));
+            }
+        }
+
+        if (requirements.Count == 0)
+        {
+            throw new FormatException("The installed directives and skills that use dotnet agentic state no -m / --minver. Run `dna check` and apply their pending updates.");
+        }
+
+        if (requirements.Select(requirement => requirement.Minimum.Major).Distinct().Count() > 1)
+        {
+            string asked = string.Join("; ", requirements.GroupBy(requirement => requirement.Source, StringComparer.Ordinal)
+                .Select(group => $"{group.Key} {string.Join(", ", group.Select(requirement => requirement.Minimum.Minimum).Distinct(StringComparer.Ordinal))}"));
+            throw new FormatException($"The installed directives and skills ask for different major versions of {PackageId}: {asked}. Run `dna check` and apply the pending updates for these items so they ask for the same major.");
+        }
+
+        return requirements.Max(requirement => requirement.Minimum)!;
     }
 
     [GeneratedRegex(@"\bdotnet[ \t]+agentic\b[^\r\n;`]*", RegexOptions.CultureInvariant)]

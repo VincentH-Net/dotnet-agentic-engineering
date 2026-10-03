@@ -394,7 +394,8 @@ sealed class CheckWorkflow(
                 report.Warnings.Add(warning);
                 reporter.Warning(warning);
             }
-            List<string> installedConsumers = [];
+            // Named so a disagreement between them can say which files to look at.
+            List<(string Source, string Content)> installedConsumers = [];
             foreach (var directive in directivePlan.Directives)
             {
                 if (DirectiveMarkers.FindBlock(directivePlan.AgentsContent, directive.Name) is { } range)
@@ -402,7 +403,7 @@ sealed class CheckWorkflow(
                     string installed = directivePlan.AgentsContent[range];
                     if (CompanionDependency.ForDirective(directive.Name, installed).Count > 0)
                     {
-                        installedConsumers.Add(installed);
+                        installedConsumers.Add(($"{Path.GetFileName(directivePlan.AgentsFile)} ({directive.Name})", installed));
                     }
                 }
             }
@@ -414,7 +415,7 @@ sealed class CheckWorkflow(
                     string path = Path.Combine(directory, skill.LocalFolder, "SKILL.md");
                     if (File.Exists(path))
                     {
-                        installedConsumers.Add(await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false));
+                        installedConsumers.Add((Path.GetRelativePath(targetDirectory, path), await File.ReadAllTextAsync(path, cancellationToken).ConfigureAwait(false)));
                     }
                 }
             }
