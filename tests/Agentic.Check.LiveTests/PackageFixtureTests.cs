@@ -60,9 +60,10 @@ public sealed class PackageFixtureTests(ITestOutputHelper output)
         Skip.If(Environment.GetEnvironmentVariable("AGENTIC_E2E_NETWORK") != "1", "Opt in with AGENTIC_E2E_NETWORK=1 and exact package/build inputs.");
         string? selectedFixture = Environment.GetEnvironmentVariable("AGENTIC_E2E_FIXTURE");
         string? selectedScenario = Environment.GetEnvironmentVariable("AGENTIC_E2E_SCENARIO");
-        FixtureFiles.Require(selectedFixture is null || Scenarios().Any(row => (string)row[0] == selectedFixture), "Unknown AGENTIC_E2E_FIXTURE.");
+        string[]? selectedFixtures = selectedFixture?.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        FixtureFiles.Require(selectedFixtures is null || (selectedFixtures.Length > 0 && selectedFixtures.All(selected => Scenarios().Any(row => (string)row[0] == selected))), "Unknown AGENTIC_E2E_FIXTURE.");
         FixtureFiles.Require(selectedScenario is null || Scenarios().Any(row => (string)row[1] == selectedScenario), "Unknown AGENTIC_E2E_SCENARIO.");
-        Skip.If(selectedFixture is not null && selectedFixture != fixture, $"Fixture selection: {selectedFixture}");
+        Skip.If(selectedFixtures is not null && !selectedFixtures.Contains(fixture, StringComparer.Ordinal), $"Fixture selection: {selectedFixture}");
         Skip.If(selectedScenario is not null && selectedScenario != scenario, $"Scenario selection: {selectedScenario}");
         if (scenario == "baseline-preparation-failed")
         {
@@ -72,6 +73,7 @@ public sealed class PackageFixtureTests(ITestOutputHelper output)
         }
         bool interactive = fixture == "broad-stack" || scenario == "preview-declined";
         Skip.If(interactive && !RecordedTerminal.Supported, "PTY scenario requires Bash on macOS/Linux; noninteractive scenarios remain portable.");
+        Skip.If(interactive && Environment.GetEnvironmentVariable("AGENTIC_E2E_UNATTENDED") == "1", "Unattended selection: the scenario drives a recorded terminal.");
         var budget = await FixtureAuthentication.Shared.RequireAsync().ConfigureAwait(true);
         output.WriteLine($"Preflight authenticated GitHub core budget: {budget.Remaining}/{budget.Limit}, reset {DateTimeOffset.FromUnixTimeSeconds(budget.Reset):O}");
         var candidate = await CandidateInputs.LoadAsync().ConfigureAwait(true);

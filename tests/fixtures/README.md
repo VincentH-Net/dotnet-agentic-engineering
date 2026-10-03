@@ -177,8 +177,9 @@ push, package directory and affected verification; no candidate is rewritten or 
 | `AGENTIC_E2E_BASELINE` | Explicit collection ID for migration; not needed by fresh scenarios. |
 | `AGENTIC_E2E_SOURCE_CHECKOUT` | Optional explicit checkout; otherwise discovered from test binaries. |
 | `AGENTIC_E2E_NETWORK=1` | Opt in to real package/GitHub install/update tests. |
-| `AGENTIC_E2E_FIXTURE` | Optional exact fixture name. |
+| `AGENTIC_E2E_FIXTURE` | Optional exact fixture name, or several separated by commas. |
 | `AGENTIC_E2E_SCENARIO` | Optional exact scenario name from the table below. |
+| `AGENTIC_E2E_UNATTENDED=1` | Optional; skips the scenarios that drive a recorded terminal. CI sets it. |
 | `AGENTIC_E2E_REPORTS` | Optional artifact directory, otherwise Agentic.Check.LiveTests/TestResults/package-fixtures. |
 | `AGENTIC_E2E_CACHE` | Optional cache directory, otherwise cache below reports. |
 

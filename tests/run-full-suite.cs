@@ -43,6 +43,7 @@ Dictionary<string, string?> settings = new(StringComparer.Ordinal)
     ["AGENTIC_CHECK_SKILL_MAINTENANCE"] = "1",
     ["AGENTIC_E2E_FIXTURE"] = null,
     ["AGENTIC_E2E_SCENARIO"] = null,
+    ["AGENTIC_E2E_UNATTENDED"] = null,
     ["AGENTIC_E2E_REPORTS"] = Path.Combine(reports, "pack"),
     ["AGENTIC_E2E_CACHE"] = Path.Combine(reports, "cache"),
     ["AGENTIC_CHECK_MAINTENANCE_REPORT_DIR"] = Path.Combine(reports, "maintenance"),

@@ -4,10 +4,10 @@ on:
   # Manual-only: the package jobs spend the repository's GitHub API budget.
   workflow_dispatch:
     inputs:
-      fixture:
-        description: Fixture whose package scenarios run on Ubuntu and Windows
+      fixtures:
+        description: Fixtures whose unattended package scenarios run on Ubuntu and Windows, comma-separated
         type: string
-        default: dotnet-cli
+        default: dotnet-cli,uno-conflicting-gates,preview-web-cli
       source_tests:
         description: Also run the four test projects from source on Ubuntu (its terminal-driven tests time out there)
         type: boolean
@@ -46,11 +46,16 @@ jobs:
           if-no-files-found: error
 
   # Tests the packed product rather than the sources: installs the candidates into an isolated feed
-  # and tool path and runs one fixture's scenarios with the real gh. Nothing is packed here.
+  # and tool path and runs the selected fixtures' unattended scenarios with the real gh. Nothing is
+  # packed here. The default fixtures are a small stack, the largest install (84 skills at once) and
+  # the switch from preview to stable.
   packages:
     needs: pack
     strategy:
       fail-fast: false
+      # One system at a time: both share this repository's GitHub limits, and the largest install on
+      # two systems at once is more parallel requests than was measured to be safe.
+      max-parallel: 1
       matrix:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
@@ -70,7 +75,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           AGENTIC_E2E_NETWORK: '1'
-          AGENTIC_E2E_FIXTURE: ${{ inputs.fixture }}
+          AGENTIC_E2E_FIXTURE: ${{ inputs.fixtures }}
+          # The scenarios that drive a recorded terminal run in the local suite only.
+          AGENTIC_E2E_UNATTENDED: '1'
         run: |
           $candidates = Join-Path $env:RUNNER_TEMP 'candidates'
           $env:AGENTIC_E2E_SOURCE_CHECKOUT = $env:GITHUB_WORKSPACE
