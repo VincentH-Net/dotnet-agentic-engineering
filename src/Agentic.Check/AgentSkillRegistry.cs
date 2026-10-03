@@ -68,7 +68,20 @@ static class AgentSkillRegistry
     public static string AgentIds => string.Join(", ", Hosts
         .Select(host => host.Id));
 
-    public static string AgentHelpLines => FormatAgentHelpLines(Console.WindowWidth);
+    public static string AgentHelpLines => FormatAgentHelpLines(TerminalWidth(() => Console.WindowWidth));
+
+    // Windows throws when no console is attached, as when an agent or CI captures all three streams.
+    internal static int TerminalWidth(Func<int> windowWidth)
+    {
+        try
+        {
+            return windowWidth();
+        }
+        catch (IOException)
+        {
+            return 80;
+        }
+    }
 
     public static string FormatAgentHelpLines(int terminalWidth)
     {

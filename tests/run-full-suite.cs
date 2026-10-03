@@ -316,7 +316,11 @@ string Summarize(int exitCode)
     {
         string directory = Path.Combine(reports, phase, "github-runs");
         string[] runs = Directory.Exists(directory) ? Directory.GetDirectories(directory) : [];
-        if (runs.Length == 0)
+        if (runs.Length == 0 && phase == "pack" && ciRun is not null)
+        {
+            _ = text.AppendLine(CultureInfo.InvariantCulture, $"  pack: done by CI run {ciRun}; not measured here.");
+        }
+        else if (runs.Length == 0)
         {
             incomplete = true;
             _ = text.AppendLine(CultureInfo.InvariantCulture, $"  {phase}: measurements unavailable; no GitHub run report.");

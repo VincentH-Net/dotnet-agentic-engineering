@@ -79,6 +79,13 @@ public sealed class InteractionTests
     }
 
     [Fact]
+    public void TerminalWidthFallsBackWhenNoConsoleIsAttached()
+    {
+        Assert.Equal(120, AgentSkillRegistry.TerminalWidth(() => 120));
+        Assert.Equal(80, AgentSkillRegistry.TerminalWidth(() => throw new IOException("The handle is invalid.")));
+    }
+
+    [Fact]
     public async Task AgentCliDetectorUsesOnlyClearIdentifyingOutput()
     {
         MappedCommandRunner commandRunner = new();

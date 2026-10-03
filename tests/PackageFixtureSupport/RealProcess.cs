@@ -120,5 +120,14 @@ sealed class FixtureWorkspace : IDisposable
         return Path.Combine(ToolDirectory, OperatingSystem.IsWindows() ? "agentic-check.exe" : "agentic-check");
     }
 
-    public void Dispose() => Directory.Delete(Root, true);
+    public void Dispose()
+    {
+        // Git marks its object files read-only, and Windows refuses to delete those.
+        if (OperatingSystem.IsWindows())
+        {
+            foreach (string file in Directory.EnumerateFiles(Root, "*", SearchOption.AllDirectories))
+                File.SetAttributes(file, FileAttributes.Normal);
+        }
+        Directory.Delete(Root, true);
+    }
 }
