@@ -71,10 +71,15 @@ only when it changed.
    every `-m` in directives and skills must be in its major and not above its major.minor (a test
    enforces this). Fill the README placeholders and, if it ships the same day, the article. Commit with
    a prompt log and push.
-2. **Run the full suite on that commit.** `dotnet run --file tests/run-full-suite.cs`. Require zero
-   failures; network and maintenance tests are enabled by the runner. Keep the run folder: its
-   `candidates/` holds the packages and `candidate-build.json`, and the summary says for each package
-   whether it was packed from this commit or is the unchanged package already on nuget.org.
+2. **Run the full suite on that commit, against the candidates CI packed.** Start the `Tests`
+   workflow for the branch with `gh workflow run tests.yml --ref <branch>`, then run
+   `dotnet run --file tests/run-full-suite.cs -- --ci-run <run id>`. CI packs the candidates once and
+   runs the package scenarios against them on Ubuntu and Windows, while the full suite runs against
+   the same files here. Require zero failures in all three; network and maintenance tests are enabled
+   by the runner. Keep the run folder: its `candidates/` holds the packages and `candidate-build.json`,
+   and the summary says for each package whether it was packed from this commit or is the unchanged
+   package already on nuget.org. Without `--ci-run` the suite packs locally, which is what everyday
+   runs use.
 3. **Publish in dependency order.** Upload only what the run packed; a package that
    `candidate-build.json` lists under `published` is already on nuget.org. Compare each file's SHA-256
    with `candidate-build.json`, then upload `InnoWvate.Agentic` and `InnoWvate.Dna` when they were

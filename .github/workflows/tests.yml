@@ -1,14 +1,96 @@
 name: Tests
 
 on:
-  # Temporarily manual-only while GitHub API quota limits are addressed.
+  # Manual-only: the package jobs spend the repository's GitHub API budget.
   workflow_dispatch:
+    inputs:
+      fixture:
+        description: Fixture whose package scenarios run on Ubuntu and Windows
+        type: string
+        default: dotnet-cli
+      source_tests:
+        description: Also run the four test projects from source on Ubuntu (its terminal-driven tests time out there)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
+env:
+  # Keep in step with the default baseline in tests/run-full-suite.cs.
+  AGENTIC_E2E_BASELINE: agentic-check-2.4.0-2026-10-02-capture01
+  MSBUILDTERMINALLOGGER: 'off'
+
 jobs:
+  # Packs the candidates once. The package jobs below, and a local
+  # `dotnet run --file tests/run-full-suite.cs -- --ci-run <run id>`, test these exact files, so what
+  # gets published is what passed on every system.
+  pack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The unchanged-package guard compares with the commits the published packages were built from.
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet build tests/Agentic.FixturePreparation/Agentic.FixturePreparation.csproj -c Release
+      - run: dotnet tests/Agentic.FixturePreparation/bin/Release/net10.0/Agentic.FixturePreparation.dll pack-candidates "$RUNNER_TEMP/candidates" Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: candidates
+          path: ${{ runner.temp }}/candidates
+          if-no-files-found: error
+
+  # Tests the packed product rather than the sources: installs the candidates into an isolated feed
+  # and tool path and runs one fixture's scenarios with the real gh. Nothing is packed here.
+  packages:
+    needs: pack
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      # Fixture content is compared byte for byte, so the checkout must not rewrite line endings.
+      - run: git config --global core.autocrlf false
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/download-artifact@v4
+        with:
+          name: candidates
+          path: ${{ runner.temp }}/candidates
+      - name: Run the package scenarios against the packed candidates
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          AGENTIC_E2E_NETWORK: '1'
+          AGENTIC_E2E_FIXTURE: ${{ inputs.fixture }}
+        run: |
+          $candidates = Join-Path $env:RUNNER_TEMP 'candidates'
+          $env:AGENTIC_E2E_SOURCE_CHECKOUT = $env:GITHUB_WORKSPACE
+          $env:AGENTIC_E2E_CHECK_PACKAGE = (Get-ChildItem $candidates -Filter 'Agentic.Check.*.nupkg').FullName
+          $env:AGENTIC_E2E_COMPANION_PACKAGE = (Get-ChildItem $candidates -Filter 'InnoWvate.Agentic.*.nupkg').FullName
+          $env:AGENTIC_E2E_DNA_PACKAGE = (Get-ChildItem $candidates -Filter 'InnoWvate.Dna.*.nupkg').FullName
+          $env:AGENTIC_E2E_BUILD_MANIFEST = Join-Path $candidates 'candidate-build.json'
+          $env:AGENTIC_E2E_REPORTS = Join-Path $env:RUNNER_TEMP 'package-reports'
+          dotnet test tests/Agentic.Check.LiveTests/Agentic.Check.LiveTests.csproj -c Release --filter "Category=PackageNetwork" --results-directory (Join-Path $env:RUNNER_TEMP 'package-results') --logger "trx;LogFileName=results.trx" --logger "console;verbosity=normal"
+          exit $LASTEXITCODE
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: package-results-${{ matrix.os }}
+          path: |
+            ${{ runner.temp }}/package-results
+            ${{ runner.temp }}/package-reports
+
   verify:
+    if: ${{ inputs.source_tests }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

@@ -1,4 +1,4 @@
-// Run from any directory: dotnet run --file /path/to/tests/run-full-suite.cs
+// Run from any directory: dotnet run --file /path/to/tests/run-full-suite.cs [-- --ci-run <run id>]
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -14,7 +14,10 @@ if (args is ["--help"])
     PrintUsage();
     return 0;
 }
-if (args.Length != 0)
+// With --ci-run the candidates that CI run packed are tested here instead of packing locally, so
+// the same files pass on this machine and on the CI operating systems before they are published.
+string? ciRun = args is ["--ci-run", var requestedRun] && requestedRun.Length > 0 && requestedRun.All(char.IsAsciiDigit) ? requestedRun : null;
+if (args.Length != 0 && ciRun is null)
 {
     Console.Error.WriteLine("Unexpected arguments. Use --help for usage.");
     return 2;
@@ -58,10 +61,18 @@ try
         return result;
     }
 
-    // Bootstrap the existing helper, which validates origin/branch/clean source before packing.
-    if (Run("build", "tests/Agentic.FixturePreparation/Agentic.FixturePreparation.csproj", "-c", "Release") != 0
-        || Run("tests/Agentic.FixturePreparation/bin/Release/net10.0/Agentic.FixturePreparation.dll",
-            "pack-candidates", candidates, "Release") != 0)
+    if (ciRun is null)
+    {
+        // Bootstrap the existing helper, which validates origin/branch/clean source before packing.
+        if (Run("build", "tests/Agentic.FixturePreparation/Agentic.FixturePreparation.csproj", "-c", "Release") != 0
+            || Run("tests/Agentic.FixturePreparation/bin/Release/net10.0/Agentic.FixturePreparation.dll",
+                "pack-candidates", candidates, "Release") != 0)
+        {
+            return result;
+        }
+    }
+    // The tests verify that these files match their manifest and that the manifest names this checkout's pushed commit.
+    else if (!WaitForCandidates(ciRun) || Execute("gh", "run", "download", ciRun, "--name", "candidates", "--dir", candidates) != 0)
     {
         return result;
     }
@@ -110,11 +121,61 @@ finally
     Console.WriteLine(outcome);
 }
 
-int Run(params string[] arguments)
+int Run(params string[] arguments) => Execute("dotnet", arguments);
+
+// The pack job of a CI run uploads the candidates as an artifact; wait for it rather than for the whole run.
+bool WaitForCandidates(string run)
 {
-    string command = "dotnet " + string.Join(' ', arguments.Select(argument => '"' + argument + '"'));
+    Console.WriteLine($"\nWaiting for the candidates of CI run {run}.");
+    for (int attempt = 0; attempt < 90; attempt++)
+    {
+        string? artifacts = Capture("gh", "api", $"repos/{{owner}}/{{repo}}/actions/runs/{run}/artifacts", "--jq", ".artifacts[].name");
+        if (artifacts is null)
+        {
+            Console.Error.WriteLine($"Cannot read CI run {run}. Check the run id and gh authentication.");
+            return false;
+        }
+
+        if (artifacts.Split('\n', StringSplitOptions.TrimEntries).Contains("candidates"))
+            return true;
+        string? conclusion = Capture("gh", "run", "view", run, "--json", "jobs", "--jq", ".jobs[] | select(.name == \"pack\") | .conclusion");
+        if (conclusion is not null && conclusion.Trim() is "failure" or "cancelled" or "skipped")
+        {
+            Console.Error.WriteLine($"The pack job of CI run {run} ended with {conclusion.Trim()}; it produced no candidates.");
+            return false;
+        }
+
+        Thread.Sleep(TimeSpan.FromSeconds(10));
+    }
+
+    Console.Error.WriteLine($"CI run {run} produced no candidates within 15 minutes.");
+    return false;
+}
+
+string? Capture(string executable, params string[] arguments)
+{
+    ProcessStartInfo start = new(executable) { WorkingDirectory = checkout, UseShellExecute = false, RedirectStandardOutput = true };
+    foreach (string argument in arguments)
+        start.ArgumentList.Add(argument);
+    try
+    {
+        using var process = Process.Start(start) ?? throw new InvalidOperationException($"Could not start {executable}.");
+        string output = process.StandardOutput.ReadToEnd();
+        process.WaitForExit();
+        return process.ExitCode == 0 ? output : null;
+    }
+    catch (Win32Exception exception)
+    {
+        Console.Error.WriteLine(exception.Message);
+        return null;
+    }
+}
+
+int Execute(string executable, params string[] arguments)
+{
+    string command = executable + " " + string.Join(' ', arguments.Select(argument => '"' + argument + '"'));
     Console.WriteLine("\n> " + command);
-    ProcessStartInfo start = new("dotnet") { WorkingDirectory = checkout, UseShellExecute = false };
+    ProcessStartInfo start = new(executable) { WorkingDirectory = checkout, UseShellExecute = false };
     foreach (string argument in arguments)
         start.ArgumentList.Add(argument);
     foreach (var (name, value) in settings)
@@ -122,7 +183,7 @@ int Run(params string[] arguments)
     int code;
     try
     {
-        using var process = Process.Start(start) ?? throw new InvalidOperationException("Could not start dotnet.");
+        using var process = Process.Start(start) ?? throw new InvalidOperationException($"Could not start {executable}.");
         // While a long command runs, show the newest line the package scenarios wrote, so progress is visible.
         string? shown = null;
         while (!process.WaitForExit(30_000))
@@ -234,6 +295,8 @@ string Summarize(int exitCode)
         using var document = JsonDocument.Parse(content);
         var build = document.RootElement;
         _ = text.AppendLine(CultureInfo.InvariantCulture, $"  origin/{build.GetProperty("branch").GetString()} @ {build.GetProperty("commit").GetString()} ({build.GetProperty("configuration").GetString()})");
+        if (ciRun is not null)
+            _ = text.AppendLine(CultureInfo.InvariantCulture, $"  Packed by CI run {ciRun} and tested here as downloaded.");
         // An unchanged package is the one nuget.org already serves; only packed ones are uploaded.
         string?[] unchanged = build.TryGetProperty("published", out var published) ? [.. published.EnumerateArray().Select(id => id.GetString())] : [];
         foreach (string name in packageKinds)
@@ -241,7 +304,9 @@ string Summarize(int exitCode)
             var package = build.GetProperty(name);
             string? id = package.GetProperty("id").GetString();
             string origin = unchanged.Contains(id) ? "unchanged, already on nuget.org: nothing to upload" : "packed from this commit";
-            _ = text.AppendLine(CultureInfo.InvariantCulture, $"  {id} {package.GetProperty("version").GetString()} ({origin}): {package.GetProperty("path").GetString()}");
+            // The manifest records where the package was packed; the file tested here is the one in this run's folder.
+            string file = Path.Combine(candidates, (package.GetProperty("path").GetString() ?? string.Empty).Split('/', '\\')[^1]);
+            _ = text.AppendLine(CultureInfo.InvariantCulture, $"  {id} {package.GetProperty("version").GetString()} ({origin}): {file}");
             _ = text.AppendLine(CultureInfo.InvariantCulture, $"    SHA256 {package.GetProperty("sha256").GetString()}");
         }
     });
@@ -297,4 +362,4 @@ static string Checkout([CallerFilePath] string source = "") => Path.GetDirectory
 [SuppressMessage("Globalization", "CA1303:Do not pass literals as localized parameters",
     Justification = "This repository-only single-file test runner is not localized; a separate resource file would defeat its standalone format.")]
 static void PrintUsage()
-    => Console.WriteLine("Usage: dotnet run --file tests/run-full-suite.cs\nRuns all four test projects with network and maintenance checks enabled.\nAGENTIC_E2E_BASELINE optionally selects a persisted baseline collection.");
+    => Console.WriteLine("Usage: dotnet run --file tests/run-full-suite.cs [-- --ci-run <run id>]\nRuns all four test projects with network and maintenance checks enabled.\n--ci-run tests the candidates packed by that run of the Tests workflow instead of packing locally.\nAGENTIC_E2E_BASELINE optionally selects a persisted baseline collection.");

@@ -49,6 +49,22 @@ Run the complete suite with the C# runner:
 dotnet run --file tests/run-full-suite.cs
 ```
 
+To test the files that CI packed instead of packing locally, start the `Tests` workflow for the
+branch and pass its run id:
+
+```sh
+gh workflow run tests.yml --ref <branch>
+dotnet run --file tests/run-full-suite.cs -- --ci-run <run id>
+```
+
+The workflow's `pack` job prepares the candidates once and stores them as the `candidates` artifact.
+Its `packages` jobs run the package scenarios of one fixture (`dotnet-cli` by default) against those
+files on Ubuntu and Windows; nothing is packed there. `--ci-run` waits for the artifact, downloads it
+and runs the complete suite against the same files here. The tests verify that the downloaded files
+match their manifest and that the manifest names this checkout's pushed commit. The workflow is
+started manually because the package jobs spend the repository's GitHub API budget; its
+`source_tests` input additionally runs the four test projects from source on Ubuntu.
+
 The runner resolves the checkout from its own file location, so an absolute script path also works
 from another directory. Both scripts turn the SDK terminal logger off for the `dotnet` processes they start, so
 their output is plain sequential lines rather than a live-redrawn node that floods a scrolling terminal. `--help` describes usage. The C# runner uses .NET 10 file-based app
