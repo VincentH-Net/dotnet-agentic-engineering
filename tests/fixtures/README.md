@@ -154,9 +154,13 @@ dotnet run --no-build --project tests/Agentic.FixturePreparation -- pack-candida
 
 The last command validates the actual remote branch against HEAD (not a cached tracking ref),
 checks the expected HTTPS/SSH origin and non-default branch, rejects dirty production/content
-inputs, and packs all three tool projects exactly once. Unrelated untracked documents are outside these
+inputs, and packs each tool project whose version is not on nuget.org exactly once. A companion or
+shorthand whose version is already published is not packed: the published package is the candidate,
+provided its sources are unchanged since the commit it was published from. Agentic.Check must carry
+an unpublished version. Unrelated untracked documents are outside these
 inputs and remain untouched. It passes RepositoryCommit into NuGet metadata and writes
-`candidate-build.json` with configuration, branch, SHA, package IDs/versions and hashes.
+`candidate-build.json` with configuration, branch, SHA, package IDs/versions and hashes, and the IDs
+of the packages taken from nuget.org.
 It checks source identity again after packing and refuses an existing output directory.
 A Debug package build is accepted with `Debug`; the test runner configuration is independent.
 Release verification requires Release packages. Candidate input changes require a new commit,

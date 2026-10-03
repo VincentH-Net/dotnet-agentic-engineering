@@ -8,15 +8,23 @@ only when it changed.
 
 - **A version number names published bytes.** Once a number is on nuget.org it is taken: the next
   change to that package needs a new number. Until then the number is free to reuse.
-- **The inner dev loop reuses the number.** `tests/manual-test.cs` and the full suite pack the working
-  tree under the version in the project file, as often as needed, without bumping. That is safe there
-  because both isolate the NuGet caches and the CLI home per run and verify the installed package
-  hashes against the packed candidate, so the bytes that run are always the bytes just packed. Do not
-  install a dev pack under a number that nuget.org already has anywhere else.
-- **Bump right after publishing, then leave it alone.** Immediately after a publication, set the next
-  patch version of every package that was published (step 6). That number is then used for every dev
-  build until it is published in turn. Raise it from patch to minor or major later when the work turns
-  out to need that; never bump for a dev build.
+- **The inner dev loop reuses the number.** `tests/manual-test.cs` packs the working tree under the
+  version in the project file, and the full suite does the same for every package whose number is not
+  on nuget.org yet, as often as needed, without bumping. That is safe there because both isolate the
+  NuGet caches and the CLI home per run and verify the installed package hashes against the packed
+  candidate, so the bytes that run are always the bytes just packed. Do not install a dev pack under a
+  number that nuget.org already has anywhere else.
+- **A version moves only when its package changes.** `InnoWvate.Agentic` and `InnoWvate.Dna` keep their
+  published number for as long as nothing that goes into them changes, and take the next number with
+  their first change. The full suite enforces both halves. It does not pack a package whose number is
+  already on nuget.org: it tests the published package itself, which is what users have. And it fails
+  when the sources of that package (its project folder, the shared files it links and the build files)
+  differ from the commit it was published from, naming what changed.
+- **Bump `Agentic.Check` right after publishing, then leave it alone.** Its version names the release
+  and it is published every time, so immediately after a publication set its next patch version
+  (step 6); the full suite refuses to pack it under a number that nuget.org already has. That number
+  is then used for every dev build until it is published in turn. Raise it from patch to minor or
+  major later when the work turns out to need that; never bump for a dev build.
 - **Majors are independent too.** Nothing compares the version of `Agentic.Check` with the version
   of `InnoWvate.Agentic`: a check reads the companion's own `<Version>` from GitHub and resolves it
   with `major.*` from that number, and the only link between the packages is the `-m` literal in
@@ -58,16 +66,20 @@ only when it changed.
 
 1. **Finish the content.** Confirm the version of every package that changed since its last
    publication is bumped as described under Versions; unchanged packages keep their published number.
+   The full suite fails when either is not the case.
    The literal `<Version>` in `src/Agentic/Agentic.csproj` is what Agentic.Check reads from GitHub, and
    every `-m` in directives and skills must be in its major and not above its major.minor (a test
    enforces this). Fill the README placeholders and, if it ships the same day, the article. Commit with
    a prompt log and push.
 2. **Run the full suite on that commit.** `dotnet run --file tests/run-full-suite.cs`. Require zero
    failures; network and maintenance tests are enabled by the runner. Keep the run folder: its
-   `candidates/` holds the packages and `candidate-build.json`.
-3. **Publish in dependency order.** Compare each file's SHA-256 with `candidate-build.json`, then upload
-   `InnoWvate.Agentic` and `InnoWvate.Dna` when they changed. Wait until nuget.org lists them, usually
-   within 15 minutes. Only then upload `Agentic.Check`. Upload through the portal or with
+   `candidates/` holds the packages and `candidate-build.json`, and the summary says for each package
+   whether it was packed from this commit or is the unchanged package already on nuget.org.
+3. **Publish in dependency order.** Upload only what the run packed; a package that
+   `candidate-build.json` lists under `published` is already on nuget.org. Compare each file's SHA-256
+   with `candidate-build.json`, then upload `InnoWvate.Agentic` and `InnoWvate.Dna` when they were
+   packed. Wait until nuget.org lists them, usually within 15 minutes. Only then upload
+   `Agentic.Check`. Upload through the portal or with
    `dotnet nuget push <package> --source https://api.nuget.org/v3/index.json --api-key <key>`.
 4. **Fast-forward `main` and tag.** Merge the branch into `main` by fast-forward, tag the packed commit
    `v<Agentic.Check version>`, and create the GitHub release at that tag; the package READMEs and the
@@ -82,5 +94,5 @@ only when it changed.
    and install `InnoWvate.Agentic` from nuget.org; then `dna prompt-log` and one agent-created commit.
 6. **Afterwards.** Publish the article. Capture a new baseline collection with the published
    Agentic.Check for future update tests (see [tests/fixtures/README.md](../tests/fixtures/README.md)),
-   and set the next patch version of every package that was published, so dev builds never reuse a
-   published number.
+   and set the next patch version of `Agentic.Check`, so its dev builds never reuse a published
+   number. The other packages keep their number until they change.

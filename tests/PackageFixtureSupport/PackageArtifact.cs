@@ -26,6 +26,42 @@ sealed record PackageArtifact(string Path, string Id, string Version, string Sha
         FixtureFiles.Require(actual == Sha256, $"Package bytes changed: {Path}; expected {Sha256}, actual {actual}");
     }
 
+    // Puts the package in a feed folder. The same bytes may arrive twice, because an unchanged package
+    // is its own published package; the same name with other bytes means a version was reused.
+    internal void CopyInto(string feed)
+    {
+        Verify();
+        string name = System.IO.Path.GetFileName(Path);
+        string destination = System.IO.Path.Combine(feed, name);
+        if (File.Exists(destination))
+        {
+            FixtureFiles.Require(FixtureFiles.Hash(destination) == Sha256,
+                $"The feed already holds different bytes for {name}. A changed package needs a new version; an unchanged one is tested as its published package.");
+            return;
+        }
+
+        File.Copy(Path, destination, false);
+    }
+
+    // The package nuget.org serves under this identity, or null when that version is not published.
+    // CA1308 guards security decisions made on normalized strings; these are URL segments that the
+    // NuGet V3 flat container defines as the lowercase package id and version.
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Globalization", "CA1308:Normalize strings to uppercase", Justification = "The NuGet V3 flat container addresses packages by lowercase id and version; no security decision depends on the result.")]
+    internal static async Task<PackageArtifact?> TryDownloadPublishedAsync(string id, string version)
+    {
+        string lowerId = id.ToLowerInvariant();
+        string lowerVersion = version.ToLowerInvariant();
+        try
+        {
+            return await DownloadAsync(new PublishedToolDefinition(id, version,
+                $"https://api.nuget.org/v3-flatcontainer/{lowerId}/{lowerVersion}/{lowerId}.{lowerVersion}.nupkg")).ConfigureAwait(false);
+        }
+        catch (HttpRequestException exception) when (exception.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+    }
+
     internal static Task<PackageArtifact> DownloadAsync(BaselineDefinition definition)
         => DownloadAsync(new PublishedToolDefinition(definition.InstallerId, definition.InstallerVersion, definition.PackageUrl));
 

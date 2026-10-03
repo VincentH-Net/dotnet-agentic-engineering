@@ -234,10 +234,14 @@ string Summarize(int exitCode)
         using var document = JsonDocument.Parse(content);
         var build = document.RootElement;
         _ = text.AppendLine(CultureInfo.InvariantCulture, $"  origin/{build.GetProperty("branch").GetString()} @ {build.GetProperty("commit").GetString()} ({build.GetProperty("configuration").GetString()})");
+        // An unchanged package is the one nuget.org already serves; only packed ones are uploaded.
+        string?[] unchanged = build.TryGetProperty("published", out var published) ? [.. published.EnumerateArray().Select(id => id.GetString())] : [];
         foreach (string name in packageKinds)
         {
             var package = build.GetProperty(name);
-            _ = text.AppendLine(CultureInfo.InvariantCulture, $"  {package.GetProperty("id").GetString()} {package.GetProperty("version").GetString()}: {package.GetProperty("path").GetString()}");
+            string? id = package.GetProperty("id").GetString();
+            string origin = unchanged.Contains(id) ? "unchanged, already on nuget.org: nothing to upload" : "packed from this commit";
+            _ = text.AppendLine(CultureInfo.InvariantCulture, $"  {id} {package.GetProperty("version").GetString()} ({origin}): {package.GetProperty("path").GetString()}");
             _ = text.AppendLine(CultureInfo.InvariantCulture, $"    SHA256 {package.GetProperty("sha256").GetString()}");
         }
     });

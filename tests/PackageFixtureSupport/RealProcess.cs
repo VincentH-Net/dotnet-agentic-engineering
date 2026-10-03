@@ -107,10 +107,7 @@ sealed class FixtureWorkspace : IDisposable
     }
 
     internal void AddPackage(PackageArtifact package)
-    {
-        package.Verify();
-        File.Copy(package.Path, Path.Combine(Feed, Path.GetFileName(package.Path)), false);
-    }
+        => package.CopyInto(Feed);
 
     internal async Task<string> InstallCheckAsync(PackageArtifact package)
     {

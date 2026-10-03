@@ -58,8 +58,12 @@ It follows this fixed sequence:
 
 1. Build the existing fixture-preparation helper in Release. Invoke its `pack-candidates`
    command, which validates the expected origin, non-default development branch, pushed HEAD,
-   and clean production/content inputs before packing all three Release candidates
-   (`Agentic.Check`, `InnoWvate.Agentic`, and `InnoWvate.Dna`). Release builds of the tool projects
+   and clean production/content inputs before preparing the three Release candidates
+   (`Agentic.Check`, `InnoWvate.Agentic`, and `InnoWvate.Dna`). `Agentic.Check` is always packed and
+   may not carry a version that nuget.org already has. Each of the other two is packed only when its
+   version is not published yet; otherwise its candidate is the published package itself, and
+   preparation fails when that package's sources changed since the commit it was published from.
+   Release builds of the tool projects
    map source paths to repository-relative paths, and packing fails if a Release PDB still contains
    the local checkout path. It records
    package hashes and source provenance and checks source readiness again after packing.
@@ -93,7 +97,8 @@ Each invocation creates a new ignored `tests/TestResults/full-suite/<run-id>/` d
 
 - `summary.txt`: commands, their exit codes, and the final result (absent if forcibly terminated).
   This includes the consolidated overview described below.
-- `candidates/`: exact packages and `candidate-build.json` provenance.
+- `candidates/`: exact packages and `candidate-build.json` provenance, which lists under `published`
+  the unchanged packages taken from nuget.org.
 - `<test-project>/results.trx`: one results file per test project.
 - `pack/` and `network/`: existing source, fixture, gateway, and GitHub budget reports.
 - `network/progress.log`: one line per phase of each package scenario, plus a heartbeat every 30 seconds
