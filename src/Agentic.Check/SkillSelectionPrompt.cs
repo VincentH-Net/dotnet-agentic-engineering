@@ -483,10 +483,11 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
 
 sealed class RecommendationSelectionPrompt(IAnsiConsole console, IRecommendationPreviewSource? previewSource = null)
 {
-    internal const int MaxVisibleItems = 24;
+    // Five rows under their kind, repository and plugin headers: what the list still shows in a very short window.
+    internal const int MinListRows = 8;
 
-    // The preview shows as many rows as the list, so opening and closing it keeps one screen region.
-    internal const int PreviewPageSize = MaxVisibleItems;
+    // The blank line, title, position and key help above the preview content, and the cursor line below it.
+    internal const int PreviewChromeRows = 5;
 
     int previousRenderLineCount;
 
@@ -725,49 +726,108 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console, IRecommendation
         await ShowPreviewAsync(preview, cancellationToken).ConfigureAwait(false);
     }
 
-    // Scrolls the preview in the same screen region as the list; closing it hands that region back.
+    // Scrolls the preview on the alternate screen, so closing it leaves the list and everything above it untouched.
+    // A terminal without one shows the preview over the list instead, growing that screen region to the window.
     async Task ShowPreviewAsync(RecommendationPreview preview, CancellationToken cancellationToken)
     {
         int width = Math.Max(20, console.Profile.Width - 1);
         string[] lines = [.. WrapLines(preview.Lines, width)];
-        int offset = 0;
-        while (true)
+        int listRenderLineCount = previousRenderLineCount;
+        using var alternateScreen = console.Profile.Capabilities is { Ansi: true, AlternateBuffer: true } ? new AlternateScreen(console) : null;
+        if (alternateScreen is not null)
         {
-            RenderPreview(preview.Title, lines, offset);
-            var key = await console.Input.ReadKeyAsync(true, cancellationToken).ConfigureAwait(false);
-            if (key is null)
-            {
-                continue;
-            }
+            previousRenderLineCount = 0;
+        }
 
-            int? next = NextPreviewOffset(key.Value.Key, offset);
-            if (next is null)
+        try
+        {
+            int offset = 0;
+            while (true)
             {
-                return;
-            }
+                // Read for every render, so a resized window is used from the next key on.
+                int pageSize = PreviewPageSize(console.Profile.Height);
+                offset = ClampPreviewOffset(offset, lines.Length, pageSize);
+                RenderPreview(preview.Title, lines, offset, pageSize);
+                var key = await console.Input.ReadKeyAsync(true, cancellationToken).ConfigureAwait(false);
+                if (key is null)
+                {
+                    continue;
+                }
 
-            offset = ClampPreviewOffset(next.Value, lines.Length);
+                int? next = NextPreviewOffset(key.Value.Key, offset, pageSize);
+                if (next is null)
+                {
+                    return;
+                }
+
+                offset = next.Value;
+            }
+        }
+        finally
+        {
+            if (alternateScreen is not null)
+            {
+                previousRenderLineCount = listRenderLineCount;
+            }
         }
     }
+
+    // What a pager does: the preview takes the whole window, and leaving puts the screen back as it was.
+    sealed class AlternateScreen : IDisposable
+    {
+        internal const string Enter = "\u001b[?1049h\u001b[H";
+        internal const string Leave = "\u001b[?1049l";
+
+        readonly IAnsiConsole console;
+        int entered = 1;
+
+        internal AlternateScreen(IAnsiConsole console)
+        {
+            this.console = console;
+            console.Write(new ControlCode(Enter));
+            // Ctrl+C ends the process without unwinding to Dispose, which would leave the shell on this screen.
+            Console.CancelKeyPress += OnCancelKeyPress;
+        }
+
+        public void Dispose()
+        {
+            Console.CancelKeyPress -= OnCancelKeyPress;
+            LeaveOnce();
+        }
+
+        void OnCancelKeyPress(object? sender, ConsoleCancelEventArgs e) => LeaveOnce();
+
+        void LeaveOnce()
+        {
+            if (Interlocked.Exchange(ref entered, 0) == 1)
+            {
+                console.Write(new ControlCode(Leave));
+            }
+        }
+    }
+
+    // A page fills the window. A taller one would scroll the preview's own title off the top.
+    internal static int PreviewPageSize(int windowHeight)
+        => Math.Max(1, windowHeight - PreviewChromeRows);
 
     // null closes the preview; any other key keeps it open, scrolling when the key says so.
     // Space and b page like less does, because macOS terminals keep Page Up/Down and Home/End for
     // their own scrollback; those keys still work where the terminal passes them through.
-    internal static int? NextPreviewOffset(ConsoleKey key, int offset)
+    internal static int? NextPreviewOffset(ConsoleKey key, int offset, int pageSize)
         => key switch
         {
             ConsoleKey.Escape or ConsoleKey.F3 or ConsoleKey.Enter or ConsoleKey.Q => null,
             ConsoleKey.UpArrow => offset - 1,
             ConsoleKey.DownArrow => offset + 1,
-            ConsoleKey.PageUp or ConsoleKey.B => offset - PreviewPageSize,
-            ConsoleKey.PageDown or ConsoleKey.Spacebar => offset + PreviewPageSize,
+            ConsoleKey.PageUp or ConsoleKey.B => offset - pageSize,
+            ConsoleKey.PageDown or ConsoleKey.Spacebar => offset + pageSize,
             ConsoleKey.Home => 0,
             ConsoleKey.End => int.MaxValue,
             _ => offset
         };
 
-    internal static int ClampPreviewOffset(int offset, int lineCount)
-        => Math.Clamp(offset, 0, Math.Max(0, lineCount - PreviewPageSize));
+    internal static int ClampPreviewOffset(int offset, int lineCount, int pageSize)
+        => Math.Clamp(offset, 0, Math.Max(0, lineCount - pageSize));
 
     // Lines longer than the console wrap on screen, which would break the in-place line count;
     // wrapping them up front keeps every rendered row one line.
@@ -788,21 +848,21 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console, IRecommendation
         }
     }
 
-    internal static string FormatPreviewPositionLine(int offset, int lineCount)
-        => lineCount <= PreviewPageSize
+    internal static string FormatPreviewPositionLine(int offset, int lineCount, int pageSize)
+        => lineCount <= pageSize
             ? string.Empty
             : string.Create(
                 System.Globalization.CultureInfo.InvariantCulture,
-                $"Lines {offset + 1}–{Math.Min(lineCount, offset + PreviewPageSize)} of {lineCount}");
+                $"Lines {offset + 1}–{Math.Min(lineCount, offset + pageSize)} of {lineCount}");
 
-    internal static string FormatPreviewKeyHelpLine(int lineCount)
-        => (lineCount <= PreviewPageSize
+    internal static string FormatPreviewKeyHelpLine(int lineCount, int pageSize)
+        => (lineCount <= pageSize
                 ? string.Empty
                 : ToolHeader.KeyMarkup("↑") + InfoText(" ") + ToolHeader.KeyMarkup("↓") + InfoText(" scroll, ")
                     + ToolHeader.KeyMarkup("space") + InfoText(" ") + ToolHeader.KeyMarkup("b") + InfoText(" page, "))
             + ToolHeader.KeyMarkup("Esc") + InfoText(" close preview");
 
-    void RenderPreview(string title, string[] lines, int offset)
+    void RenderPreview(string title, string[] lines, int offset, int pageSize)
     {
         if (previousRenderLineCount > 0 && !Console.IsOutputRedirected)
         {
@@ -821,19 +881,19 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console, IRecommendation
         console.WriteLine();
         lineCount++;
         MarkupLine($"[bold]{Markup.Escape($"Preview: {title}")}[/]");
-        string position = FormatPreviewPositionLine(offset, lines.Length);
+        string position = FormatPreviewPositionLine(offset, lines.Length, pageSize);
         if (position.Length > 0)
         {
             MarkupLine($"[{SpectreReporter.InfoColor}]{Markup.Escape(position)}[/]");
         }
 
-        MarkupLine(FormatPreviewKeyHelpLine(lines.Length));
+        MarkupLine(FormatPreviewKeyHelpLine(lines.Length, pageSize));
         if (lines.Length == 0)
         {
             MarkupLine("[grey]The preview is empty.[/]");
         }
 
-        for (int index = offset; index < Math.Min(lines.Length, offset + PreviewPageSize); index++)
+        for (int index = offset; index < Math.Min(lines.Length, offset + pageSize); index++)
         {
             MarkupLine(lines[index].Length == 0 ? " " : Markup.Escape(lines[index]));
         }
@@ -878,9 +938,11 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console, IRecommendation
             return;
         }
 
+        // The list gets the rows the window has left under the lines above, less the cursor line below it.
         var (visibleStartIndex, visibleItems) = GetVisibleItems(
             state.FilteredItems,
             state.CursorIndex,
+            Math.Max(MinListRows, console.Profile.Height - 1 - lineCount),
             item => 1 + (ShouldShowDuplicateDetails(state, item) ? 1 + state.GetDuplicateLocations(item).Count : 0));
         int visibleEndIndex = visibleStartIndex + visibleItems.Count;
         if (visibleItems.Count < state.FilteredItems.Count)
@@ -890,9 +952,6 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console, IRecommendation
                 $"[grey]Items {visibleStartIndex + 1}–{visibleEndIndex} of {state.FilteredItems.Count}[/]"));
         }
 
-        RecommendationSelectionKind? lastKind = null;
-        string? lastSkillSourceRepo = null;
-        string? lastSkillPlugin = null;
         bool showVersionColumn = visibleItems.Any(item => !string.IsNullOrWhiteSpace(item.Version));
         int versionColumnStart = showVersionColumn ? CalculateVersionColumnStart(state.FilteredItems) : 0;
         if (showVersionColumn)
@@ -903,42 +962,25 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console, IRecommendation
         if (visibleStartIndex > 0)
             MarkupLine(FormatOverflowIndicator(visibleStartIndex, above: true));
 
-        string[] visibleSkillSourceReposWithoutPluginHeaders = [.. visibleItems
-            .Select(item => item.Skill)
-            .OfType<SkillManifestEntry>()
-            .GroupBy(skill => skill.SourceRepo, StringComparer.OrdinalIgnoreCase)
-            .Where(group => !SkillGroupHeaderPolicy.ShouldShowPluginHeaders(group.Key, group.Select(skill => skill.Plugin)))
-            .Select(group => group.Key)];
+        GroupHeaders groupHeaders = new(visibleItems);
         for (int index = 0; index < visibleItems.Count; index++)
         {
             int itemIndex = visibleStartIndex + index;
             var item = visibleItems[index];
-            if (item.Kind != lastKind)
+            var (kindHeader, sourceHeader, pluginHeader) = groupHeaders.Next(item);
+            if (kindHeader)
             {
                 MarkupLine(FormatRecommendationKindHeaderMarkup(item.Kind));
-
-                lastKind = item.Kind;
-                lastSkillSourceRepo = null;
-                lastSkillPlugin = null;
             }
 
-            if (item.Skill is { IsCompanion: false, IsDna: false, IsCodexRules: false, IsReadmeBadge: false })
+            if (sourceHeader)
             {
-                string skillSourceRepo = item.Skill.SourceRepo;
-                bool showPluginHeaders = !visibleSkillSourceReposWithoutPluginHeaders.Contains(skillSourceRepo, StringComparer.OrdinalIgnoreCase);
-                if (!skillSourceRepo.Equals(lastSkillSourceRepo, StringComparison.OrdinalIgnoreCase))
-                {
-                    MarkupLine(FormatRecommendationSourceHeaderMarkup(skillSourceRepo, state.Filter));
-                    lastSkillSourceRepo = skillSourceRepo;
-                    lastSkillPlugin = null;
-                }
+                MarkupLine(FormatRecommendationSourceHeaderMarkup(item.Skill!.SourceRepo, state.Filter));
+            }
 
-                string skillPlugin = item.Skill.Plugin;
-                if (showPluginHeaders && !skillPlugin.Equals(lastSkillPlugin, StringComparison.OrdinalIgnoreCase))
-                {
-                    MarkupLine(FormatRecommendationPluginHeaderMarkup(skillPlugin, state.Filter));
-                    lastSkillPlugin = skillPlugin;
-                }
+            if (pluginHeader)
+            {
+                MarkupLine(FormatRecommendationPluginHeaderMarkup(item.Skill!.Plugin, state.Filter));
             }
 
             string cursor = itemIndex == state.CursorIndex ? ">" : " ";
@@ -1075,68 +1117,110 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console, IRecommendation
     static string InfoText(string value)
         => $"[{SpectreReporter.InfoColor}]{Markup.Escape(value)}[/]";
 
-    internal static (int StartIndex, IReadOnlyList<RecommendationSelectionItem> Items) GetVisibleItems(
-        IReadOnlyList<RecommendationSelectionItem> items,
-        int cursorIndex)
-    {
-        if (items.Count <= MaxVisibleItems)
-        {
-            return (0, items);
-        }
-
-        int startIndex = Math.Clamp(cursorIndex - (MaxVisibleItems / 2), 0, items.Count - MaxVisibleItems);
-        return (startIndex, [.. items.Skip(startIndex).Take(MaxVisibleItems)]);
-    }
-
+    // The widest run of items around the cursor whose rows, group headers and paging lines fit the row budget.
     internal static (int StartIndex, IReadOnlyList<RecommendationSelectionItem> Items) GetVisibleItems(
         IReadOnlyList<RecommendationSelectionItem> items,
         int cursorIndex,
-        Func<RecommendationSelectionItem, int> visualRowCount)
+        int rowBudget,
+        Func<RecommendationSelectionItem, int> itemRows)
     {
-        int totalRows = items.Sum(visualRowCount);
-        if (totalRows <= MaxVisibleItems)
+        if (ListRows(items, 0, items.Count, itemRows) <= rowBudget)
         {
             return (0, items);
         }
 
-        int startIndex = Math.Clamp(cursorIndex - (MaxVisibleItems / 2), 0, Math.Max(0, items.Count - 1));
-        while (startIndex > 0 && VisualRows(items, startIndex, cursorIndex, visualRowCount) < MaxVisibleItems / 2)
+        // Growing in turn below and above the cursor keeps it centered while scrolling.
+        int start = Math.Clamp(cursorIndex, 0, items.Count - 1);
+        int end = start + 1;
+        bool grew = true;
+        while (grew)
         {
-            startIndex--;
-        }
-
-        List<RecommendationSelectionItem> visibleItems = [];
-        int visibleRows = 0;
-        for (int index = startIndex; index < items.Count; index++)
-        {
-            int itemRows = visualRowCount(items[index]);
-            if (visibleItems.Count > 0 && visibleRows + itemRows > MaxVisibleItems)
+            grew = false;
+            if (end < items.Count && ListRows(items, start, end + 1, itemRows) <= rowBudget)
             {
-                break;
+                end++;
+                grew = true;
             }
 
-            visibleItems.Add(items[index]);
-            visibleRows += itemRows;
+            if (start > 0 && ListRows(items, start - 1, end, itemRows) <= rowBudget)
+            {
+                start--;
+                grew = true;
+            }
         }
 
-        if (!visibleItems.Contains(items[cursorIndex]) && cursorIndex < items.Count)
-        {
-            var (_, fallbackItems) = GetVisibleItems([.. items.Skip(cursorIndex)], 0, visualRowCount);
-            return (cursorIndex, fallbackItems);
-        }
-
-        return (startIndex, visibleItems);
+        return (start, [.. items.Skip(start).Take(end - start)]);
     }
 
-    static int VisualRows(
+    // The rows Render writes for these items: the range and column header lines, the overflow indicators,
+    // the group headers and the items themselves.
+    internal static int ListRows(
         IReadOnlyList<RecommendationSelectionItem> items,
-        int startIndex,
-        int endIndex,
-        Func<RecommendationSelectionItem, int> visualRowCount)
-        => items
-            .Skip(startIndex)
-            .Take(Math.Max(0, endIndex - startIndex + 1))
-            .Sum(visualRowCount);
+        int start,
+        int end,
+        Func<RecommendationSelectionItem, int> itemRows)
+    {
+        RecommendationSelectionItem[] visibleItems = [.. items.Skip(start).Take(end - start)];
+        int rows = (visibleItems.Length < items.Count ? 1 : 0)
+            + (visibleItems.Any(item => !string.IsNullOrWhiteSpace(item.Version)) ? 1 : 0)
+            + (start > 0 ? 1 : 0)
+            + (end < items.Count ? 1 : 0);
+        GroupHeaders groupHeaders = new(visibleItems);
+        foreach (var item in visibleItems)
+        {
+            var (kindHeader, sourceHeader, pluginHeader) = groupHeaders.Next(item);
+            rows += (kindHeader ? 1 : 0) + (sourceHeader ? 1 : 0) + (pluginHeader ? 1 : 0) + itemRows(item);
+        }
+
+        return rows;
+    }
+
+    // Which group headers each visible item needs above it, for rendering and for measuring alike.
+    sealed class GroupHeaders(IReadOnlyList<RecommendationSelectionItem> visibleItems)
+    {
+        readonly string[] sourceReposWithoutPluginHeaders = [.. visibleItems
+            .Select(item => item.Skill)
+            .OfType<SkillManifestEntry>()
+            .GroupBy(skill => skill.SourceRepo, StringComparer.OrdinalIgnoreCase)
+            .Where(group => !SkillGroupHeaderPolicy.ShouldShowPluginHeaders(group.Key, group.Select(skill => skill.Plugin)))
+            .Select(group => group.Key)];
+
+        RecommendationSelectionKind? lastKind;
+        string? lastSourceRepo;
+        string? lastPlugin;
+
+        internal (bool Kind, bool Source, bool Plugin) Next(RecommendationSelectionItem item)
+        {
+            bool kind = item.Kind != lastKind;
+            if (kind)
+            {
+                lastKind = item.Kind;
+                lastSourceRepo = null;
+                lastPlugin = null;
+            }
+
+            if (item.Skill is not { IsCompanion: false, IsDna: false, IsCodexRules: false, IsReadmeBadge: false } skill)
+            {
+                return (kind, false, false);
+            }
+
+            bool source = !skill.SourceRepo.Equals(lastSourceRepo, StringComparison.OrdinalIgnoreCase);
+            if (source)
+            {
+                lastSourceRepo = skill.SourceRepo;
+                lastPlugin = null;
+            }
+
+            bool plugin = !sourceReposWithoutPluginHeaders.Contains(skill.SourceRepo, StringComparer.OrdinalIgnoreCase)
+                && !skill.Plugin.Equals(lastPlugin, StringComparison.OrdinalIgnoreCase);
+            if (plugin)
+            {
+                lastPlugin = skill.Plugin;
+            }
+
+            return (kind, source, plugin);
+        }
+    }
 
     void FinishRender(int currentRenderLineCount)
     {

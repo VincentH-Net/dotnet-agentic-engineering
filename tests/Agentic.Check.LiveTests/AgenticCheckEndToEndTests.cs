@@ -138,6 +138,119 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
 
     [Fact]
     [Trait("Category", "EndToEnd")]
+    public async Task F3PreviewFillsTheTerminalHeight()
+    {
+        if (IsUnsupportedPlatform())
+        {
+            return;
+        }
+
+        const int windowRows = 50;
+        string firstPage = string.Empty;
+        string lastPage = string.Empty;
+        string afterClose = string.Empty;
+        bool openedOnAlternateScreen = false;
+        bool closedOnAlternateScreen = true;
+        using var workspace = await TestWorkspace.CreateAsync(nameof(F3PreviewFillsTheTerminalHeight)).ConfigureAwait(true);
+        _ = await RunInteractiveCommandAsync(workspace, $"--agents codex {Quote(workspace.RepoPath)}", async auto =>
+        {
+            await auto.WaitUntilTextAsync("dotnet-livecharts2 (install)").ConfigureAwait(true);
+            await auto.TypeAsync("foundation-prompt-log").ConfigureAwait(true);
+            await auto.WaitUntilTextAsync("Filter: foundation-prompt-log").ConfigureAwait(true);
+            await auto.KeyAsync(Hex1bKey.F3).ConfigureAwait(true);
+            await auto.WaitUntilTextAsync("Esc close preview").ConfigureAwait(true);
+            firstPage = ScreenText(auto);
+            using (var snapshot = auto.CreateSnapshot())
+            {
+                openedOnAlternateScreen = snapshot.InAlternateScreen;
+            }
+
+            await auto.KeyAsync(Hex1bKey.End).ConfigureAwait(true);
+            await auto.WaitUntilTextAsync("<!-- foundation-prompt-log:end -->").ConfigureAwait(true);
+            lastPage = ScreenText(auto);
+            await auto.EscapeAsync().ConfigureAwait(true);
+            await auto.WaitUntilTextAsync("[x] foundation-prompt-log").ConfigureAwait(true);
+            using (var snapshot = auto.CreateSnapshot())
+            {
+                closedOnAlternateScreen = snapshot.InAlternateScreen;
+                afterClose = snapshot.GetScreenText();
+            }
+
+            await auto.EscapeAsync().ConfigureAwait(true);
+            await auto.WaitUntilTextAsync("Type to filter").ConfigureAwait(true);
+            await auto.LeftAsync().ConfigureAwait(true);
+            await auto.EnterAsync().ConfigureAwait(true);
+        }, rows: windowRows).ConfigureAwait(true);
+
+        // The title, the position line, the key help and a full page of content share the window with the
+        // cursor line below them, and the title stays on screen instead of scrolling off the top.
+        Assert.Contains("Preview: foundation-prompt-log directive", firstPage, StringComparison.Ordinal);
+        Assert.Contains($"Lines 1–{windowRows - 5} of ", firstPage, StringComparison.Ordinal);
+        Assert.Contains("Preview: foundation-prompt-log directive", lastPage, StringComparison.Ordinal);
+
+        // The view is on the alternate screen, so closing it brings back the list with the summary table above it.
+        Assert.True(openedOnAlternateScreen);
+        Assert.False(closedOnAlternateScreen);
+        Assert.DoesNotContain("Preview:", afterClose, StringComparison.Ordinal);
+        Assert.Contains("Recommended skills", afterClose, StringComparison.Ordinal);
+        Assert.Contains("select which to apply:", afterClose, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    [Trait("Category", "EndToEnd")]
+    public async Task CtrlCInTheF3PreviewReturnsTheShellToTheNormalScreen()
+    {
+        if (IsUnsupportedPlatform())
+        {
+            return;
+        }
+
+        using var workspace = await TestWorkspace.CreateAsync(nameof(CtrlCInTheF3PreviewReturnsTheShellToTheNormalScreen)).ConfigureAwait(true);
+        var result = await RunInteractiveCommandAsync(workspace, $"--agents codex {Quote(workspace.RepoPath)}", async auto =>
+        {
+            await auto.WaitUntilTextAsync("dotnet-livecharts2 (install)").ConfigureAwait(true);
+            await auto.TypeAsync("foundation-prompt-log").ConfigureAwait(true);
+            await auto.WaitUntilTextAsync("Filter: foundation-prompt-log").ConfigureAwait(true);
+            await auto.KeyAsync(Hex1bKey.F3).ConfigureAwait(true);
+            await auto.WaitUntilAlternateScreenAsync().ConfigureAwait(true);
+            await auto.WaitUntilTextAsync("Esc close preview").ConfigureAwait(true);
+            await auto.Ctrl().KeyAsync(Hex1bKey.C).ConfigureAwait(true);
+            await auto.WaitUntilAsync(snapshot => !snapshot.InAlternateScreen, timeout: TimeSpan.FromSeconds(10), description: "Back on the normal screen").ConfigureAwait(true);
+        }, expectedExitCode: 130, rows: 50).ConfigureAwait(true);
+
+        // The shell is back where the tool was started, with the list it interrupted still above the prompt.
+        Assert.DoesNotContain("Preview:", result.Screen, StringComparison.Ordinal);
+        Assert.Contains("select which to apply:", result.Screen, StringComparison.Ordinal);
+        Assert.DoesNotContain(" skill install ", await workspace.ReadGhLogAsync().ConfigureAwait(true), StringComparison.Ordinal);
+    }
+
+    static string ScreenText(Hex1bTerminalAutomator auto)
+    {
+        using var snapshot = auto.CreateSnapshot();
+        return snapshot.GetScreenText();
+    }
+
+    // The "Items 7–30 of 84" line the list shows while it is paged.
+    static (int First, int Last, int Total)? ReadRange(string screen)
+    {
+        string? line = screen.Split('\n').Select(line => line.Trim()).FirstOrDefault(line => line.StartsWith("Items ", StringComparison.Ordinal) && line.Contains(" of ", StringComparison.Ordinal));
+        if (line is null)
+        {
+            return null;
+        }
+
+        string[] words = line.Split(' ');
+        string[] bounds = words[1].Split('–');
+        return bounds.Length == 2
+            && int.TryParse(bounds[0], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out int first)
+            && int.TryParse(bounds[1], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out int last)
+            && int.TryParse(words[^1], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out int total)
+                ? (first, last, total)
+                : null;
+    }
+
+    [Fact]
+    [Trait("Category", "EndToEnd")]
     public async Task ReadmeBadgeIsOfferedSelectedAndAddedWhenKept()
     {
         if (IsUnsupportedPlatform())
@@ -773,32 +886,24 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
             async auto =>
             {
                 await auto.WaitUntilTextAsync("Recommend ", timeout: TimeSpan.FromSeconds(45)).ConfigureAwait(true);
-                await auto.WaitUntilTextAsync("Items 1–24 of", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
-                int total;
-                using (var snapshot = auto.CreateSnapshot())
-                {
-                    string range = Assert.Single(snapshot.GetScreenText().Split('\n'), line => line.Trim().StartsWith("Items 1–24 of ", StringComparison.Ordinal));
-                    total = int.Parse(range.Trim().Split(' ')[^1], System.Globalization.CultureInfo.InvariantCulture);
-                }
+                var (_, topLast, total) = await WaitForRangeAsync(range => range.First == 1, "the top of the list").ConfigureAwait(true);
+                Assert.True(topLast < total, "Expected a list longer than the window.");
+                await WaitForOverflowAsync(0, total - topLast).ConfigureAwait(true);
 
-                await WaitForOverflowAsync(0, total - 24).ConfigureAwait(true);
                 for (int index = 0; index < 30; index++)
                 {
                     await auto.DownAsync().ConfigureAwait(true);
                 }
 
-                await auto.WaitUntilTextAsync($"Items 19–42 of {total}", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
-                await WaitForOverflowAsync(18, total - 42).ConfigureAwait(true);
+                // The cursor is on item 31, which scrolled into view with items on both sides still hidden.
+                var (middleFirst, middleLast, _) = await WaitForRangeAsync(range => range.First > 1 && range.Last >= 31, "item 31 in view").ConfigureAwait(true);
+                Assert.True(middleFirst <= 31 && middleLast < total, $"Unexpected range {middleFirst}–{middleLast}.");
+                await WaitForOverflowAsync(middleFirst - 1, total - middleLast).ConfigureAwait(true);
 
-                for (int index = 30; index < total - 13; index++)
+                for (int index = 30; index < total - 1; index++)
                     await auto.DownAsync().ConfigureAwait(true);
-                await auto.WaitUntilTextAsync($"Items {total - 24}–{total - 1} of {total}").ConfigureAwait(true);
-                await WaitForOverflowAsync(total - 25, 1).ConfigureAwait(true);
-
-                for (int index = 0; index < 12; index++)
-                    await auto.DownAsync().ConfigureAwait(true);
-                await auto.WaitUntilTextAsync($"Items {total - 12}–{total} of {total}").ConfigureAwait(true);
-                await WaitForOverflowAsync(total - 13, 0).ConfigureAwait(true);
+                var (bottomFirst, _, _) = await WaitForRangeAsync(range => range.Last == total, "the end of the list").ConfigureAwait(true);
+                await WaitForOverflowAsync(bottomFirst - 1, 0).ConfigureAwait(true);
 
                 await auto.TypeAsync("t").ConfigureAwait(true);
                 await auto.WaitUntilTextAsync("Filter: t", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
@@ -823,8 +928,8 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
                 await auto.WaitUntilTextAsync("No recommendations match the current filter.").ConfigureAwait(true);
                 await WaitForOverflowAsync(0, 0).ConfigureAwait(true);
                 await auto.EscapeAsync().ConfigureAwait(true);
-                await auto.WaitUntilTextAsync($"Items 1–24 of {total}").ConfigureAwait(true);
-                await WaitForOverflowAsync(0, total - 24).ConfigureAwait(true);
+                await auto.WaitUntilTextAsync($"Items 1–{topLast} of {total}").ConfigureAwait(true);
+                await WaitForOverflowAsync(0, total - topLast).ConfigureAwait(true);
 
                 await auto.LeftAsync().ConfigureAwait(true);
                 await auto.EnterAsync().ConfigureAwait(true);
@@ -840,7 +945,21 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
                                 ? !screen.Contains("more items below", StringComparison.Ordinal) && !screen.Contains("more item below", StringComparison.Ordinal)
                                 : screen.Contains($"↓ {below} more {(below == 1 ? "item" : "items")} below", StringComparison.Ordinal));
                     }, timeout: TimeSpan.FromSeconds(10), description: $"Overflow indicators: {above} above, {below} below");
-            }).ConfigureAwait(true);
+
+                // Waits for a range line that matches, with the whole prompt in the window: its heading has not
+                // scrolled off the top.
+                async Task<(int First, int Last, int Total)> WaitForRangeAsync(Func<(int First, int Last, int Total), bool> matches, string description)
+                {
+                    await auto.WaitUntilAsync(
+                        snapshot => ReadRange(snapshot.GetScreenText()) is { } range && matches(range),
+                        timeout: TimeSpan.FromSeconds(10),
+                        description: $"Item range: {description}").ConfigureAwait(true);
+                    string screen = ScreenText(auto);
+                    Assert.Contains("select which to apply:", screen, StringComparison.Ordinal);
+                    return ReadRange(screen)!.Value;
+                }
+            },
+            rows: 40).ConfigureAwait(true);
 
         Assert.Equal(0, result.ExitCode);
         Assert.DoesNotContain(" skill install ", await workspace.ReadGhLogAsync().ConfigureAwait(true), StringComparison.Ordinal);
@@ -1134,11 +1253,12 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
         TestWorkspace workspace,
         string arguments,
         Func<Hex1bTerminalAutomator, Task> interact,
-        int expectedExitCode = 0)
+        int expectedExitCode = 0,
+        int rows = DefaultTerminalRows)
     {
         output.WriteLine($"Hex1b recording: {workspace.RecordingPath}");
         TerminalRunResult result;
-        var terminal = CreateTerminal(workspace);
+        var terminal = CreateTerminal(workspace, rows);
         await using (terminal.ConfigureAwait(true))
         {
             using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(180));
@@ -1197,12 +1317,15 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
         return $"TERM=xterm-256color HOME={Quote(workspace.HomePath)} XDG_CONFIG_HOME={Quote(Path.Combine(workspace.HomePath, ".config"))} GH_TOKEN= GITHUB_TOKEN= GH_CONFIG_DIR={Quote(Path.Combine(workspace.RootPath, "gh"))} AGENTIC_CHECK_CACHE_SECONDS=3600 AGENTIC_CHECK_CACHE_DIR={Quote(Path.Combine(workspace.RootPath, "cache"))} AGENTIC_CHECK_GH_LOG={Quote(workspace.GhLogPath)} AGENTIC_CHECK_NUGET_INDEX={Quote(workspace.NuGetIndexPath)} PATH={Quote(path)} {Quote(Path.ChangeExtension(ToolAssemblyPath, null))} {arguments}";
     }
 
-    static Hex1bTerminal CreateTerminal(TestWorkspace workspace)
+    // Tall enough that no prompt has to scroll, unless a test asks for a real window height.
+    const int DefaultTerminalRows = 260;
+
+    static Hex1bTerminal CreateTerminal(TestWorkspace workspace, int rows = DefaultTerminalRows)
     {
         string path = workspace.BinPath + Path.PathSeparator + HostPath.WithoutGlobalTools();
         return Hex1bTerminal.CreateBuilder()
             .WithHeadless()
-            .WithDimensions(300, 260)
+            .WithDimensions(300, rows)
             .WithPtyProcess(options =>
             {
                 options.FileName = "/bin/bash";

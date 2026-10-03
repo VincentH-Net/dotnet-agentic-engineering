@@ -8,6 +8,9 @@ public sealed class RecommendationPreviewTests
     const string SkillName = "dotnet-livecharts2";
     const string WorkingDirectory = "/work";
 
+    // The content rows of a preview in the test console's window.
+    const int PageSize = 24;
+
     // What gh skill preview prints when its output is captured: a file tree, then rendered markdown
     // padded to the wrap width, plus a hidden-directory notice on stderr.
     const string GhPreviewOutput = "[plugins] dotnet/dotnet-livecharts2/\n└── SKILL.md\n\n# LiveCharts2 Development Guide      \n\x1b[1mUse\x1b[0m when implementing charts.\n\n\n";
@@ -118,7 +121,7 @@ public sealed class RecommendationPreviewTests
     [InlineData(ConsoleKey.End, 5, int.MaxValue)]
     [InlineData(ConsoleKey.A, 5, 5)]
     public void PreviewKeysScrollOrClose(ConsoleKey key, int offset, int? expected)
-        => Assert.Equal(expected, RecommendationSelectionPrompt.NextPreviewOffset(key, offset));
+        => Assert.Equal(expected, RecommendationSelectionPrompt.NextPreviewOffset(key, offset, PageSize));
 
     [Theory]
     [InlineData(-3, 10, 0)]
@@ -126,7 +129,14 @@ public sealed class RecommendationPreviewTests
     [InlineData(99, 30, 6)]
     [InlineData(3, 30, 3)]
     public void PreviewOffsetStaysWithinTheContent(int offset, int lineCount, int expected)
-        => Assert.Equal(expected, RecommendationSelectionPrompt.ClampPreviewOffset(offset, lineCount));
+        => Assert.Equal(expected, RecommendationSelectionPrompt.ClampPreviewOffset(offset, lineCount, PageSize));
+
+    [Theory]
+    [InlineData(50, 45)]
+    [InlineData(29, PageSize)]
+    [InlineData(3, 1)]
+    public void PreviewPageFillsTheWindowBelowItsHeaderRows(int windowHeight, int expected)
+        => Assert.Equal(expected, RecommendationSelectionPrompt.PreviewPageSize(windowHeight));
 
     [Fact]
     public void LongLinesWrapToTheConsoleWidthSoEveryRowIsOneLine()
@@ -137,10 +147,10 @@ public sealed class RecommendationPreviewTests
     [Fact]
     public void PositionAndKeyHelpAppearOnlyWhenThePreviewScrolls()
     {
-        Assert.Equal(string.Empty, RecommendationSelectionPrompt.FormatPreviewPositionLine(0, RecommendationSelectionPrompt.PreviewPageSize));
-        Assert.Equal("Lines 7–30 of 30", RecommendationSelectionPrompt.FormatPreviewPositionLine(6, 30));
-        Assert.Equal("Esc close preview", Spectre.Console.Markup.Remove(RecommendationSelectionPrompt.FormatPreviewKeyHelpLine(3)));
-        Assert.Equal("↑ ↓ scroll, space b page, Esc close preview", Spectre.Console.Markup.Remove(RecommendationSelectionPrompt.FormatPreviewKeyHelpLine(30)));
+        Assert.Equal(string.Empty, RecommendationSelectionPrompt.FormatPreviewPositionLine(0, PageSize, PageSize));
+        Assert.Equal("Lines 7–30 of 30", RecommendationSelectionPrompt.FormatPreviewPositionLine(6, 30, PageSize));
+        Assert.Equal("Esc close preview", Spectre.Console.Markup.Remove(RecommendationSelectionPrompt.FormatPreviewKeyHelpLine(3, PageSize)));
+        Assert.Equal("↑ ↓ scroll, space b page, Esc close preview", Spectre.Console.Markup.Remove(RecommendationSelectionPrompt.FormatPreviewKeyHelpLine(30, PageSize)));
     }
 
     [Fact]
@@ -234,11 +244,58 @@ public sealed class RecommendationPreviewTests
         Assert.DoesNotContain("Preview", noSource.Output, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task PromptShowsThePreviewOnTheAlternateScreenAndLeavesItOnClose()
+    {
+        using var console = CreateConsole();
+        console.EmitAnsiSequences = true;
+        console.Profile.Capabilities.Ansi = true;
+        console.Profile.Capabilities.AlternateBuffer = true;
+        FakeCommandRunner runner = new();
+        DirectivePlanItem directive = new("foundation-prompt-log", DirectiveStatuses.Missing, "## Prompt Log\nBody line.");
+        console.Input.PushKey(ConsoleKey.F3);
+        console.Input.PushKey(ConsoleKey.Escape);
+        console.Input.PushKey(ConsoleKey.Enter);
+
+        _ = await Prompt(console, runner).PromptAsync([directive], [], NoDuplicates(), NothingElsewhere(), CancellationToken.None);
+
+        int enter = console.Output.IndexOf("\u001b[?1049h\u001b[H", StringComparison.Ordinal);
+        int preview = console.Output.IndexOf("Preview: foundation-prompt-log directive", StringComparison.Ordinal);
+        int leave = console.Output.IndexOf("\u001b[?1049l", StringComparison.Ordinal);
+        Assert.True(enter >= 0 && enter < preview && preview < leave, console.Output);
+        Assert.Equal(1, Occurrences(console.Output, "\u001b[?1049h"));
+        Assert.Equal(1, Occurrences(console.Output, "\u001b[?1049l"));
+        // The list is drawn again on the restored screen.
+        Assert.True(console.Output.LastIndexOf("Recommend 1 action(s)", StringComparison.Ordinal) > leave);
+    }
+
+    [Fact]
+    public async Task PromptListFillsTheWindowWithoutOutgrowingIt()
+    {
+        using var console = CreateConsole();
+        console.Profile.Height = 20;
+        DirectivePlanItem[] directives = [.. Enumerable.Range(1, 3).Select(index => new DirectivePlanItem($"directive-{index}", DirectiveStatuses.Missing, "content"))];
+        SkillManifestEntry[] skills =
+        [
+            .. Enumerable.Range(1, 20).Select(index => new SkillManifestEntry("owner/alpha", $"alpha-{index}", $"alpha-{index}", TechnologyNames.Dotnet, [])),
+            .. Enumerable.Range(1, 20).Select(index => new SkillManifestEntry("owner/beta", $"beta-{index}", $"beta-{index}", TechnologyNames.Dotnet, []))
+        ];
+        console.Input.PushKey(ConsoleKey.Enter);
+
+        _ = await new RecommendationSelectionPrompt(console).PromptAsync(directives, skills, NoDuplicates(), NothingElsewhere(), CancellationToken.None);
+
+        // One render: every line it wrote plus the cursor line below them is exactly the window.
+        Assert.Equal(console.Profile.Height - 1, Occurrences(console.Output, "\n"));
+        Assert.Contains("Items 1–", console.Output, StringComparison.Ordinal);
+        Assert.Contains("more items below", console.Output, StringComparison.Ordinal);
+    }
+
     static TestConsole CreateConsole()
     {
         TestConsole console = new();
         console.Profile.Capabilities.Interactive = true;
         console.Profile.Width = 120;
+        console.Profile.Height = PageSize + RecommendationSelectionPrompt.PreviewChromeRows;
         return console;
     }
 

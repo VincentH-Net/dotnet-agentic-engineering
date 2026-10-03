@@ -204,7 +204,7 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
                 await auto.WaitUntilTextAsync("[x] foundation-prompt-log").ConfigureAwait(false);
                 await auto.EscapeAsync().ConfigureAwait(false);
                 await auto.WaitUntilTextAsync("Type to filter").ConfigureAwait(false);
-                // The unfiltered selector is paged; bring the dependency back into view.
+                // The unfiltered selector is paged when it outgrows the window; a filter shows the dependency either way.
                 await auto.TypeAsync("InnoWvate.Agentic").ConfigureAwait(false);
                 await auto.WaitUntilTextAsync("Filter: InnoWvate.Agentic").ConfigureAwait(false);
                 await auto.WaitUntilTextAsync("[x] InnoWvate.Agentic").ConfigureAwait(false);

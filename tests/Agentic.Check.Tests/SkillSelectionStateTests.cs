@@ -165,16 +165,56 @@ public sealed class SkillSelectionStateTests
     }
 
     [Fact]
-    public void VisibleItemsAreBoundedAroundCursor()
+    public void VisibleItemsFillTheRowBudgetAroundTheCursor()
     {
         var items = CreateItems([], [.. Enumerable.Range(1, 30).Select(index => $"skill-{index}")]);
 
-        var (startIndex, visibleItems) = RecommendationSelectionPrompt.GetVisibleItems(items, 20);
+        // 20 rows hold the range line, both overflow indicators, the three group headers and 14 items.
+        var (startIndex, visibleItems) = RecommendationSelectionPrompt.GetVisibleItems(items, 20, 20, _ => 1);
 
-        Assert.Equal(6, startIndex);
-        Assert.Equal(RecommendationSelectionPrompt.MaxVisibleItems, visibleItems.Count);
-        Assert.Equal("skill-7", visibleItems[0].Skill?.LocalFolder);
-        Assert.Equal("skill-30", visibleItems[^1].Skill?.LocalFolder);
+        Assert.Equal(14, startIndex);
+        Assert.Equal(14, visibleItems.Count);
+        Assert.Equal("skill-15", visibleItems[0].Skill?.LocalFolder);
+        Assert.Equal("skill-28", visibleItems[^1].Skill?.LocalFolder);
+        Assert.Equal(20, RecommendationSelectionPrompt.ListRows(items, 14, 28, _ => 1));
+    }
+
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(29, 15)]
+    public void VisibleItemsUseTheRowOfTheOverflowIndicatorThatAnEndOfTheListDoesNotNeed(int cursorIndex, int expectedStartIndex)
+    {
+        var items = CreateItems([], [.. Enumerable.Range(1, 30).Select(index => $"skill-{index}")]);
+
+        var (startIndex, visibleItems) = RecommendationSelectionPrompt.GetVisibleItems(items, cursorIndex, 20, _ => 1);
+
+        Assert.Equal(expectedStartIndex, startIndex);
+        Assert.Equal(15, visibleItems.Count);
+    }
+
+    [Fact]
+    public void VisibleItemsCountGroupHeadersAndTheExtraRowsOfAnItem()
+    {
+        List<RecommendationSelectionItem> items =
+        [
+            .. CreateItems(["first", "second"], []),
+            .. Enumerable.Range(1, 6).Select(index => CreateSkillItem(new SkillManifestEntry("owner/alpha", $"alpha-{index}", $"alpha-{index}", TechnologyNames.Dotnet, []))),
+            .. Enumerable.Range(1, 6).Select(index => CreateSkillItem(new SkillManifestEntry("owner/beta", $"beta-{index}", $"beta-{index}", TechnologyNames.Dotnet, [])))
+        ];
+        static int Rows(RecommendationSelectionItem item) => item.Skill?.LocalFolder == "alpha-1" ? 3 : 1;
+
+        // The directives header and 2 directives, the skills header, then per repository a source header, a plugin
+        // header and 6 items, one of which is 3 rows: 3 + 1 + 10 + 8.
+        Assert.Equal(22, RecommendationSelectionPrompt.ListRows(items, 0, items.Count, Rows));
+        Assert.Same(items, RecommendationSelectionPrompt.GetVisibleItems(items, 0, 22, Rows).Items);
+
+        var (startIndex, visibleItems) = RecommendationSelectionPrompt.GetVisibleItems(items, 0, 12, Rows);
+
+        // The range line, the indicator below, the directives with their header, then the skills, source and
+        // plugin headers leave room for the three-row item and one more.
+        Assert.Equal(0, startIndex);
+        Assert.Equal(4, visibleItems.Count);
+        Assert.Equal(12, RecommendationSelectionPrompt.ListRows(items, 0, 4, Rows));
     }
 
     [Fact]
@@ -182,7 +222,7 @@ public sealed class SkillSelectionStateTests
     {
         var items = CreateItems([], ["alpha", "beta"]);
 
-        var (startIndex, visibleItems) = RecommendationSelectionPrompt.GetVisibleItems(items, 1);
+        var (startIndex, visibleItems) = RecommendationSelectionPrompt.GetVisibleItems(items, 1, RecommendationSelectionPrompt.MinListRows, _ => 1);
 
         Assert.Equal(0, startIndex);
         Assert.Same(items, visibleItems);
