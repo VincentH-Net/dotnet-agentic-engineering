@@ -47,15 +47,12 @@ jobs:
 
   # Tests the packed product rather than the sources: installs the candidates into an isolated feed
   # and tool path and runs the selected fixtures' unattended scenarios with the real gh. Nothing is
-  # packed here. The default fixtures are a small stack, the largest install (84 skills at once) and
-  # the switch from preview to stable.
+  # packed here. The default fixtures are a small stack, the largest install (84 skills in one run, in
+  # the fresh-stable scenario) and the switch from preview to stable.
   packages:
     needs: pack
     strategy:
       fail-fast: false
-      # One system at a time: both share this repository's GitHub limits, and the largest install on
-      # two systems at once is more parallel requests than was measured to be safe.
-      max-parallel: 1
       matrix:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}

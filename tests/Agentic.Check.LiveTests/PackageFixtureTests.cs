@@ -7,6 +7,8 @@ namespace Agentic.Check.LiveTests;
 public sealed class PackageFixtureTests(ITestOutputHelper output)
 {
     static readonly PackageTestRun TestRun = new();
+    const string LargestStableFixture = "uno-conflicting-gates";
+
     public static TheoryData<string, string, bool> Scenarios()
         => BuildScenarios(Environment.GetEnvironmentVariable("AGENTIC_E2E_BASELINE"));
 
@@ -17,6 +19,10 @@ public sealed class PackageFixtureTests(ITestOutputHelper output)
             .Order(StringComparer.Ordinal).Select(path => FixtureFiles.ReadJson<FixtureDefinition>(Path.Combine(path, "definition.json"))).ToArray();
         foreach (var definition in definitions)
             rows.Add(definition.Name, "fresh", false);
+        // A first-time setup from the stable channel, for the fixture with the most stable skills: the one
+        // case that installs more skills at once than the installer runs in parallel.
+        if (definitions.Any(definition => definition.Name == LargestStableFixture))
+            rows.Add(LargestStableFixture, PackageScenario.FreshStable, false);
         if (selectedBaseline is not null)
         {
             FixtureFiles.Require(Path.GetFileName(selectedBaseline) == selectedBaseline, "Invalid baseline ID.");

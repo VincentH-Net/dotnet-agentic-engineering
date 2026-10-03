@@ -59,9 +59,9 @@ dotnet run --file tests/run-full-suite.cs -- --ci-run <run id>
 
 The workflow's `pack` job prepares the candidates once and stores them as the `candidates` artifact.
 Its `packages` jobs run the unattended package scenarios of the fixtures in its `fixtures` input
-against those files, first on Ubuntu and then on Windows; nothing is packed there. The default is
-`dotnet-cli`, `uno-conflicting-gates` (the largest install, 84 skills at once) and `preview-web-cli`
-(the switch from preview to stable). The scenarios that drive a recorded terminal run only here. `--ci-run` waits for the artifact, downloads it
+against those files on Ubuntu and Windows; nothing is packed there. The default is
+`dotnet-cli`, `uno-conflicting-gates` (whose `fresh-stable` scenario is the largest install, 84 skills
+in one run) and `preview-web-cli` (the switch from preview to stable). The scenarios that drive a recorded terminal run only here. `--ci-run` waits for the artifact, downloads it
 and runs the complete suite against the same files here. The tests verify that the downloaded files
 match their manifest and that the manifest names this checkout's pushed commit. The workflow is
 started manually because the package jobs spend the repository's GitHub API budget; its

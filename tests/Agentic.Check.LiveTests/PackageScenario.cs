@@ -6,6 +6,7 @@ namespace Agentic.Check.LiveTests;
 
 sealed class PackageScenario(CandidateBuild candidate, string fixtureName, string scenario, Action<string> log, PackageTestRun testRun) : IDisposable
 {
+    internal const string FreshStable = "fresh-stable";
     const string UserText = "\nFixture-owned instructions: preserve this exact text.\n";
     readonly FixtureWorkspace workspace = new();
     readonly Dictionary<string, SourceSnapshot> sources = new(StringComparer.Ordinal);
@@ -25,6 +26,8 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
     SortedDictionary<string, string>? filesBeforeOperation;
     string operationPhase = string.Empty;
     IReadOnlyList<SkillManifestEntry> expectedSkills = [];
+    // A fresh scenario starts from a fixture's trigger files alone; fresh-stable sets that up from the stable channel.
+    readonly bool fresh = scenario is "fresh" or FreshStable;
     bool preview = scenario is "fresh" or "migration" or "preview-preview" or "preview-declined";
     internal bool HasContentTransition { get; private set; }
     internal bool ObservedContentTransition { get; private set; }
@@ -33,7 +36,7 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
 
     internal async Task PrepareAsync()
     {
-        if (scenario == "fresh")
+        if (fresh)
         {
             string definitionDirectory = Path.Combine(FixtureFiles.Checkout, "tests/fixtures/definitions", fixtureName);
             definition = FixtureFiles.ReadJson<FixtureDefinition>(Path.Combine(definitionDirectory, "definition.json"));
@@ -70,7 +73,7 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
             _ = await workspace.Process.SuccessAsync("dotnet", ["tool", "restore"], workspace.Target).ConfigureAwait(false);
             await CompanionRoundTripAsync(workspace, original).ConfigureAwait(false);
         }
-        if (scenario != "fresh")
+        if (!fresh)
         {
             await WriteUnrelatedManifestAsync(workspace, candidate.Check).ConfigureAwait(false);
             await File.WriteAllTextAsync(Path.Combine(workspace.Target, "user-owned.txt"), "untouched source\n").ConfigureAwait(false);
@@ -136,7 +139,7 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
         if (!dryRun)
         {
             // Each setup/apply/recheck phase gets its own evidence; fresh installs stay strict.
-            filesBeforeOperation = scenario == "fresh" ? null : FixtureFiles.Inventory(workspace.Target);
+            filesBeforeOperation = fresh ? null : FixtureFiles.Inventory(workspace.Target);
             operationPhase = phase;
         }
         testRun.UseCache(workspace, candidate.Check.Sha256, preview, log);
@@ -237,7 +240,7 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
         await VerifyReadmeAsync(after).ConfigureAwait(false);
 
         string agents = await ReadAgentsAsync().ConfigureAwait(false);
-        if (scenario != "fresh")
+        if (!fresh)
         {
             FixtureFiles.Require(agents.Contains(UserText.Trim(), StringComparison.Ordinal), "Unrelated instructions changed.");
             using var manifest = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(workspace.Target, ".config/dotnet-tools.json")).ConfigureAwait(false));
@@ -303,14 +306,22 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
         {
             FixtureFiles.WriteJson(Path.Combine(FixtureFiles.Reports, runId + "-" + operationPhase + "-retained-assets.json"), retainedFiles);
         }
-        if (preview)
+        if (preview || scenario == FreshStable)
         {
             var installed = report.GetProperty("installResults").EnumerateArray().Select(item => item.GetProperty("sourceRepo").GetString() + "\n" + item.GetProperty("installArg").GetString()).Order(StringComparer.Ordinal);
-            FixtureFiles.Require(installed.SequenceEqual(expectedSkills.Select(skill => skill.Key).Order(StringComparer.Ordinal)), "Preview did not execute each intended real gh installation/reinstallation.");
+            FixtureFiles.Require(installed.SequenceEqual(expectedSkills.Select(skill => skill.Key).Order(StringComparer.Ordinal)), "The check did not execute each intended real gh installation/reinstallation.");
             foreach (var installation in report.GetProperty("installResults").EnumerateArray())
                 FixtureFiles.Require(installation.GetProperty("standardOutput").GetString()!.Contains("Installed ", StringComparison.Ordinal), "gh did not report an actual install/reinstall.");
+        }
+        if (preview)
+        {
             foreach (var skill in report.GetProperty("recommendedSkills").EnumerateArray().Where(skill => skill.GetProperty("sourceRepo").GetString() == SourceOracle.OwnRepository))
                 FixtureFiles.Require(skill.GetProperty("sourceRef").GetString() == candidate.Commit, "Candidate skill source SHA differs from package/source provenance.");
+        }
+        if (scenario == FreshStable)
+        {
+            FixtureFiles.Require(expectedSkills.Count > SkillInstaller.DefaultMaxConcurrentInstalls,
+                $"{fixtureName} installs {expectedSkills.Count} skills, which no longer fills the {SkillInstaller.DefaultMaxConcurrentInstalls} parallel installs this scenario is here to exercise.");
         }
         foreach (string agent in definition.Agents.Contains("claude-code", StringComparison.Ordinal) ? new[] { ".agents/skills", ".claude/skills" } : [".agents/skills"])
         {

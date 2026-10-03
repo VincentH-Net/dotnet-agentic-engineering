@@ -53,6 +53,7 @@ public sealed class PackageFixtureSupportTests
         Assert.Equal(14, Directory.GetDirectories(Path.Combine(FixtureFiles.Checkout, "tests/fixtures/definitions")).Length);
         object[][] rows = [.. PackageFixtureTests.BuildScenarios(null)];
         Assert.Equal(14, rows.Count(row => (string)row[1] == "fresh"));
+        _ = Assert.Single(rows, row => (string)row[1] == PackageScenario.FreshStable && (string)row[0] == "uno-conflicting-gates");
         foreach (string scenario in new[] { "preview-preview", "preview-stable", "preview-declined", "candidate-preview-stable" })
             Assert.Contains(rows, row => (string)row[0] == "preview-web-cli" && (string)row[1] == scenario && !(bool)row[2]);
     }

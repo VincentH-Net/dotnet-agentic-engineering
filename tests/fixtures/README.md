@@ -239,6 +239,7 @@ PowerShell users set the same names with `$env:NAME = 'value'` before running do
 | Scenario | Independent starting state and behavior |
 | --- | --- |
 | `fresh` | Each of 14 trigger definitions; preview plus exact candidate SHA. Broad is interactive and checks dependency selection and both agent directories. |
+| `fresh-stable` | The uno-conflicting-gates trigger definition set up from the stable channel: 84 real installs in one run, more than the installer runs in parallel. |
 | `migration` | Each of 13 stable snapshots; preview plus exact candidate SHA. |
 | `stable` | Each stable snapshot; published-source real gh update, no override. Broad accepts available updates interactively. |
 | `stable-current` | Broad snapshot updated within this case, then checked again. |
