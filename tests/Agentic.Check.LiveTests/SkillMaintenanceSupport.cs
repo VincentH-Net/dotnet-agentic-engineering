@@ -17,7 +17,8 @@ sealed class SkillMaintenanceFactAttribute : FactAttribute
     }
 }
 
-sealed record SkillTreeFile(string Path, string BlobSha, string Name, string Description = "", string DirectoryTreeSha = "", bool HasFrontmatter = false);
+// InstalledFrom is the origin gh stamped into an installed copy's frontmatter; a published source skill has none.
+sealed record SkillTreeFile(string Path, string BlobSha, string Name, string Description = "", string DirectoryTreeSha = "", bool HasFrontmatter = false, string InstalledFrom = "");
 
 sealed record SkillSourceSnapshot(string Ref, string CommitSha, DateTimeOffset CommittedAt);
 
@@ -157,7 +158,13 @@ sealed class MaintenanceGh(Func<IReadOnlyList<string>, CancellationToken, Task<C
                     yaml.Load(yamlReader);
                     return yaml.Documents.Count != 1 || yaml.Documents[0].RootNode is not YamlMappingNode mapping
                         ? throw new IOException($"Expected YAML mapping: {skill.Path}")
-                        : (skill with { Name = Scalar(mapping, "name", skill.Path), Description = Scalar(mapping, "description", skill.Path), HasFrontmatter = true });
+                        : (skill with
+                        {
+                            Name = Scalar(mapping, "name", skill.Path),
+                            Description = Scalar(mapping, "description", skill.Path),
+                            HasFrontmatter = true,
+                            InstalledFrom = InstallOrigin(mapping)
+                        });
                 }
                 catch (YamlException exception)
                 {
@@ -176,6 +183,23 @@ sealed class MaintenanceGh(Func<IReadOnlyList<string>, CancellationToken, Task<C
             && node is YamlScalarNode { Value: { } value } && !string.IsNullOrWhiteSpace(value)
                 ? value
                 : throw new IOException($"Missing scalar {key} in {path}");
+
+    // gh skill install records the source repository and path, under metadata or at the top level.
+    static string InstallOrigin(YamlMappingNode mapping)
+    {
+        YamlMappingNode?[] candidates = [mapping, mapping.Children.TryGetValue(new YamlScalarNode("metadata"), out var metadata) ? metadata as YamlMappingNode : null];
+        foreach (var candidate in candidates)
+        {
+            if (candidate is not null
+                && candidate.Children.TryGetValue(new YamlScalarNode("github-repo"), out var repo) && repo is YamlScalarNode { Value: { Length: > 0 } repoValue }
+                && candidate.Children.TryGetValue(new YamlScalarNode("github-path"), out var path) && path is YamlScalarNode { Value: { Length: > 0 } pathValue })
+            {
+                return $"{repoValue}: {pathValue}";
+            }
+        }
+
+        return "";
+    }
 
     internal static async Task<CommandResult> RunAsync(IReadOnlyList<string> arguments, CancellationToken cancellationToken)
     {

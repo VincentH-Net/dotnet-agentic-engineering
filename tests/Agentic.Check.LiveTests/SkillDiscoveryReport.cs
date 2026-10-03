@@ -13,7 +13,7 @@ static class SkillDiscoveryReport
     {
         StringBuilder report = new("# Skill maintenance review\n\n");
         _ = report.AppendLine(CultureInfo.InvariantCulture, $"Generated: {generatedAt:yyyy-MM-dd HH:mm zzz}\n");
-        _ = report.AppendLine("[New candidates](#new-candidates) | [Deferred candidates](#deferred-candidates) | [Missing / moved skills](#missing--moved-skills) | [Alternative locations](#alternative-locations) | [Excluded skills](#excluded-skills)\n");
+        _ = report.AppendLine("[New candidates](#new-candidates) | [Deferred candidates](#deferred-candidates) | [Missing / moved skills](#missing--moved-skills) | [Alternative locations](#alternative-locations) | [Installed copies](#installed-copies) | [Excluded skills](#excluded-skills)\n");
         if (errors.Count > 0)
         {
             _ = report.AppendLine("## Scan errors\n\nThese repos are incomplete. Do not advance their review baselines.\n");
@@ -42,7 +42,7 @@ static class SkillDiscoveryReport
 
         _ = report.AppendLine("\n## Deferred candidates\n");
         var deferred = rows.Where(row => row.Item.Kind == SkillDiscoveryKind.Deferred).ToArray();
-        _ = report.AppendLine(deferred.Length == 0 ? "None.\n" : "Reported, not failing, until their trigger is released (see SkillDeferrals.cs).\n\n| Repo | Folder | Skill | Available in | Waiting for |\n| --- | --- | --- | --- | --- |");
+        _ = report.AppendLine(deferred.Length == 0 ? "None.\n" : "Reported, not failing, until their trigger is reached (see SkillDeferrals.cs).\n\n| Repo | Folder | Skill | Available in | Waiting for |\n| --- | --- | --- | --- | --- |");
         foreach (var (scan, item) in deferred)
         {
             _ = report.AppendLine(CultureInfo.InvariantCulture, $"| {Escape(scan.Review.SourceRepo)} | {Escape(ParentFolder(item.Skill.Path))} | {SkillLink(scan, item)} | {item.Availability} | {Escape(item.Detail)} |");
@@ -67,6 +67,16 @@ static class SkillDiscoveryReport
         {
             string included = string.Join(", ", group.SelectMany(row => row.Item.RelatedPaths ?? []).Select(ParentFolder).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal));
             _ = report.AppendLine(CultureInfo.InvariantCulture, $"| {Escape(group.Key.Repo)} | {Escape(group.Key.Folder)} | {Escape(included)} |");
+        }
+
+        _ = report.AppendLine("\n## Installed copies\n");
+        var installed = rows.Where(row => row.Item.Kind == SkillDiscoveryKind.InstalledCopy)
+            .GroupBy(row => (Repo: row.Scan.Review.SourceRepo, Folder: ParentFolder(row.Item.Skill.Path))).ToArray();
+        _ = report.AppendLine(installed.Length == 0 ? "None.\n" : "Stamped by gh with the source they were installed from, so not candidates for the manifest.\n\n| Repo | Folder | Copies |\n| --- | --- | --- |");
+        foreach (var group in installed)
+        {
+            int copies = group.Select(row => row.Item.Skill.Path).Distinct(StringComparer.Ordinal).Count();
+            _ = report.AppendLine(CultureInfo.InvariantCulture, $"| {Escape(group.Key.Repo)} | {Escape(group.Key.Folder)} | {copies} |");
         }
 
         _ = report.AppendLine("\n## Excluded skills\n");

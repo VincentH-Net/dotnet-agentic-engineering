@@ -37,8 +37,10 @@ public sealed class SkillDiscoveryLiveTests(ITestOutputHelper output)
                 var deferrals = SkillDeferrals.For(review.SourceRepo);
                 foreach (var deferral in deferrals)
                 {
-                    releases[deferral] = await ReleasedInAsync(gh, deferral, cancellation.Token).ConfigureAwait(true);
-                    output.WriteLine($"{review.SourceRepo}: {deferral.SkillName} deferred until {deferral.WaitingFor}: {(releases[deferral] is { } release ? $"released in {release}" : "not released")}");
+                    releases[deferral] = deferral.UntilCheckVersion is null
+                        ? await ReleasedInAsync(gh, deferral, cancellation.Token).ConfigureAwait(true)
+                        : deferral.DueIn(SkillDeferrals.CheckVersion);
+                    output.WriteLine($"{review.SourceRepo}: {deferral.SkillName} deferred until {deferral.WaitingFor}: {(releases[deferral] is { } release ? deferral.Released(release) : "still waiting")}");
                 }
                 var items = SkillDiscovery.ApplyDeferrals(SkillDiscovery.Compare(review.SourceRepo, baselineFiles, stableFiles, previewFiles,
                     StaticSkillManifest.All, StaticSkillManifest.Preview, stable.CommittedAt <= review.ReviewedAt), deferrals, deferral => releases[deferral]);
@@ -63,7 +65,7 @@ public sealed class SkillDiscoveryLiveTests(ITestOutputHelper output)
             gh.CacheDuration,
             Cache = "gh api cache; separate from agentic-check. Cache hits are not tracked; no stale fallback.",
             Sources = scans.Select(scan => new { scan.Review, scan.Stable, scan.Preview }),
-            Deferrals = releases.Select(pair => new { pair.Key.SourceRepo, pair.Key.SkillName, pair.Key.TriggerRepo, pair.Key.TriggerPath, ReleasedIn = pair.Value }),
+            Deferrals = releases.Select(pair => new { pair.Key.SourceRepo, pair.Key.SkillName, pair.Key.TriggerRepo, pair.Key.TriggerPath, pair.Key.UntilCheckVersion, ReleasedIn = pair.Value }),
             Errors = errors
         }, ReportJsonOptions);
         _ = await MaintenanceReport.WriteAsync("skill-discovery-sources.json", metadata).ConfigureAwait(true);

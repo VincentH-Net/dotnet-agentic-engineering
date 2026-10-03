@@ -403,6 +403,191 @@ public sealed class CompanionTests
         Assert.Contains("-m 2.3", await ReadIfExistsAsync(result.Report.AgentsFile), StringComparison.Ordinal);
     }
 
+    // The directive is installed and current, so nothing in the run depends on the companion. A pinned
+    // companion still follows the newest stable version in its major: a newer one is offered as an
+    // ordinary row, and one that is already the latest is reported as current without a row.
+    [Theory]
+    [InlineData("2.4.0", "2.4.1", "currently 2.4.0; required 2.4; latest 2.4.1")]
+    [InlineData("2.4.1", "2.4.1", null)]
+    [InlineData("2.4.2", "2.4.1", null)]
+    public async Task InstalledCompanionFollowsTheNewestVersionInItsMajorWithoutDependentRecommendations(string installed, string published, string? offered)
+    {
+        using TempDirectory temp = new();
+        var (source, runner, versions) = CurrentPromptLogRepository(temp, installed, published);
+        FakePrompts prompts = new() { SelectedDirectiveNames = [], SelectedSkillInstallArgs = [CompanionDependency.PackageId] };
+        RecordingReporter reporter = new();
+
+        var result = await new CheckWorkflow(runner, prompts, reporter, source, new FakeSourceVersionResolver(), [],
+            new DnaInstaller(new DnaRunner(runner) { Version = "1.0.0" }, string.Empty), null, versions)
+            .RunAsync(new(temp.Path, false, false, null, null, "codex", false), CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Equal(0, source.ProjectFetches);
+        var companion = prompts.RecommendedSkillActions.SingleOrDefault(skill => skill.IsCompanion);
+        Assert.Equal(offered, companion?.Version);
+        Assert.NotNull(result.Report.Companion);
+        Assert.True(result.Report.Companion.Success);
+        Assert.Equal("2.4", result.Report.Companion.RequiredMinimum);
+        if (offered is null)
+        {
+            Assert.Equal("current", result.Report.Companion.Action);
+            Assert.Contains($"current InnoWvate.Agentic: installed {installed}, required 2.4, pattern 2.*, already the latest", result.Report.Actions);
+            Assert.Contains($"  ✓ InnoWvate.Agentic {installed}", reporter.Successes);
+            Assert.DoesNotContain(runner.Calls, call => call.FileName == "dotnet" && call.Arguments is ["tool", "install" or "update" or "restore", ..] && !call.Arguments.Contains("--global"));
+            Assert.Equal(installed, CompanionInstaller.InstalledVersion(temp.Path));
+        }
+        else
+        {
+            Assert.Equal("update", companion!.RecommendationAction);
+            Assert.False(companion.IsRequiredToolRepair);
+            Assert.Equal("update", result.Report.Companion.Action);
+            Assert.Equal(installed, result.Report.Companion.InstalledVersion);
+            Assert.Equal(published, result.Report.Companion.ResolvedVersion);
+            var update = Assert.Single(runner.Calls, call => call.FileName == "dotnet" && call.Arguments is ["tool", "update", ..] && !call.Arguments.Contains("--global"));
+            Assert.Contains("2.*", update.Arguments);
+            Assert.DoesNotContain(runner.Calls, call => call.Arguments is ["tool", "restore", ..]);
+            Assert.Equal(published, CompanionInstaller.InstalledVersion(temp.Path));
+        }
+        Assert.Contains("-m 2.4", await ReadIfExistsAsync(result.Report.AgentsFile), StringComparison.Ordinal);
+    }
+
+    // The offered update is an ordinary row: declining it changes nothing, and --yes applies it.
+    [Theory]
+    [InlineData(false, false, "2.4.0")]
+    [InlineData(false, true, "2.4.1")]
+    [InlineData(true, false, "2.4.1")]
+    public async Task OfferedCompanionUpdateIsAppliedOnlyWhenSelected(bool yes, bool select, string expected)
+    {
+        using TempDirectory temp = new();
+        var (source, runner, versions) = CurrentPromptLogRepository(temp, "2.4.0", "2.4.1");
+        FakePrompts prompts = new() { SelectedDirectiveNames = [], SelectedSkillInstallArgs = select ? [CompanionDependency.PackageId] : [] };
+
+        var result = await new CheckWorkflow(runner, prompts, new RecordingReporter(), source, new FakeSourceVersionResolver(), [],
+            new DnaInstaller(new DnaRunner(runner) { Version = "1.0.0" }, string.Empty), null, versions)
+            .RunAsync(new(temp.Path, false, yes, null, null, "codex", false), CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Equal(expected, CompanionInstaller.InstalledVersion(temp.Path));
+        Assert.Equal(expected == "2.4.0" ? null : "update", result.Report.Companion?.Action);
+        Assert.Equal(expected == "2.4.0" ? 0 : 1, runner.Calls.Count(call => call.FileName == "dotnet" && call.Arguments is ["tool", "update", ..] && !call.Arguments.Contains("--global")));
+    }
+
+    // Offering needs a known newer version. Without a feed answer the run neither offers a blind update
+    // nor claims the companion is current.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task InstalledCompanionIsLeftAloneWhenTheLatestVersionIsUnknown(bool unlisted)
+    {
+        using TempDirectory temp = new();
+        var (source, runner, _) = CurrentPromptLogRepository(temp, "2.4.0", "2.4.1");
+        FakeVersionSource? versions = unlisted
+            ? new(new Dictionary<string, string[]?>(StringComparer.Ordinal) { [CompanionDependency.PackageId] = null, [DnaInstaller.PackageId] = ["1.0.0"] })
+            : null;
+        FakePrompts prompts = new() { SelectedDirectiveNames = [], SelectedSkillInstallArgs = [CompanionDependency.PackageId] };
+
+        var result = await new CheckWorkflow(runner, prompts, new RecordingReporter(), source, new FakeSourceVersionResolver(), [],
+            new DnaInstaller(new DnaRunner(runner) { Version = "1.0.0" }, string.Empty), null, versions)
+            .RunAsync(new(temp.Path, false, false, null, null, "codex", false), CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.DoesNotContain(prompts.RecommendedSkillActions, skill => skill.IsCompanion);
+        Assert.Null(result.Report.Companion);
+        Assert.DoesNotContain(runner.Calls, call => call.FileName == "dotnet" && call.Arguments is ["tool", "install" or "update" or "restore", ..] && !call.Arguments.Contains("--global"));
+        Assert.Equal("2.4.0", CompanionInstaller.InstalledVersion(temp.Path));
+    }
+
+    // A companion that nothing installed uses is still pinned, so it follows its own line; a newer
+    // version in another major is not an update for it.
+    [Theory]
+    [InlineData("2.4.1", "currently 2.4.0; required 2.4; latest 2.4.1")]
+    [InlineData("2.4.0", null)]
+    public async Task PinnedCompanionWithoutConsumersFollowsItsOwnMajor(string published, string? offered)
+    {
+        using TempDirectory temp = new();
+        WriteManifest(temp.Path, "2.4.0");
+        ToolRunner runner = new() { Resolved = "2.4.0", Updated = published };
+        FakeVersionSource versions = new(new Dictionary<string, string[]?>(StringComparer.Ordinal)
+        {
+            [CompanionDependency.PackageId] = [published, "3.0.0", "2.5.0-preview.1"],
+            [DnaInstaller.PackageId] = ["1.0.0"]
+        });
+        FakePrompts prompts = new() { SelectedDirectiveNames = [], SelectedSkillInstallArgs = [] };
+
+        var result = await new CheckWorkflow(runner, prompts, new RecordingReporter(), new FakeDirectiveSource(new Dictionary<string, string>()), new FakeSourceVersionResolver(), [],
+            new DnaInstaller(new DnaRunner(runner) { Version = "1.0.0" }, string.Empty), null, versions)
+            .RunAsync(new(temp.Path, false, false, null, null, "codex", false), CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Equal(offered, prompts.RecommendedSkillActions.SingleOrDefault(skill => skill.IsCompanion)?.Version);
+        Assert.Equal(offered is null ? "current" : null, result.Report.Companion?.Action);
+        Assert.Equal("2.4.0", CompanionInstaller.InstalledVersion(temp.Path));
+    }
+
+    // Nothing is pinned and nothing needs the companion: a published version is no reason to install it.
+    [Fact]
+    public async Task AbsentCompanionIsNotOfferedWhenNothingNeedsIt()
+    {
+        using TempDirectory temp = new();
+        _ = temp.CreateDirectory("target");
+        ToolRunner runner = new();
+        FakeVersionSource versions = new(new Dictionary<string, string[]?>(StringComparer.Ordinal) { [CompanionDependency.PackageId] = ["2.4.1"] });
+        FakePrompts prompts = new() { SelectedDirectiveNames = [], SelectedSkillInstallArgs = [] };
+
+        var result = await new CheckWorkflow(runner, prompts, new RecordingReporter(), new FakeDirectiveSource(new Dictionary<string, string>()), new FakeSourceVersionResolver(), [],
+            new DnaInstaller(runner, string.Empty), null, versions)
+            .RunAsync(new(temp.Path, false, false, null, null, "codex", false), CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.DoesNotContain(prompts.RecommendedSkillActions, skill => skill.IsCompanion);
+        Assert.Null(result.Report.Companion);
+        Assert.False(File.Exists(CompanionInstaller.ManifestPath(temp.Path)));
+    }
+
+    // A pinned companion that satisfies the installed directive but is not restored is repaired. With a
+    // known newer version that repair is the update itself, not a restore of the older version.
+    [Theory]
+    [InlineData("2.4.1", "update", "currently 2.4.0; required 2.4; latest 2.4.1")]
+    [InlineData("2.4.0", "restore", "currently 2.4.0; required 2.4")]
+    public async Task UnrestoredCompanionTakesAKnownNewerVersionInsteadOfARestore(string published, string action, string status)
+    {
+        using TempDirectory temp = new();
+        var (source, _, versions) = CurrentPromptLogRepository(temp, "2.4.0", published);
+        ToolRunner runner = new() { Resolved = "2.4.0", Updated = published, NotRestored = true };
+        FakePrompts prompts = new() { SelectedDirectiveNames = [], SelectedSkillInstallArgs = [CompanionDependency.PackageId] };
+
+        var result = await new CheckWorkflow(runner, prompts, new RecordingReporter(), source, new FakeSourceVersionResolver(), [],
+            new DnaInstaller(new DnaRunner(runner) { Version = "1.0.0" }, string.Empty), null, versions)
+            .RunAsync(new(temp.Path, false, false, null, null, "codex", false), CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        var companion = Assert.Single(prompts.RecommendedSkillActions, skill => skill.IsCompanion);
+        Assert.Equal(action, companion.RecommendationAction);
+        Assert.Equal(status, companion.Version);
+        Assert.True(companion.IsRequiredToolRepair);
+        Assert.Equal(action, result.Report.Companion?.Action);
+        Assert.Equal(action == "update" ? 1 : 0, runner.Calls.Count(call => call.FileName == "dotnet" && call.Arguments is ["tool", "update", ..] && !call.Arguments.Contains("--global")));
+        Assert.Equal(action == "restore" ? 1 : 0, runner.Calls.Count(call => call.Arguments is ["tool", "restore", ..]));
+        Assert.Equal(published, CompanionInstaller.InstalledVersion(temp.Path));
+    }
+
+    // A repository whose Prompt Log directive is installed and identical to its source, with the companion pinned.
+    static (FakeDirectiveSource Source, ToolRunner Runner, FakeVersionSource Versions) CurrentPromptLogRepository(TempDirectory temp, string installed, string published)
+    {
+        string block = PromptLogBlock("dotnet agentic prompt-log show -m 2.4", "");
+        temp.Write("AGENTS.md", block);
+        WriteManifest(temp.Path, installed);
+        FakeDirectiveSource source = new(new Dictionary<string, string> { ["foundation-prompt-log.md"] = "~~~md\n" + block + "~~~\n" });
+        ToolRunner runner = new() { Resolved = installed, Updated = published };
+        FakeVersionSource versions = new(new Dictionary<string, string[]?>(StringComparer.Ordinal)
+        {
+            // Other majors and prereleases never count for a stable run.
+            [CompanionDependency.PackageId] = ["2.3.0", published, "2.5.0-preview.1", "3.0.0"],
+            [DnaInstaller.PackageId] = ["1.0.0"]
+        });
+        return (source, runner, versions);
+    }
+
     [Theory]
     [InlineData(true, false)]
     [InlineData(false, false)]
@@ -751,6 +936,9 @@ sealed class ToolRunner : ICommandRunner
 {
     internal List<CommandCall> Calls { get; } = [];
     internal string Resolved { get; init; } = "2.3.0";
+    // What an install or update resolves to when that differs from the version that runs before it.
+    internal string? Updated { get; init; }
+    string? written;
     internal bool Fail { get; init; }
     internal bool UpdateCandidate { get; init; }
     internal bool NotRestored { get; init; }
@@ -773,10 +961,11 @@ sealed class ToolRunner : ICommandRunner
             {
                 int manifestIndex = arguments.ToList().IndexOf("--tool-manifest");
                 string folder = manifestIndex >= 0 ? Path.GetDirectoryName(Path.GetDirectoryName(arguments[manifestIndex + 1]))! : workingDirectory;
-                CompanionTests.WriteManifest(folder, Resolved);
+                written = Updated ?? Resolved;
+                CompanionTests.WriteManifest(folder, written);
             }
 
-            return Task.FromResult(new CommandResult(0, arguments[1] == "run" ? Resolved : "localized SDK output", ""));
+            return Task.FromResult(new CommandResult(0, arguments[1] == "run" ? written ?? Resolved : "localized SDK output", ""));
         }
 
         if (FakeGh.IsInstall(Calls[^1]))

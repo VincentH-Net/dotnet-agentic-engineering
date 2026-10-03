@@ -54,6 +54,96 @@ public sealed class SkillDiscoveryTests
         Assert.Equal(SkillDiscoveryKind.NewCandidate, Item(SkillDiscovery.ApplyDeferrals(excluded, deferrals, _ => "9.2.0"), flat.Path).Kind);
     }
 
+    [Theory]
+    [InlineData("2.4.1", false)]
+    [InlineData("2.4.99", false)]
+    [InlineData("2.5.0-preview.1", true)]
+    [InlineData("2.5.0", true)]
+    [InlineData("2.6.0", true)]
+    [InlineData("3.0.0", true)]
+    public void VersionScopedDeferralHoldsBelowItsMinorAndIsOverFromThereOn(string check, bool due)
+    {
+        var deferral = SkillDeferral.UntilCheck(Repo, "later", "2.5", "the next minor release");
+        var candidate = File("plugins/p/skills/later/SKILL.md");
+        var compared = SkillDiscovery.Compare(Repo, [], [], [candidate], [], []);
+
+        var item = Item(SkillDiscovery.ApplyDeferrals(compared, [deferral], waiting => waiting.DueIn(ToolVersion.Parse(check))), candidate.Path);
+
+        Assert.Equal(due ? SkillDiscoveryKind.NewCandidate : SkillDiscoveryKind.Deferred, item.Kind);
+        Assert.Equal(due, SkillDiscovery.NeedsReview(item));
+        Assert.Equal(due
+            ? $"Deferred until the next minor release; Agentic.Check is now {check}. Include or exclude it."
+            : "Waiting for the next minor release (Agentic.Check 2.5).", item.Detail);
+    }
+
+    [Fact]
+    public void EveryDeferralNamesAManifestSourceAndAUsableTrigger()
+    {
+        var repos = StaticSkillManifest.SourceReviews.Select(review => review.SourceRepo).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        Assert.All(SkillDeferrals.All, deferral =>
+        {
+            Assert.Contains(deferral.SourceRepo, repos);
+            Assert.False(string.IsNullOrWhiteSpace(deferral.SkillName));
+            Assert.False(string.IsNullOrWhiteSpace(deferral.WaitingFor));
+            if (deferral.UntilCheckVersion is null)
+            {
+                Assert.False(string.IsNullOrWhiteSpace(deferral.TriggerRepo));
+                Assert.False(string.IsNullOrWhiteSpace(deferral.TriggerPath));
+            }
+            else
+            {
+                // Only major.minor parses, and evaluating it against the build under test must not throw.
+                _ = deferral.DueIn(SkillDeferrals.CheckVersion);
+            }
+        });
+    }
+
+    [Fact]
+    public void InstalledCopiesAreRecognizedByTheirInstallStampAndNeedNoReview()
+    {
+        var nested = MaintenanceGh.ReadFrontmatter(File(".agents/skills/run-tests/SKILL.md"), """
+            ---
+            description: Runs tests.
+            metadata:
+                github-path: plugins/dotnet-test/skills/run-tests
+                github-ref: refs/tags/v1.0.0
+                github-repo: https://github.com/dotnet/skills
+                github-tree-sha: 1df99bb3
+            name: run-tests
+            ---
+            Body
+            """);
+        var flat = MaintenanceGh.ReadFrontmatter(File(".claude/skills/flat/SKILL.md"), """
+            ---
+            name: flat
+            description: Stamped at the top level.
+            github-repo: https://github.com/owner/source
+            github-path: skills/flat
+            ---
+            """);
+        var authoredInHiddenFolder = MaintenanceGh.ReadFrontmatter(File(".agents/skills/local/SKILL.md"), "---\nname: local\ndescription: Written here.\nmetadata:\n    author: someone\n---\n");
+        var published = MaintenanceGh.ReadFrontmatter(File("plugins/p/skills/own/SKILL.md"), "---\nname: own\ndescription: Published here.\n---\n");
+
+        Assert.Equal("https://github.com/dotnet/skills: plugins/dotnet-test/skills/run-tests", nested.InstalledFrom);
+        Assert.Equal("https://github.com/owner/source: skills/flat", flat.InstalledFrom);
+        Assert.Empty(authoredInHiddenFolder.InstalledFrom);
+        Assert.Empty(published.InstalledFrom);
+
+        SkillTreeFile[] current = [nested, flat, authoredInHiddenFolder, published];
+        var items = SkillDiscovery.Compare(Repo, [], current, current, [], []);
+        Assert.Equal(SkillDiscoveryKind.InstalledCopy, Item(items, nested.Path).Kind);
+        Assert.Equal("Installed from https://github.com/dotnet/skills: plugins/dotnet-test/skills/run-tests.", Item(items, nested.Path).Detail);
+        Assert.Equal(SkillDiscoveryKind.InstalledCopy, Item(items, flat.Path).Kind);
+        // A hidden folder alone proves nothing: an unstamped skill there may be a source and still needs review.
+        Assert.Equal(SkillDiscoveryKind.NewCandidate, Item(items, authoredInHiddenFolder.Path).Kind);
+        Assert.Equal(SkillDiscoveryKind.NewCandidate, Item(items, published.Path).Kind);
+        Assert.Equal(2, items.Count(SkillDiscovery.NeedsReview));
+
+        // A copy that was already present at the review baseline is reported as a copy too, not as an exclusion.
+        var reviewed = SkillDiscovery.Compare(Repo, [nested], current, current, [], []);
+        Assert.Equal(SkillDiscoveryKind.InstalledCopy, Item(reviewed, nested.Path).Kind);
+    }
+
     [Fact]
     public void SameNamesInOtherReposAndFoldersDoNotBecomeIncluded()
     {

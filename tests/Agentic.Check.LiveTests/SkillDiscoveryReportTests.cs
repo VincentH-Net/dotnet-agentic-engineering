@@ -37,6 +37,19 @@ public sealed class SkillDiscoveryReportTests
     }
 
     [Fact]
+    public void InstalledCopiesAreCountedPerFolderWithoutListingSkillNames()
+    {
+        string report = SkillDiscoveryReport.Render([Scan("owner/one")], [], DateTimeOffset.UnixEpoch);
+        Assert.Equal(1, Count(report, "## Installed copies\n"));
+        Assert.Contains("| owner/one | .agents/skills | 2 |", report, StringComparison.Ordinal);
+        Assert.DoesNotContain("installed-one", report, StringComparison.Ordinal);
+        Assert.DoesNotContain("installed-two", report, StringComparison.Ordinal);
+        Assert.True(report.IndexOf("## Alternative locations", StringComparison.Ordinal) < report.IndexOf("## Installed copies", StringComparison.Ordinal));
+        Assert.True(report.IndexOf("## Installed copies", StringComparison.Ordinal) < report.IndexOf("## Excluded skills", StringComparison.Ordinal));
+        Assert.Contains("## Installed copies\n\nNone.", SkillDiscoveryReport.Render([], [], DateTimeOffset.UnixEpoch), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ScanErrorsAppearFirstOnlyWhenPresentAndEscapeMarkdown()
     {
         string report = SkillDiscoveryReport.Render([Scan("owner/ok")], [new("owner/error", "HTTP 403 | <error>\nretry")], DateTimeOffset.UnixEpoch);
@@ -66,7 +79,9 @@ public sealed class SkillDiscoveryReportTests
                 Item(SkillDiscoveryKind.AlternativeLocation, "copy-two", "copies/two/SKILL.md") with { RelatedPaths = ["included/two/SKILL.md", "other/one/SKILL.md"] },
                 Item(SkillDiscoveryKind.ExcludedAtBaseline, "excluded", "skills/excluded/SKILL.md"),
                 Item(SkillDiscoveryKind.Included, "already-included", "skills/already-included/SKILL.md"),
-                Item(SkillDiscoveryKind.IdenticalIncludedCopy, "identical-copy", "skills/identical-copy/SKILL.md")
+                Item(SkillDiscoveryKind.IdenticalIncludedCopy, "identical-copy", "skills/identical-copy/SKILL.md"),
+                Item(SkillDiscoveryKind.InstalledCopy, "installed-one", ".agents/skills/installed-one/SKILL.md"),
+                Item(SkillDiscoveryKind.InstalledCopy, "installed-two", ".agents/skills/installed-two/SKILL.md")
             ]);
 
     static SkillDiscoveryItem Item(SkillDiscoveryKind kind, string name, string path, string source = "preview")

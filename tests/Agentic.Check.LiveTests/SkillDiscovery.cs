@@ -8,6 +8,7 @@ enum SkillDiscoveryKind
     MissingUpstream,
     AlternativeLocation,
     IdenticalIncludedCopy,
+    InstalledCopy,
     ExcludedAtBaseline,
     Included
 }
@@ -48,10 +49,13 @@ static class SkillDiscovery
             string availability = stablePaths.Contains(skill.Path)
                 ? previewPaths.Contains(skill.Path) ? "stable + preview" : "stable only"
                 : "preview only";
+            // gh stamps what it installs with its origin, so a stamped SKILL.md is a copy held in an agent
+            // folder, not a source this repo publishes: there is nothing to include or exclude.
             var kind = includedPaths.Contains(skill.Path)
                 ? SkillDiscoveryKind.Included
+                : skill.InstalledFrom.Length > 0 ? SkillDiscoveryKind.InstalledCopy
                 : baselinePaths.Contains(skill.Path) ? SkillDiscoveryKind.ExcludedAtBaseline : SkillDiscoveryKind.NewCandidate;
-            string detail = "";
+            string detail = kind == SkillDiscoveryKind.InstalledCopy ? $"Installed from {skill.InstalledFrom}." : "";
             IReadOnlyList<string>? relatedPaths = null;
             if (kind == SkillDiscoveryKind.ExcludedAtBaseline)
             {
@@ -177,8 +181,9 @@ static class SkillDiscovery
     internal static bool NeedsReview(SkillDiscoveryItem item)
         => item.Kind is SkillDiscoveryKind.NewCandidate or SkillDiscoveryKind.PossibleMove or SkillDiscoveryKind.MissingUpstream;
 
-    // A deferred skill stays out of the review count until releasedIn reports its trigger release; it then
-    // becomes a new candidate again even when the review baseline already contains it.
+    // A deferred skill stays out of the review count until releasedIn reports what ended its deferral, an
+    // upstream release or this tool's own version; it then becomes a new candidate again even when the
+    // review baseline already contains it.
     internal static IReadOnlyList<SkillDiscoveryItem> ApplyDeferrals(IReadOnlyList<SkillDiscoveryItem> items,
         IReadOnlyList<SkillDeferral> deferrals, Func<SkillDeferral, string?> releasedIn)
         => [.. items.Select(item =>
@@ -191,7 +196,7 @@ static class SkillDiscovery
             string? release = releasedIn(deferral);
             return release is null
                 ? item with { Kind = SkillDiscoveryKind.Deferred, Detail = $"Waiting for {deferral.WaitingFor} ({deferral.Trigger})." }
-                : item with { Kind = SkillDiscoveryKind.NewCandidate, Detail = $"Deferred until {deferral.WaitingFor}; now released in {deferral.TriggerRepo} {release}. Include or exclude it." };
+                : item with { Kind = SkillDiscoveryKind.NewCandidate, Detail = $"Deferred until {deferral.WaitingFor}; {deferral.Released(release)}. Include or exclude it." };
         })];
 
 

@@ -45,6 +45,12 @@ only when it changed.
   selects the Prompt Log directive fails.
 - **Tag the packed commit and keep it reachable.** The Source Link map and repository commit inside
   the published packages point at that commit, so merge `main` by fast-forward, never by rebase.
+- **`main` never carries a companion major.minor that nuget.org does not have.** The preview channel
+  reads the default branch and takes the companion requirement from the `<Version>` it finds there, so
+  every `--preview` run that selects the Prompt Log directive fails while that major.minor is
+  unpublished. Publishing before the fast-forward (steps 3 and 4) guarantees this for a release; do
+  not merge a branch that raised the companion's minor or major into `main` any earlier. A patch that
+  is ahead of nuget.org is harmless, because only the major.minor is required.
 
 ## Steps
 
