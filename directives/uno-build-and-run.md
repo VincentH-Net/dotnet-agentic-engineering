@@ -17,7 +17,7 @@ Use `dna check` to install or update directives for your technology, or manually
 This directive overrides any skill's build, start, verify and stop steps, including `uno-testing`; apply `uno-agentic-support` without asking first.
 
 ### Uno Platform MCPs
-Once per session, BEFORE the first Uno task, check that the tools `uno_platform_docs_search` and `uno_app_start` (or `uno_discover_tools`) are listed. If NOT, register these MCP servers at folder/project scope, then tell the user to run `dotnet dnx -y uno.devserver login` outside the session and restart:
+Once per session, BEFORE the first Uno task, check that the tools `uno_platform_docs_search` and `uno_app_start` (or `uno_discover_tools`) are listed. If NOT, register these MCP servers at folder/project scope, then tell the user to run `dnx -y uno.devserver login` outside the session and restart:
 - `uno`: HTTP transport, `https://mcp.platform.uno/v1`
 - `uno-app`: stdio transport, command `dotnet dnx -y uno.devserver --mcp-app`
 
