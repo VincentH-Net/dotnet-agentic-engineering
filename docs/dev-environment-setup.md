@@ -23,16 +23,16 @@ Astra is comparable for:
 
 #### Other models & compute
 
-The frontier models are good enough for sustainable agentic engineering **most of the time**, and they still need a lot of tools and human expertise and assist to ensure reliable and sustainable engineering. This is hard enough to do well as it is; don't bother wasting time with lesser models - yet.
+The frontier models are good enough for agentic engineering **most of the time**, even though they still need a lot of tools and human expertise and assist to ensure reliability and sustainability. This is hard enough to do well as it is; don't bother wasting time with lesser models - yet.
 
 At some point the frontier model labs are going to stop heavily subsidizing tokens, and depending on your budget that is the moment to evaluate the state of OSS models and running those on your own hardware - both are improving rapidly, but still lag behind frontier model labs. However, the continuing price increase of inference capable hardware keeps postponing the break-even point (ram prices went to 400% over the past year).
 
 ### Harness
 
-The harness choice has just as much impact on the quality of the output as the model choice. For best results, use the native app harness of the model maker (Claude App / ChatGPT App). This used to be the CLI, but since the race to gain computer work market share has led to investments prioritizing the desktop app, the CLI became 2nd class citizen. Also the architecture of both apps has improved to the point where for code the harness behaves identical - there is no context pollution from the non-code features that the apps offer. The benefit of the apps are the additional productivity features for software engineering work:
+The harness choice has just as much impact on the quality of the output as the model choice. For best results, use the native app harness of the model maker (Claude App / ChatGPT App). This used to be the CLI, but since the race to gain computer work market share has led to investments prioritizing the desktop app, the CLI became 2nd class citizen. Also the architecture of both apps has improved to the point where for code the harness behaves identical - there is no context pollution from the non-code features that the apps offer. The benefits of the apps are the additional productivity features for software engineering work:
 
 - Best dictation: faster than typing and works equally well on devices without keyboard
-- Best remote support: controlling sessions on your dev machine from mobile works most reliably when they are started in the desktop app
+- Best remote support: controlling sessions on your dev machine from mobile works best (or only) when they are started in the desktop app
 
 - Best diff / changes view: I used to use VS code for diffs, but the built-in views in the apps are now even better
 
