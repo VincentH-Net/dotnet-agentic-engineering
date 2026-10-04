@@ -8,42 +8,45 @@ For any target technology.
 
 ### Model
 
-The best models are the latest Opus and Codex, with effort High and biggest context available (validated through Opus 4.7 1M and Codex 5.5 High).
+The best models at the time of writing (Oct 4, 2026) are Fable and Astra, with effort Extra High (validated through Fable 5.1 and GPT 6 Astra).
 
-Opus is best for:
+Fable is best all around:
 
 - UI Design. Less mess, looks better.
 - Functional design; "getting" your core intent from functional prompts and creating plans for that
 
-Codex is best for:
+- Logic - both writing and codebase analysis
+ 
+Astra is comparable for:
 
 - Logic - both writing and codebase analysis
-- Edge cases - misses a lot less that Opus, up to the point of overengineering
 
 #### Other models & compute
 
-The frontier models are barely good enough for sustainable agentic engineering, and they still need a lot of tools and human expertise and assist to deliver that. This is hard enough to do well as it is; don't bother wasting time with lesser models - yet.
+The frontier models are good enough for sustainable agentic engineering **most of the time**, and they still need a lot of tools and human expertise and assist to ensure reliable and sustainable engineering. This is hard enough to do well as it is; don't bother wasting time with lesser models - yet.
 
-At some point the frontier model labs are going to stop heavily subsidizing tokens, and depending on your budget that is the moment to evaluate the state of OSS models and running those on your own hardware - both are improving rapidly, but still lag behind frontier model labs.
+At some point the frontier model labs are going to stop heavily subsidizing tokens, and depending on your budget that is the moment to evaluate the state of OSS models and running those on your own hardware - both are improving rapidly, but still lag behind frontier model labs. However, the continuing price increase of inference capable hardware keeps postponing the break-even point (ram prices went to 400% over the past year).
 
 ### Harness
 
-The harness choice has just as much impact on the quality of the output as the model choice. For best results, use the CLI harness of the model maker (Claude Code CLI / Codex CLI). The brand owned CLI remains the 1st class harness for each company; it receives earliest updates and fixes, has the most features, and is tested most heavily (because agents can use and test CLI's much better than apps).
+The harness choice has just as much impact on the quality of the output as the model choice. For best results, use the native app harness of the model maker (Claude App / ChatGPT App). This used to be the CLI, but since the race to gain computer work market share has led to investments prioritizing the desktop app, the CLI became 2nd class citizen. Also the architecture of both apps has improved to the point where for code the harness behaves identical - there is no context pollution from the non-code features that the apps offer. The benefit of the apps are the additional productivity features for software engineering work:
+
+- Best dictation: faster than typing and works equally well on devices without keyboard
+- Best remote support: controlling sessions on your dev machine from mobile works most reliably when they are started in the desktop app
+
+- Best diff / changes view: I used to use VS code for diffs, but the built-in views in the apps are now even better
 
 Cost is also a factor that favors the brand-owned harnesses: they benefit from the heaviest token-subsidizing subscriptions. API tokens used by 3rd party harnesses are much more expensive.
 
 See:
 
-[Claude Code Get Started](https://code.claude.com/docs/en/overview#get-started)
+[Claude Get Started](https://code.claude.com/docs/en/overview#desktop-app)
 
-[Codex CLI Setup](https://developers.openai.com/codex/cli#cli-setup)
+[Codex Get Started](https://chatgpt.com/features/codex-get-started/)
 
-#### Enable automatic approvals
+#### Automatic approvals
 
-Enabling automatic approvals is probably the single most important tip to increase your productivity.
-
-- Use the `/permissions` command in Codex CLI to configure `Approve for me`
-- In Claude Code CLI, turn `auto mode` on (`shift+tab` to cycle)
+Automatic approvals is probably the single most important way to increase your productivity. By now this is the default in the apps - check yours are on `auto`.
 
 ### OS
 
@@ -51,9 +54,9 @@ Mac, linux or WSL on Windows works best - the harnesses 1st class shell is bash,
 
 ### IDE
 
-You mostly need a UI that has good UX with git on local changes, commits and branches. Git worktree support is useful for parallel agent workstreams.
+IDE's are still useful for UI that has good UX with git on local changes, commits, branches and worktrees. Harness apps are getting there but they are not as complete and user friendly as mature IDE's yet.
 
-IDE functionality for reading and navigating code quickly and easily is useful to understand / validate the implementation architecture.
+Occasionally an IDE is useful for reading and navigating code quickly and to understand / validate the implementation architecture. Agents are becoming better at visualizing and explaining implementation and architecture, but IDE's are still better for navigating the code.
 
 Actual manual editing and debugging is more exception than rule in agentic engineering, but you do need it when the agents don't cut it.
 
@@ -61,7 +64,7 @@ Actual manual editing and debugging is more exception than rule in agentic engin
 
 ### GitHub
 
-[Install](https://cli.github.com/) the `gh` CLI - `agentic-check` requires it for it's `skill` command.
+[Install](https://cli.github.com/) the `gh` CLI - `dnx agentic.check` requires it for it's `skill` command.
 
 ## 2 .NET Engineering Setup
 
@@ -79,7 +82,7 @@ Recommended:
 Prerequisites:
 
 - [x] [Foundation Setup](#1-foundational-engineering-setup)
-  You need both Opus and Codex for UI with Uno platform - neither alone is capable enough yet, no matter how much tools and guidance you provide (validated through Opus 4.7 1M and Codex 5.5 High).
+ Fable can do both UI and logic well with Uno platform; Astra can do the UI logic but is not so good at design, no matter how much tools and guidance you provide (validated through Fable 5.1 and GPT 6 Astra).
 - [x] [.NET Setup](#2-net-engineering-setup)
 
 Required:
@@ -90,5 +93,5 @@ Required:
 
 ### Which model for what
 
-- For anything involving UI markup: use latest Claude Code CLI with Opus 1M High effort; no matter what you tell & give Codex, it often makes a visual mess when creating UX. Validated on Codex 5.5 High effort and older.
-- If Claude gets stuck in complex **UI logic** issues (e.g. how to use a complex UI library like LiveCharts2), latest Codex CLI High can get you unstuck.
+- For anything involving UI markup: use latest Claude App with Fable; no matter what you tell & give Codex with Astra, it often makes a visual mess when creating UX. Validated on Extra High effort with Fable 5.1 / GPT 6 Astra and older.
+- If Claude gets stuck in complex **UI logic** issues (e.g. how to use a complex UI library like LiveCharts2), latest Astra can get you unstuck.
