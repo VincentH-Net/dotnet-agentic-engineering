@@ -121,7 +121,7 @@ public sealed class SkillRemovalTests
     }
 
     [Fact]
-    public void ASkillAtAnotherPathThanTheManifestNamesIsReinstalledFromTheNewPath()
+    public void ASkillAtAnotherPathThanExpectedIsReinstalledFromTheNewPath()
     {
         var pathEntry = new SkillManifestEntry("dotnet/skills", "plugins/dotnet-test/skills/crap-score", "crap-score", TechnologyNames.Dotnet, []);
         var nameEntry = Entry(Repository, "dotnet-livecharts2");
@@ -130,10 +130,84 @@ public sealed class SkillRemovalTests
             new("a", "crap-score", "dotnet/skills", "skills/crap-score"),
             new("a", "dotnet-livecharts2", Repository, "plugins/dotnet/skills/dotnet-livecharts2")
         ];
+        static string? ManifestPath(SkillManifestEntry skill) => skill.InstallArg.Contains('/', StringComparison.Ordinal) ? skill.InstallArg : null;
 
-        Assert.Equal([pathEntry], SkillRemovalPlanner.FindMoved(installed, [pathEntry, nameEntry]));
-        Assert.Empty(SkillRemovalPlanner.FindMoved([new("a", "crap-score", "dotnet/skills", "plugins/dotnet-test/skills/crap-score/")], [pathEntry]));
-        Assert.Empty(SkillRemovalPlanner.FindMoved([new("a", "crap-score", OtherRepository, "skills/crap-score")], [pathEntry]));
+        // A path entry compares with the manifest; a name-only entry with the path the repository has now, or not at all.
+        Assert.Equal([pathEntry], SkillRemovalPlanner.FindMoved(installed, [pathEntry, nameEntry], ManifestPath));
+        Assert.Equal([nameEntry], SkillRemovalPlanner.FindMoved(installed, [nameEntry], _ => "plugins/charts/skills/dotnet-livecharts2"));
+        Assert.Empty(SkillRemovalPlanner.FindMoved(installed, [nameEntry], _ => "plugins/dotnet/skills/dotnet-livecharts2/"));
+        Assert.Empty(SkillRemovalPlanner.FindMoved([new("a", "crap-score", "dotnet/skills", "plugins/dotnet-test/skills/crap-score/")], [pathEntry], ManifestPath));
+        Assert.Empty(SkillRemovalPlanner.FindMoved([new("a", "crap-score", OtherRepository, "skills/crap-score")], [pathEntry], ManifestPath));
+        var nameOnly = Assert.Single(SkillRemovalPlanner.NameOnlyInstalled(installed, [pathEntry, nameEntry]));
+        Assert.Equal((Repository, nameEntry), (nameOnly.Key, Assert.Single(nameOnly.Value)));
+    }
+
+    [Fact]
+    public void TheRepositoryTreeGivesEachSkillsPathByFolderName()
+    {
+        const string tree = """
+            {"sha":"abc","truncated":false,"tree":[
+              {"path":"plugins/orleans/skills/orleans-multitenant/SKILL.md","type":"blob"},
+              {"path":"plugins/orleans/skills/orleans-multitenant/references/storage-providers.md","type":"blob"},
+              {"path":".agents/skills/dotnet-livecharts2/SKILL.md","type":"blob"},
+              {"path":"plugins/dotnet/skills/dotnet-livecharts2/SKILL.md","type":"blob"},
+              {"path":"plugins/dotnet/skills/cli-e2e-testing","type":"tree"},
+              {"path":"plugins/dotnet/skills/cli-e2e-testing/SKILL.md","type":"blob"}]}
+            """;
+
+        var paths = GitHubSourceVersionResolver.ParseSkillPaths(tree);
+
+        // A name at two paths is ambiguous and left out, as gh could not resolve it either.
+        Assert.NotNull(paths);
+        Assert.Equal("plugins/orleans/skills/orleans-multitenant", paths["orleans-multitenant"]);
+        Assert.Equal("plugins/dotnet/skills/cli-e2e-testing", paths["CLI-E2E-TESTING"]);
+        Assert.False(paths.ContainsKey("dotnet-livecharts2"));
+        Assert.Null(GitHubSourceVersionResolver.ParseSkillPaths("""{"truncated":true,"tree":[]}"""));
+    }
+
+    [Fact]
+    public async Task ANameOnlySkillTheRepositoryMovedIsReinstalledFromWhereItIsNow()
+    {
+        using TempDirectory temp = new();
+        temp.Write("App.csproj", "<Project />");
+        temp.Write(".agents/skills/dotnet-livecharts2/SKILL.md", Stamped(Repository, "plugins/dotnet/skills/dotnet-livecharts2"));
+        temp.Write(".agents/skills/dotnet-modern-csharp-editorconfig/SKILL.md", Stamped(Repository, "plugins/dotnet/skills/dotnet-modern-csharp-editorconfig"));
+        FakeCommandRunner runner = new();
+        QueueChecks(runner, directories: 1);
+        FakeSourceVersionResolver resolver = new()
+        {
+            SkillPaths = { [Repository] = new(StringComparer.OrdinalIgnoreCase) { ["dotnet-livecharts2"] = "plugins/charts/skills/dotnet-livecharts2", ["dotnet-modern-csharp-editorconfig"] = "plugins/dotnet/skills/dotnet-modern-csharp-editorconfig" } }
+        };
+        RecordingReporter reporter = new();
+        CheckWorkflow workflow = new(runner, new FakePrompts { SelectedDirectiveNames = [], SelectedSkillInstallArgs = [] }, reporter, new FakeDirectiveSource(), resolver,
+            skillManifest: [Entry(Repository, "dotnet-livecharts2"), Entry(Repository, "dotnet-modern-csharp-editorconfig")]);
+
+        var result = await workflow.RunAsync(new(temp.Path, true, false, null, null, "codex", false), CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Equal([$"{Repository}@v1.2.3"], resolver.SkillPathRequests);
+        Assert.Contains($"Would install {Repository} dotnet-livecharts2 into {Path.Combine(temp.Path, ".agents", "skills")}.", result.Report.Actions);
+        Assert.DoesNotContain(result.Report.Actions, action => action.Contains("dotnet-modern-csharp-editorconfig", StringComparison.Ordinal));
+        Assert.Empty(reporter.Warnings);
+    }
+
+    [Fact]
+    public async Task AnUnreadableTreeLeavesMovesUndetectedWithAWarning()
+    {
+        using TempDirectory temp = new();
+        temp.Write("App.csproj", "<Project />");
+        temp.Write(".agents/skills/dotnet-livecharts2/SKILL.md", Stamped(Repository, "plugins/dotnet/skills/dotnet-livecharts2"));
+        FakeCommandRunner runner = new();
+        QueueChecks(runner, directories: 1);
+        RecordingReporter reporter = new();
+        CheckWorkflow workflow = new(runner, new FakePrompts { SelectedDirectiveNames = [], SelectedSkillInstallArgs = [] }, reporter, new FakeDirectiveSource(), new FakeSourceVersionResolver(),
+            skillManifest: [Entry(Repository, "dotnet-livecharts2")]);
+
+        var result = await workflow.RunAsync(new(temp.Path, true, false, null, null, "codex", false), CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.DoesNotContain(result.Report.Actions, action => action.Contains("dotnet-livecharts2", StringComparison.Ordinal));
+        Assert.Contains(reporter.Warnings, warning => warning.StartsWith($"Could not read where {Repository} keeps its skills", StringComparison.Ordinal));
     }
 
     [Fact]

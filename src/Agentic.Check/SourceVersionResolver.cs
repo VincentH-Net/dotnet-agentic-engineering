@@ -10,6 +10,14 @@ interface ISourceVersionResolver
         SourceVersionMode sourceVersionMode,
         DirectiveCacheSettings cacheSettings,
         CancellationToken cancellationToken);
+
+    // The path of every skill folder in the repository at that ref, by folder name: one request for the
+    // whole tree. A name that occurs at more than one path is left out, as gh could not resolve it either.
+    Task<IReadOnlyDictionary<string, string>> ResolveSkillPathsAsync(
+        string sourceRepo,
+        string contentRef,
+        DirectiveCacheSettings cacheSettings,
+        CancellationToken cancellationToken);
 }
 
 sealed record SourceVersionInfo(string SourceRepo, string Ref, DateTimeOffset LastChangedAtUtc, string CommitSha = "")
@@ -100,6 +108,60 @@ sealed class GitHubSourceVersionResolver(HttpClient? httpClient = null, IReporte
         }
 
         return versions;
+    }
+
+    public async Task<IReadOnlyDictionary<string, string>> ResolveSkillPathsAsync(
+        string sourceRepo,
+        string contentRef,
+        DirectiveCacheSettings cacheSettings,
+        CancellationToken cancellationToken)
+    {
+        DirectiveHttpCache cache = new(cacheSettings, reporter);
+        string url = $"https://api.github.com/repos/{sourceRepo}/git/trees/{Uri.EscapeDataString(contentRef)}?recursive=1";
+        string content = await GetStringAsync(new Uri(url), url, $"skill paths of {sourceRepo}", cache, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return ParseSkillPaths(content) ?? throw new DirectiveException($"The file tree of {sourceRepo} at {contentRef} is too large to list completely.");
+        }
+        catch (JsonException exception)
+        {
+            throw new DirectiveException($"Invalid file tree for {sourceRepo} at {contentRef}: {exception.Message}", exception);
+        }
+    }
+
+    // Null when GitHub truncated the tree, which leaves the paths unknown.
+    internal static IReadOnlyDictionary<string, string>? ParseSkillPaths(string treeJson)
+    {
+        using var document = JsonDocument.Parse(treeJson);
+        if (document.RootElement.TryGetProperty("truncated", out var truncated) && truncated.GetBoolean())
+        {
+            return null;
+        }
+
+        Dictionary<string, string> paths = new(StringComparer.OrdinalIgnoreCase);
+        HashSet<string> ambiguous = new(StringComparer.OrdinalIgnoreCase);
+        foreach (var entry in document.RootElement.GetProperty("tree").EnumerateArray())
+        {
+            string? path = entry.GetProperty("path").GetString();
+            if (entry.GetProperty("type").GetString() != "blob" || path is null || !path.EndsWith("/SKILL.md", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            string folder = path[..^"/SKILL.md".Length];
+            string name = folder[(folder.LastIndexOf('/') + 1)..];
+            if (!paths.TryAdd(name, folder))
+            {
+                _ = ambiguous.Add(name);
+            }
+        }
+
+        foreach (string name in ambiguous)
+        {
+            _ = paths.Remove(name);
+        }
+
+        return paths;
     }
 
     async Task<SourceVersionInfo> ResolvePreviewRefAsync(string sourceRef, DirectiveHttpCache cache, CancellationToken cancellationToken)

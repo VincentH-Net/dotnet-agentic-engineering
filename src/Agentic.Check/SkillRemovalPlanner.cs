@@ -86,15 +86,29 @@ static class SkillRemovalPlanner
         return result;
     }
 
-    // Installed skills from the right repository at a path the manifest no longer names, so gh skill update
-    // would look in the wrong place. A name-only entry has no path to compare.
+    // Installed skills from the right repository at a path the repository no longer has them at, so gh skill
+    // update would look in the wrong place. The expected path is the manifest's for an entry that names one,
+    // and the repository's current path for a name-only entry; null when it is unknown.
     internal static IReadOnlyList<SkillManifestEntry> FindMoved(
         IReadOnlyList<InstalledSkill> installed,
-        IReadOnlyList<SkillManifestEntry> recommended)
-        => [.. recommended.Where(skill => skill.InstallArg.Contains('/', StringComparison.Ordinal)
+        IReadOnlyList<SkillManifestEntry> recommended,
+        Func<SkillManifestEntry, string?> expectedPath)
+        => [.. recommended.Where(skill => expectedPath(skill) is { } expected
             && installed.Any(candidate => candidate.Folder.Equals(skill.LocalFolder, StringComparison.OrdinalIgnoreCase)
                 && candidate.SourceRepo is { } sourceRepo && sourceRepo.Equals(skill.SourceRepo, StringComparison.OrdinalIgnoreCase)
-                && candidate.SourcePath is { } path && !path.Trim('/').Equals(skill.InstallArg.Trim('/'), StringComparison.OrdinalIgnoreCase)))];
+                && candidate.SourcePath is { } path && !path.Trim('/').Equals(expected.Trim('/'), StringComparison.OrdinalIgnoreCase)))];
+
+    // The installed, stamped skills listed by name only, grouped by repository: the ones whose current path
+    // only the repository's tree can tell.
+    internal static IReadOnlyDictionary<string, IReadOnlyList<SkillManifestEntry>> NameOnlyInstalled(
+        IReadOnlyList<InstalledSkill> installed,
+        IReadOnlyList<SkillManifestEntry> recommended)
+        => recommended
+            .Where(skill => !skill.InstallArg.Contains('/', StringComparison.Ordinal) && skill is { IsCompanion: false, IsDna: false, IsCodexRules: false, IsReadmeBadge: false }
+                && installed.Any(candidate => candidate.Folder.Equals(skill.LocalFolder, StringComparison.OrdinalIgnoreCase)
+                    && candidate.SourceRepo is { } sourceRepo && sourceRepo.Equals(skill.SourceRepo, StringComparison.OrdinalIgnoreCase) && candidate.SourcePath is not null))
+            .GroupBy(skill => skill.SourceRepo, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => (IReadOnlyList<SkillManifestEntry>)[.. group], StringComparer.OrdinalIgnoreCase);
 
     internal static bool IsRemoval(SkillManifestEntry skill)
         => skill.RecommendationAction == SkillInstaller.RemoveAction;

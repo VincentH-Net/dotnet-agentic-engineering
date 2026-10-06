@@ -367,6 +367,24 @@ sealed class FakeSourceVersionResolver : ISourceVersionResolver
 
     public SourceVersionMode? LastMode { get; private set; }
 
+    // Skill folder paths by repository and name, as the repository's tree would give them.
+    public Dictionary<string, Dictionary<string, string>> SkillPaths { get; init; } = new(StringComparer.OrdinalIgnoreCase);
+
+    public List<string> SkillPathRequests { get; } = [];
+
+    public Task<IReadOnlyDictionary<string, string>> ResolveSkillPathsAsync(
+        string sourceRepo,
+        string contentRef,
+        DirectiveCacheSettings cacheSettings,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        SkillPathRequests.Add($"{sourceRepo}@{contentRef}");
+        return SkillPaths.TryGetValue(sourceRepo, out var paths)
+            ? Task.FromResult((IReadOnlyDictionary<string, string>)paths)
+            : throw new DirectiveException($"No fake tree for {sourceRepo}.");
+    }
+
     public Task<IReadOnlyDictionary<string, SourceVersionInfo>> ResolveVersionsAsync(
         IEnumerable<string> sourceRepos,
         SourceVersionMode sourceVersionMode,

@@ -209,6 +209,7 @@ sealed class CheckWorkflow(
         report.SkillsDirectory = firstSkillsDirectory;
         report.SkillsDirectories.AddRange(skillsDirectories);
         IReadOnlyList<SkillManifestEntry> manifest;
+        var resolver = sourceVersionResolver ?? new GitHubSourceVersionResolver(githubClient, reporter, options.PreviewSourceRef);
         try
         {
             manifest = await AddSourceVersionInfoAsync(
@@ -216,7 +217,7 @@ sealed class CheckWorkflow(
                 sourceMode,
                 directiveCacheSettings,
                 options.PreviewSourceRef,
-                githubClient,
+                resolver,
                 cancellationToken).ConfigureAwait(false);
         }
         catch (DirectiveException exception) when (options.PreviewSourceRef is not null)
@@ -379,7 +380,8 @@ sealed class CheckWorkflow(
         var recommendedDirectives = directivePlan.SelectableDirectives;
         var stableSwitchSkills = FindStableSwitchSkillActions(options.Preview, recommended, skillsDirectories);
         var metadataReinstallSkills = FindMetadataReinstallSkillActions(options.Preview, recommended, skillsWithoutMetadata);
-        var movedSkills = SkillRemovalPlanner.FindMoved(installedSkills, recommended);
+        var movedSkills = SkillRemovalPlanner.FindMoved(installedSkills, recommended,
+            await ExpectedSkillPathsAsync(installedSkills, recommended, resolver, directiveCacheSettings, cancellationToken).ConfigureAwait(false));
         var recommendedSkillActions = options.Preview
             ? [.. recommended.Select(skill => skill with
             {
@@ -861,15 +863,47 @@ sealed class CheckWorkflow(
         return new CheckRunResult(exitCode, report);
     }
 
+    // Where each recommended skill lives in its repository now: the manifest's path, or for a name-only
+    // entry with an installed, stamped copy, the path from the repository's tree at the resolved ref. One
+    // request per repository; when a tree cannot be read, those moves go undetected and the run says so.
+    async Task<Func<SkillManifestEntry, string?>> ExpectedSkillPathsAsync(
+        IReadOnlyList<InstalledSkill> installedSkills,
+        IReadOnlyList<SkillManifestEntry> recommended,
+        ISourceVersionResolver resolver,
+        DirectiveCacheSettings cacheSettings,
+        CancellationToken cancellationToken)
+    {
+        Dictionary<string, IReadOnlyDictionary<string, string>> pathsByRepo = new(StringComparer.OrdinalIgnoreCase);
+        foreach (var (sourceRepo, skills) in SkillRemovalPlanner.NameOnlyInstalled(installedSkills, recommended))
+        {
+            if (skills[0].ResolvedSource is not { } source)
+            {
+                continue;
+            }
+
+            try
+            {
+                pathsByRepo[sourceRepo] = await resolver.ResolveSkillPathsAsync(sourceRepo, source.ContentRef, cacheSettings, cancellationToken).ConfigureAwait(false);
+            }
+            catch (DirectiveException exception)
+            {
+                reporter.Warning($"Could not read where {sourceRepo} keeps its skills, so a moved skill from it is not detected: {exception.Message}");
+            }
+        }
+
+        return skill => skill.InstallArg.Contains('/', StringComparison.Ordinal)
+            ? skill.InstallArg
+            : pathsByRepo.TryGetValue(skill.SourceRepo, out var paths) && paths.TryGetValue(skill.LocalFolder, out string? path) ? path : null;
+    }
+
     async Task<IReadOnlyList<SkillManifestEntry>> AddSourceVersionInfoAsync(
         IReadOnlyList<SkillManifestEntry> manifest,
         SourceVersionMode sourceVersionMode,
         DirectiveCacheSettings cacheSettings,
         string? previewSourceRef,
-        HttpClient githubClient,
+        ISourceVersionResolver resolver,
         CancellationToken cancellationToken)
     {
-        var resolver = sourceVersionResolver ?? new GitHubSourceVersionResolver(githubClient, reporter, previewSourceRef);
         IReadOnlyDictionary<string, SourceVersionInfo> versions;
         try
         {
