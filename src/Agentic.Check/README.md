@@ -9,7 +9,7 @@
   dotnet-agentic-engineering GitHub repo
 - For Codex, rules that run `dotnet` outside its sandbox are installed in `.codex/rules`, so
   `dotnet` has network access without approval prompts
-- Skills are installed / updated directly from source GitHub skill repo's with `gh skill`
+- Skills are installed / updated directly from source GitHub skill repo's with `gh skill`, and a skill a newer release no longer offers is removed again
 - Tools that directives and skills depend on are installed / updated with `dotnet tool`, pinned once per repository; a tool that is already the latest on nuget.org is reported as up to date and left alone
 
 The skills available for composition are carefully tested and are selected from

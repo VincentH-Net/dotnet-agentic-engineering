@@ -40,6 +40,13 @@ Reports are written to `tests/Agentic.Check.LiveTests/bin/Debug/net10.0/TestResu
 
 Discovery uses `gh api --cache 1800s`, separate from agentic-check's cache. `AGENTIC_CHECK_MAINTENANCE_CACHE_SECONDS=0` requests fresh API responses; other non-negative values change the duration. Within a run, identical endpoints are fetched once. The source JSON records the cache policy, not individual cache hits. `gh skill preview` controls its own fetching; the API cache setting does not govern that command.
 
+## Manifest history
+
+`ManifestHistoryTests` loads the previous release's `Agentic.Check` package from nuget.org, reads both
+manifest sets from its assembly, and fails when an entry of that release is in neither set now and not in
+`StaticSkillManifest.Retired`. The manifest is code, so the released assembly, not the tagged source, says
+which set an entry ended up in.
+
 ## Discovery rules
 
 For every repo in `StaticSkillManifest.SourceReviews`, resolve the current default branch dynamically (for this repository, the pushed branch of the checkout, which is what its default branch becomes at the merge) and the latest non-prerelease GitHub release, falling back to the default branch when no release exists. A stable manifest entry that names a minimum release counts as stable only once the latest release is at least that. Read recursive Git trees at those exact SHAs and at the reviewed SHA. This stable policy matches agentic-check's source-version resolver; the separate unversioned `gh skill preview` check exercises gh's actual stable selection.

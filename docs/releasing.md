@@ -73,8 +73,10 @@ only when it changed.
    ships it as its minimum release, so the stable channel offers it from that release on and the suite
    does not look for it in an older one; the preview channel has it at once. The maintenance tests read
    this repository's preview content from the pushed branch of the checkout, which is what `main`
-   becomes at the merge. Fill the README placeholders and, if it ships the same day, the article. Commit
-   with a prompt log and push.
+   becomes at the merge. A skill that leaves both manifest sets goes into `StaticSkillManifest.Retired`,
+   so a check still removes it from the repositories that have it; a maintenance test reads the previous
+   release's package and fails when an entry left without being retired. Fill the README placeholders
+   and, if it ships the same day, the article. Commit with a prompt log and push.
 2. **Run the full suite on that commit, against the candidates CI packed.** Start the `Tests`
    workflow for the branch with `gh workflow run tests.yml --ref <branch>`, then run
    `dotnet run --file tests/run-full-suite.cs -- --ci-run <run id>`. CI packs the candidates once and

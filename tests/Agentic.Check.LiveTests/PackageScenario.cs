@@ -1,5 +1,6 @@
 ﻿using System.Text.Json;
 using Agentic.PackageFixtures;
+using YamlDotNet.RepresentationModel;
 using Hex1b.Automation;
 
 namespace Agentic.Check.LiveTests;
@@ -11,6 +12,8 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
     readonly FixtureWorkspace workspace = new();
     readonly Dictionary<string, SourceSnapshot> sources = new(StringComparer.Ordinal);
     readonly Dictionary<string, string> skillTextBefore = new(StringComparer.Ordinal);
+    // Skill folders the check removed in any phase so far, as agent/skills/name.
+    readonly HashSet<string> removedFolders = new(StringComparer.Ordinal);
     readonly string runId = $"{fixtureName}-{scenario}-{Guid.NewGuid():N}";
     FixtureDefinition definition = null!;
     FixtureCapture? baseline;
@@ -175,6 +178,11 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
         ProgressLog.Append($"{fixtureName} {scenario}: {phase} done");
         using var document = JsonDocument.Parse(await File.ReadAllTextAsync(reportPath).ConfigureAwait(false));
         report = document.RootElement.Clone();
+        if (report.TryGetProperty("skillRemovals", out var removals))
+        {
+            foreach (var removal in removals.EnumerateArray().Where(removal => removal.GetProperty("success").GetBoolean()))
+                _ = removedFolders.Add(Path.GetRelativePath(workspace.Target, removal.GetProperty("skillsDirectory").GetString()!).Replace('\\', '/') + "/" + removal.GetProperty("localFolder").GetString());
+        }
         BaselinePreparation.VerifyReport(report, definition);
         foreach (var update in report.GetProperty("skillUpdateDryRuns").EnumerateArray().Concat(report.GetProperty("skillUpdates").EnumerateArray()))
             FixtureFiles.Require(update.GetProperty("success").GetBoolean(), $"Real gh update failed: {update}");
@@ -339,7 +347,7 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
             var expected = expectedSkills.Select(skill => agent + "/" + skill.LocalFolder).Order(StringComparer.Ordinal);
             var actual = origins.Where(origin => origin.LocalPath.StartsWith(agent + "/", StringComparison.Ordinal)).Select(origin => origin.LocalPath).Order(StringComparer.Ordinal);
             FixtureFiles.Require(expected.SequenceEqual(actual), $"Installed manifest/dependency inventory mismatch in {agent}");
-            VerifySkillDirectoryInventory(workspace.Target, agent, expected, filesBeforeOperation);
+            VerifySkillDirectoryInventory(workspace.Target, agent, expected, filesBeforeOperation, removedFolders);
         }
         foreach (var origin in origins)
         {
@@ -361,9 +369,22 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
         }
         if (definition.Agents.Contains("claude-code", StringComparison.Ordinal))
             FixtureFiles.Require((await File.ReadAllTextAsync(Path.Combine(workspace.Target, "CLAUDE.md")).ConfigureAwait(false)).Contains("@AGENTS.md", StringComparison.Ordinal), "Missing Claude instruction import.");
-        // Content outside the applicable manifest is preserved, including preview-only skills in stable mode.
-        foreach (var (path, hash) in before.Where(file => (file.Key.StartsWith(".agents/skills/", StringComparison.Ordinal) || file.Key.StartsWith(".claude/skills/", StringComparison.Ordinal)) && !allowed.Contains(file.Key.Split('/')[2])))
+        // Content outside the applicable manifest is preserved, except what the check removed: a skill this
+        // channel no longer offers leaves whole, by the identity gh stamped into it.
+        foreach (var (path, hash) in before.Where(file => (file.Key.StartsWith(".agents/skills/", StringComparison.Ordinal) || file.Key.StartsWith(".claude/skills/", StringComparison.Ordinal))
+            && !allowed.Contains(file.Key.Split('/')[2]) && !removedFolders.Contains(SkillFolder(file.Key))))
+        {
             FixtureFiles.Require(FixtureFiles.Hash(Path.Combine(workspace.Target, path)) == hash, $"Unselected skill unexpectedly changed: {path}");
+        }
+        foreach (string folder in removedFolders)
+            FixtureFiles.Require(!Directory.Exists(Path.Combine(workspace.Target, folder)), $"Removed skill still present: {folder}");
+        var obsolete = StaticSkillManifest.ObsoleteFor(preview ? StaticSkillManifest.Preview : StaticSkillManifest.All);
+        foreach (var (path, text) in skillTextBefore)
+        {
+            string folder = SkillFolder(path);
+            if (StampedRepository(SourceOracle.ParseSkill(text).Yaml) is { } stamped && obsolete.Contains(new SkillIdentity(stamped, Path.GetFileName(folder))))
+                FixtureFiles.Require(removedFolders.Contains(folder), $"Obsolete skill was not removed: {folder}");
+        }
         bool requiresCompanion = ExpectedDirectives().Any(directive => directive.Name == "foundation-prompt-log" && directive.Block.Contains("dotnet agentic", StringComparison.Ordinal))
             || expectedSkills.Any(skill => skill.Dependencies.Contains(CompanionDependency.Identity));
         if (requiresCompanion)
@@ -406,15 +427,27 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
         FixtureFiles.WriteJson(Path.Combine(FixtureFiles.Reports, runId + "-installed-sources.json"), origins);
     }
 
+    // agent/skills/name for a path below a skill folder.
+    static string SkillFolder(string path)
+        => string.Join('/', path.Split('/').Take(3));
+
+    static string? StampedRepository(YamlMappingNode yaml)
+        => yaml.Children.TryGetValue(new YamlScalarNode("metadata"), out var metadata) && metadata is YamlMappingNode mapping
+            && mapping.Children.TryGetValue(new YamlScalarNode("github-repo"), out var repository) && repository is YamlScalarNode { Value: { } value }
+                ? InstalledSkills.SourceRepoOf(value)
+                : null;
+
     IEnumerable<(string Name, string Block)> ExpectedDirectives()
         => DirectiveOracle.Expected(sources[SourceOracle.OwnRepository].Directory, definition.Technologies, prefixFreeMarkers: true);
 
-    internal static void VerifySkillDirectoryInventory(string target, string agent, IEnumerable<string> expected, IReadOnlyDictionary<string, string>? previousFiles)
+    internal static void VerifySkillDirectoryInventory(string target, string agent, IEnumerable<string> expected, IReadOnlyDictionary<string, string>? previousFiles, IReadOnlySet<string>? removedFolders = null)
     {
         // Setup may have added preview-only skills beyond the frozen baseline. Keep the
-        // inventory from immediately before this phase, whose setup was already verified.
+        // inventory from immediately before this phase, whose setup was already verified, less what the
+        // check removed since.
         var retained = previousFiles?.Keys.Where(path => path.StartsWith(agent + "/", StringComparison.Ordinal)
-            && path.Split('/').Length == 4 && path.EndsWith("/SKILL.md", StringComparison.Ordinal)).Select(path => path[..^"/SKILL.md".Length]) ?? [];
+            && path.Split('/').Length == 4 && path.EndsWith("/SKILL.md", StringComparison.Ordinal)).Select(path => path[..^"/SKILL.md".Length])
+            .Where(folder => removedFolders?.Contains(folder) != true) ?? [];
         var allExpected = expected.Concat(retained).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal);
         string skillsDirectory = Path.Combine(target, agent);
         string[] directories = Directory.Exists(skillsDirectory) ? Directory.GetDirectories(skillsDirectory) : [];

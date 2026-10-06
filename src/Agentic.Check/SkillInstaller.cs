@@ -14,6 +14,12 @@ sealed class SkillInstaller(
     // re-install from the manifest source writes that metadata so later updates work.
     internal const string MetadataReinstallAction = "re-install to enable updates";
 
+    // gh skill update follows the path stamped into the skill; a skill its repository moved is
+    // re-installed from where the manifest names it now.
+    internal const string MovedReinstallAction = "re-install from its new path";
+
+    internal const string RemoveAction = "remove";
+
     // Each gh skill install spends its time on about nine serial GitHub round trips, so installs
     // run concurrently. Measured on 2026-10-02: 84 installs launched at once finished in 7 s with
     // no rate-limit response. 48 keeps the largest manifest batch near 10 s while bounding the
@@ -65,6 +71,49 @@ sealed class SkillInstaller(
         // An unpinned default branch is also a valid stable source when no release exists.
         return skill.ResolvedSource is not { IsDefaultBranch: true } stableSource
             || !gitHubRef.Equals($"refs/heads/{stableSource.Ref}", StringComparison.Ordinal);
+    }
+
+    // Removes the whole folder of each selected removal wherever it is installed: a folder stamped with
+    // the row's repository, or one without a stamp, which only a row the user selected can name.
+    internal IReadOnlyList<SkillRemovalResult> Remove(
+        IReadOnlyList<SkillManifestEntry> removals,
+        IReadOnlyList<InstalledSkill> installed,
+        string workingDirectory,
+        Action<SkillRemovalResult>? reportResult = null)
+    {
+        List<SkillRemovalResult> results = [];
+        foreach (var removal in removals)
+        {
+            foreach (var skill in installed.Where(skill => skill.Folder.Equals(removal.LocalFolder, StringComparison.OrdinalIgnoreCase)
+                && (skill.SourceRepo is null || skill.SourceRepo.Equals(removal.SourceRepo, StringComparison.OrdinalIgnoreCase))))
+            {
+                string? error = null;
+                try
+                {
+                    Directory.Delete(Path.Combine(skill.SkillsDirectory, skill.Folder), recursive: true);
+                }
+                catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+                {
+                    error = exception.Message;
+                }
+
+                SkillRemovalResult result = new(removal.SourceRepo, skill.Folder, skill.SkillsDirectory, error is null, error);
+                results.Add(result);
+                reportResult?.Invoke(result);
+                string skillName = ActionOutputFormatter.FormatSkillName(workingDirectory, skill.SkillsDirectory, skill.Folder);
+                if (error is null)
+                {
+                    reporter.Success(ActionOutputFormatter.FormatLine("Removed skill", skillName));
+                }
+                else
+                {
+                    reporter.Error(ActionOutputFormatter.FormatLine("Failed skill removal", skillName));
+                    reporter.Error(ActionOutputFormatter.FormatDetail(error));
+                }
+            }
+        }
+
+        return results;
     }
 
     internal static string StagingRoot(string skillsDirectory)
@@ -204,7 +253,7 @@ sealed class SkillInstaller(
             : skill.RecommendationAction switch
             {
                 StableSwitchAction => "Switch to stable skill",
-                MetadataReinstallAction => "Re-installed skill",
+                MetadataReinstallAction or MovedReinstallAction => "Re-installed skill",
                 _ => null
             };
 
@@ -231,7 +280,7 @@ sealed class SkillInstaller(
     static string? ReadGitHubRef(string skillFile)
         => ReadFrontMatterValue(skillFile, "github-ref:");
 
-    static string? ReadFrontMatterValue(string skillFile, string key)
+    internal static string? ReadFrontMatterValue(string skillFile, string key)
     {
         if (!File.Exists(skillFile))
         {
@@ -520,3 +569,10 @@ sealed record SkillInstallResult(
     int ExitCode,
     string StandardOutput,
     string StandardError);
+
+sealed record SkillRemovalResult(
+    string SourceRepo,
+    string LocalFolder,
+    string SkillsDirectory,
+    bool Success,
+    string? Error);

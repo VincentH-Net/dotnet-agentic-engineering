@@ -71,6 +71,12 @@ sealed record SkillManifestEntry
 
     public bool IsRequiredToolRepair { get; init; }
 
+    // Shown in the action list under the row, for a choice the check leaves to the user.
+    public IReadOnlyList<string> Notes { get; init; } = [];
+
+    // A row the check does not select on its own: the user opts in.
+    public bool SelectedByDefault { get; init; } = true;
+
     public string RecommendationAction { get; init; }
 
     public bool ForceInstall { get; init; }
@@ -81,6 +87,18 @@ sealed record SkillManifestEntry
 }
 
 sealed record GateRequirement(string Gate, string Value);
+
+// A skill as removal and retirement know it: by source repository and folder name, whatever its path
+// or commit, since names are unique within a repository.
+readonly record struct SkillIdentity(string SourceRepo, string Name)
+{
+    public bool Equals(SkillIdentity other)
+        => string.Equals(SourceRepo, other.SourceRepo, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(Name, other.Name, StringComparison.OrdinalIgnoreCase);
+
+    public override int GetHashCode()
+        => HashCode.Combine(SourceRepo.ToUpperInvariant(), Name.ToUpperInvariant());
+}
 
 sealed record SkillDependency(string SourceRepo, string InstallArg)
 {
@@ -139,7 +157,7 @@ static class StaticSkillManifest
         ..DotnetTestSkills(),
         VincentOrleans("orleans-result-pattern"),
         VincentOrleans("orleans-multiservice-pattern"),
-        VincentOrleans("orleans-multitenant", minimumRelease: "2.4.2"),
+        VincentOrleans("orleans-multitenant", minimumRelease: "2.5.0"),
         VincentUno("uno-agentic-support"),
         VincentUno("uno-mvvm", "presentation", "mvvm"),
         VincentUno("uno-csharpmarkup2", "markup", "csharp2"),
@@ -164,6 +182,15 @@ static class StaticSkillManifest
         ..UnoStudioToolkitUngated()
     ];
 
+    // Skills some release offered that neither set offers now. A manifest never forgets a skill: a check
+    // removes an installed skill its channel no longer offers, and a maintenance test fails when an entry
+    // leaves both sets without being listed here.
+    internal static IReadOnlyList<SkillIdentity> Retired { get; } =
+    [
+        // Offered on preview by 2.2.0 and 2.3.0; dotnet/skills withdrew it.
+        new(DotnetSkillsRepo, "minimal-api-file-upload")
+    ];
+
     internal static IReadOnlyList<SkillManifestEntry> Preview { get; } =
     [
         ..All.Where(skill => (skill.SourceRepo != DotnetSkillsRepo || skill.Plugin != "dotnet-test") && skill.SourceRepo != UnoStudioRepo),
@@ -171,6 +198,19 @@ static class StaticSkillManifest
         ..UnoStudioHubs(),
         DotnetAspNetCore("dotnet-webapi")
     ];
+
+    internal static SkillIdentity Identity(SkillManifestEntry skill)
+        => new(skill.SourceRepo, skill.LocalFolder);
+
+    // What a channel's manifest leaves obsolete: every skill any manifest ever offered, by source repository
+    // and folder name, that this manifest does not. The other channel's skills count as ever offered, so
+    // switching channels never leaves both sets installed side by side.
+    internal static IReadOnlySet<SkillIdentity> ObsoleteFor(IReadOnlyList<SkillManifestEntry> manifest)
+    {
+        HashSet<SkillIdentity> obsolete = [.. All.Concat(Preview).Select(Identity), .. Retired];
+        obsolete.ExceptWith(manifest.Select(Identity));
+        return obsolete;
+    }
 
     // Whether this channel, resolved to this source version, offers the entry. Only an entry with a minimum
     // release can be left out: on the stable channel, when the latest release predates it. A default branch

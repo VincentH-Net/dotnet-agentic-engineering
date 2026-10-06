@@ -4,13 +4,13 @@ public sealed class ManifestReleaseGateTests
 {
     const string Repository = "VincentH-Net/dotnet-agentic-engineering";
 
-    static readonly SkillManifestEntry Gated = new(Repository, "orleans-multitenant", "orleans-multitenant", TechnologyNames.Orleans, [], minimumRelease: ToolVersion.Parse("2.4.2"));
+    static readonly SkillManifestEntry Gated = new(Repository, "orleans-multitenant", "orleans-multitenant", TechnologyNames.Orleans, [], minimumRelease: ToolVersion.Parse("2.5.0"));
 
     [Theory]
     [InlineData("v2.4.1", false)]
-    [InlineData("2.4.1", false)]
-    [InlineData("v2.4.2", true)]
+    [InlineData("2.4.9", false)]
     [InlineData("v2.5.0", true)]
+    [InlineData("v2.6.0", true)]
     [InlineData("v3.0.0", true)]
     [InlineData("latest", true)]
     public void StableOffersAGatedEntryFromItsMinimumReleaseOn(string tag, bool offered)
@@ -32,14 +32,14 @@ public sealed class ManifestReleaseGateTests
         var stable = Assert.Single(StaticSkillManifest.All, skill => skill.InstallArg == "orleans-multitenant");
         var preview = Assert.Single(StaticSkillManifest.Preview, skill => skill.InstallArg == "orleans-multitenant");
 
-        Assert.Equal(ToolVersion.Parse("2.4.2"), stable.MinimumRelease);
+        Assert.Equal(ToolVersion.Parse("2.5.0"), stable.MinimumRelease);
         Assert.Same(stable, preview);
         Assert.All(StaticSkillManifest.All.Where(skill => skill != stable), skill => Assert.Null(skill.MinimumRelease));
     }
 
     [Theory]
     [InlineData("v2.4.1", false)]
-    [InlineData("v2.4.2", true)]
+    [InlineData("v2.5.0", true)]
     public async Task AStableCheckRecommendsAGatedSkillOnlyFromItsRelease(string stableRef, bool recommended)
     {
         using TempDirectory tempDirectory = new();
@@ -51,7 +51,7 @@ public sealed class ManifestReleaseGateTests
         SkillManifestEntry[] manifest =
         [
             new(Repository, "dotnet-livecharts2", "dotnet-livecharts2", TechnologyNames.Dotnet, [], "dotnet"),
-            new(Repository, "dotnet-later", "dotnet-later", TechnologyNames.Dotnet, [], "dotnet", minimumRelease: ToolVersion.Parse("2.4.2"))
+            new(Repository, "dotnet-later", "dotnet-later", TechnologyNames.Dotnet, [], "dotnet", minimumRelease: ToolVersion.Parse("2.5.0"))
         ];
         CheckWorkflow workflow = new(
             commandRunner,

@@ -38,7 +38,7 @@ static class SkillDeferrals
     [
         // A valuable addition for Windows Forms repositories, but offering it only there needs a WinForms
         // install gate: new detection, which belongs in a minor release rather than a patch.
-        SkillDeferral.UntilCheck("dotnet/skills", "winforms-expert", "2.5", "the next minor release, which adds the WinForms install gate it needs")
+        SkillDeferral.UntilCheck("dotnet/skills", "winforms-expert", "2.6", "a later minor release, which adds the WinForms install gate it needs")
     ];
 
     // The Agentic.Check build under test, without build metadata.

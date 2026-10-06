@@ -36,14 +36,18 @@ sealed record RecommendationSelectionItem(
     DirectivePlanItem? Directive,
     SkillManifestEntry? Skill,
     string Version = "",
-    string? VersionWithoutConsumers = null);
+    string? VersionWithoutConsumers = null)
+{
+    // Lines shown under the row, for a choice the check leaves to the user.
+    public IReadOnlyList<string> Notes { get; init; } = [];
+}
 
 sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionItem> items)
 {
     readonly IReadOnlyList<RecommendationSelectionItem> items = items;
     readonly Dictionary<string, IReadOnlyList<string>> dependencyKeysByKey = BuildDependencyKeysByKey(items);
     readonly Dictionary<string, IReadOnlyList<string>> dependentKeysByKey = BuildDependentKeysByKey(items);
-    readonly HashSet<string> selectedKeys = items.Select(item => item.Key).ToHashSet(StringComparer.Ordinal);
+    readonly HashSet<string> selectedKeys = items.Where(item => item.Skill?.SelectedByDefault != false).Select(item => item.Key).ToHashSet(StringComparer.Ordinal);
     readonly Dictionary<string, int> ordinalByKey = BuildOrdinalByKey(items);
     readonly HashSet<string> automaticallySelectedKeys = new(StringComparer.Ordinal);
     // Rows present above or below the target that specialization deselects; target-local repairs stay.
@@ -583,7 +587,10 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console, IRecommendation
             null,
             skill,
             skill.Version,
-            skill.VersionWithoutConsumers)));
+            skill.VersionWithoutConsumers)
+        {
+            Notes = skill.Notes
+        }));
         return items;
     }
 
@@ -943,7 +950,7 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console, IRecommendation
             state.FilteredItems,
             state.CursorIndex,
             Math.Max(MinListRows, console.Profile.Height - 1 - lineCount),
-            item => 1 + (ShouldShowDuplicateDetails(state, item) ? 1 + state.GetDuplicateLocations(item).Count : 0));
+            item => 1 + item.Notes.Count + (ShouldShowDuplicateDetails(state, item) ? 1 + state.GetDuplicateLocations(item).Count : 0));
         int visibleEndIndex = visibleStartIndex + visibleItems.Count;
         if (visibleItems.Count < state.FilteredItems.Count)
         {
@@ -1000,6 +1007,11 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console, IRecommendation
             else
             {
                 MarkupLine(prefix + display);
+            }
+
+            foreach (string note in item.Notes)
+            {
+                MarkupLine($"[yellow]{Markup.Escape($"{indent}    {note}")}[/]");
             }
 
             var duplicateLocations = state.GetDuplicateLocations(item);

@@ -29,7 +29,8 @@ sealed class CheckWorkflow(
     DnaInstaller? dnaInstaller = null,
     Func<string, string?>? readEnvironment = null,
     INuGetVersionSource? versionSource = null,
-    Func<TimeSpan, CancellationToken, Task>? rateLimitDelay = null)
+    Func<TimeSpan, CancellationToken, Task>? rateLimitDelay = null,
+    IReadOnlySet<SkillIdentity>? obsoleteSkills = null)
 {
     // A manual test shell sets this so every check it starts, including dna check and dnx, reads pinned content.
     internal const string PreviewSourceRefVariable = "AGENTIC_CHECK_PREVIEW_SOURCE_REF";
@@ -196,6 +197,7 @@ sealed class CheckWorkflow(
         IReadOnlyList<SkillManifestEntry> recommended = [];
         IReadOnlyList<SkillManifestEntry> missing = [];
         IReadOnlyList<SkillUpdateCandidate> skillUpdates = [];
+        IReadOnlyList<InstalledSkill> installedSkills = [];
         IReadOnlyList<string> skillsWithoutMetadata = [];
         ScopeDuplicateScanResult? duplicates = null;
         PresentElsewhere? presentElsewhere = null;
@@ -304,6 +306,7 @@ sealed class CheckWorkflow(
 
                 missing = SkillInstaller.FindMissing(recommended, skillsDirectories);
                 report.MissingSkills.AddRange(missing.Select(SkillReportItem.FromManifestEntry));
+                installedSkills = InstalledSkills.Scan(skillsDirectories);
 
                 if (!options.Preview)
                 {
@@ -376,9 +379,18 @@ sealed class CheckWorkflow(
         var recommendedDirectives = directivePlan.SelectableDirectives;
         var stableSwitchSkills = FindStableSwitchSkillActions(options.Preview, recommended, skillsDirectories);
         var metadataReinstallSkills = FindMetadataReinstallSkillActions(options.Preview, recommended, skillsWithoutMetadata);
+        var movedSkills = SkillRemovalPlanner.FindMoved(installedSkills, recommended);
         var recommendedSkillActions = options.Preview
-            ? [.. recommended.Select(skill => skill with { RecommendationAction = missing.Contains(skill) ? "install" : "re-install" })]
-            : BuildSkillActions(recommended, missing, stableSwitchSkills, metadataReinstallSkills);
+            ? [.. recommended.Select(skill => skill with
+            {
+                RecommendationAction = missing.Contains(skill) ? "install" : movedSkills.Contains(skill) ? SkillInstaller.MovedReinstallAction : "re-install"
+            })]
+            : BuildSkillActions(recommended, missing, stableSwitchSkills, metadataReinstallSkills, movedSkills);
+        // An injected manifest carries no history, so nothing is obsolete unless the test says so.
+        var obsolete = obsoleteSkills ?? (skillManifest is null ? StaticSkillManifest.ObsoleteFor(options.Preview ? StaticSkillManifest.Preview : StaticSkillManifest.All) : new HashSet<SkillIdentity>());
+        var removals = SkillRemovalPlanner.PlanRemovals(installedSkills, recommended, obsolete);
+        report.ObsoleteSkills.AddRange(removals.Select(SkillReportItem.FromManifestEntry));
+        recommendedSkillActions = [.. SkillRemovalPlanner.WithReplacements(recommendedSkillActions, recommended, installedSkills), .. removals];
         ToolVersion? repairRequirement = null;
         // What the installed consumers need, kept even when the installed companion satisfies it.
         ToolVersion? installedRequirement = null;
@@ -614,10 +626,14 @@ sealed class CheckWorkflow(
         // The same selection graph closes dependencies for interactive, --yes, dry-run, and updates.
         var closedSelection = CloseDependencies(selectedDirectives, selectedSkills, recommendedSkillActions);
         selectedSkills = closedSelection.SelectedSkills;
+        IReadOnlyList<SkillManifestEntry> selectedRemovals = [.. selectedSkills.Where(SkillRemovalPlanner.IsRemoval)];
+        selectedSkills = [.. selectedSkills.Where(skill => !SkillRemovalPlanner.IsRemoval(skill))];
+        // A skill on its way out is not updated first.
+        skillUpdates = [.. skillUpdates.Where(update => !selectedRemovals.Any(removal => removal.LocalFolder.Equals(update.Name, StringComparison.OrdinalIgnoreCase)))];
 
         if (!options.DryRun && (recommendedDirectives.Count > 0 || recommendedSkillActions.Count > 0))
         {
-            ReportSelectedActions(selectedDirectives.Count + selectedSkills.Count);
+            ReportSelectedActions(selectedDirectives.Count + selectedSkills.Count + selectedRemovals.Count);
         }
 
         if (selectedSkills.Any(skill => skill.IsCompanion))
@@ -733,6 +749,15 @@ sealed class CheckWorkflow(
         if (options.DryRun)
         {
             ReportDirectiveDryRunActions(selectedDirectives, report.AgentsFile);
+            ReportSkillRemovalDryRunActions(selectedRemovals);
+            foreach (var removal in selectedRemovals)
+            {
+                foreach (var skill in RemovableFolders(removal, installedSkills))
+                {
+                    report.Actions.Add($"Would remove {skill.Folder} from {skill.SkillsDirectory}: {(removal.Notes.Count > 0 ? removal.Notes[0] : string.Empty)}");
+                }
+            }
+
             ReportSkillInstallDryRunActions(selectedSkills);
 
             foreach (var skill in selectedSkills)
@@ -745,11 +770,18 @@ sealed class CheckWorkflow(
 
             if (!options.Preview)
             {
-                ReportSkillUpdateDryRunActions(report.SkillUpdateDryRuns, recommended);
+                ReportSkillUpdateDryRunActions(report.SkillUpdateDryRuns, recommended, selectedRemovals);
             }
 
             await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
             return new CheckRunResult(report.Companion?.Success == false || report.Dna?.Success == false || report.CodexRules?.Success == false || report.ReadmeBadge?.Success == false ? 1 : 0, report);
+        }
+
+        if (selectedRemovals.Count > 0)
+        {
+            // Before the installs: a replacement goes where the skill it replaces was.
+            _ = new SkillInstaller(githubRunner, reporter, delay: rateLimitDelay)
+                .Remove(selectedRemovals, installedSkills, targetDirectory, report.SkillRemovals.Add);
         }
 
         if (selectedSkills.Count > 0)
@@ -824,7 +856,7 @@ sealed class CheckWorkflow(
             }, cancellationToken).ConfigureAwait(false);
         }
 
-        int exitCode = report.Companion?.Success == false || report.Dna?.Success == false || report.CodexRules?.Success == false || report.ReadmeBadge?.Success == false || report.SkillUpdates.Any(result => !result.Success) || report.InstallResults.Any(result => !result.Success) || report.SkillCopyResults.Any(result => !result.Success) ? 1 : 0;
+        int exitCode = report.SkillRemovals.Any(result => !result.Success) || report.Companion?.Success == false || report.Dna?.Success == false || report.CodexRules?.Success == false || report.ReadmeBadge?.Success == false || report.SkillUpdates.Any(result => !result.Success) || report.InstallResults.Any(result => !result.Success) || report.SkillCopyResults.Any(result => !result.Success) ? 1 : 0;
         await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
         return new CheckRunResult(exitCode, report);
     }
@@ -1115,11 +1147,29 @@ sealed class CheckWorkflow(
         ReportSkillGroups(selectedSkills, skill => $"      {skill.LocalFolder}", ItemStyle.Plain);
     }
 
+    void ReportSkillRemovalDryRunActions(IReadOnlyList<SkillManifestEntry> selectedRemovals)
+    {
+        if (selectedRemovals.Count == 0)
+        {
+            return;
+        }
+
+        ReportSectionHeader("Would remove skills from skills directories:");
+        ReportSkillGroups(selectedRemovals, skill => $"      {skill.LocalFolder}", ItemStyle.Plain);
+    }
+
+    // The folders a removal row stands for: stamped with its repository, or without a stamp.
+    static IEnumerable<InstalledSkill> RemovableFolders(SkillManifestEntry removal, IReadOnlyList<InstalledSkill> installed)
+        => installed.Where(skill => skill.Folder.Equals(removal.LocalFolder, StringComparison.OrdinalIgnoreCase)
+            && (skill.SourceRepo is null || skill.SourceRepo.Equals(removal.SourceRepo, StringComparison.OrdinalIgnoreCase)));
+
     void ReportSkillUpdateDryRunActions(
         IReadOnlyList<CommandReport> dryRunReports,
-        IReadOnlyList<SkillManifestEntry> recommendedSkills)
+        IReadOnlyList<SkillManifestEntry> recommendedSkills,
+        IReadOnlyList<SkillManifestEntry> selectedRemovals)
     {
-        SkillUpdateCandidate[] skillUpdates = [.. ExtractDistinctSkillUpdates(dryRunReports, recommendedSkills)];
+        SkillUpdateCandidate[] skillUpdates = [.. ExtractDistinctSkillUpdates(dryRunReports, recommendedSkills)
+            .Where(update => !selectedRemovals.Any(removal => removal.LocalFolder.Equals(update.Name, StringComparison.OrdinalIgnoreCase)))];
         if (skillUpdates.Length == 0)
         {
             return;
@@ -1374,7 +1424,8 @@ sealed class CheckWorkflow(
         IReadOnlyList<SkillManifestEntry> recommendedSkills,
         IReadOnlyList<SkillManifestEntry> missingSkills,
         IReadOnlyList<SkillManifestEntry> stableSwitchSkills,
-        IReadOnlyList<SkillManifestEntry> metadataReinstallSkills)
+        IReadOnlyList<SkillManifestEntry> metadataReinstallSkills,
+        IReadOnlyList<SkillManifestEntry> movedSkills)
     {
         var missingSkillKeys = missingSkills
             .Select(SkillKey)
@@ -1385,12 +1436,16 @@ sealed class CheckWorkflow(
         var metadataReinstallSkillKeys = metadataReinstallSkills
             .Select(SkillKey)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var movedSkillKeys = movedSkills
+            .Select(SkillKey)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
         return
         [
             .. recommendedSkills
                 .Where(skill => missingSkillKeys.Contains(SkillKey(skill))
                     || stableSwitchSkillKeys.Contains(SkillKey(skill))
-                    || metadataReinstallSkillKeys.Contains(SkillKey(skill)))
+                    || metadataReinstallSkillKeys.Contains(SkillKey(skill))
+                    || movedSkillKeys.Contains(SkillKey(skill)))
                 .Select(skill => stableSwitchSkillKeys.Contains(SkillKey(skill))
                     ? skill with
                     {
@@ -1403,7 +1458,13 @@ sealed class CheckWorkflow(
                             RecommendationAction = SkillInstaller.MetadataReinstallAction,
                             ForceInstall = true
                         }
-                        : skill)
+                        : movedSkillKeys.Contains(SkillKey(skill))
+                            ? skill with
+                            {
+                                RecommendationAction = SkillInstaller.MovedReinstallAction,
+                                ForceInstall = true
+                            }
+                            : skill)
         ];
     }
 
