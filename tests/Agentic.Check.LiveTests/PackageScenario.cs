@@ -283,6 +283,13 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
             ObservedContentTransition = ContentChanged(before, after) || agentsBefore != agents;
             foreach (var (path, oldText) in skillTextBefore)
             {
+                // A skill the check removed is a transition of its own; there is nothing left to compare.
+                if (removedFolders.Contains(SkillFolder(path)))
+                {
+                    ObservedContentTransition = true;
+                    continue;
+                }
+
                 var (oldYaml, oldBody) = SourceOracle.ParseSkill(oldText);
                 var (newYaml, newBody) = SourceOracle.ParseSkill(await File.ReadAllTextAsync(Path.Combine(workspace.Target, path)).ConfigureAwait(false));
                 SourceOracle.RemoveTracking(oldYaml);
