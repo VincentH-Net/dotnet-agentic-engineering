@@ -120,7 +120,7 @@ static class AgenticCheckCli
         - For Codex, rules that run dotnet outside its sandbox are installed in
           .codex/rules, so dotnet has network access without approval prompts
         - Skills are installed / updated directly from source GitHub skill repo's with 
-          'gh skill'
+          'gh skill', and a skill a newer release no longer offers is removed again
         - Tools that directives and skills depend on are installed / updated with 'dotnet tool',
           pinned once per repository in the repo root's .config/dotnet-tools.json
 
