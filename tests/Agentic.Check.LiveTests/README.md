@@ -42,7 +42,7 @@ Discovery uses `gh api --cache 1800s`, separate from agentic-check's cache. `AGE
 
 ## Discovery rules
 
-For every repo in `StaticSkillManifest.SourceReviews`, resolve the current default branch dynamically and the latest non-prerelease GitHub release, falling back to the default branch when no release exists. Read recursive Git trees at those exact SHAs and at the reviewed SHA. This stable policy matches agentic-check's source-version resolver; the separate unversioned `gh skill preview` check exercises gh's actual stable selection.
+For every repo in `StaticSkillManifest.SourceReviews`, resolve the current default branch dynamically (for this repository, the pushed branch of the checkout, which is what its default branch becomes at the merge) and the latest non-prerelease GitHub release, falling back to the default branch when no release exists. A stable manifest entry that names a minimum release counts as stable only once the latest release is at least that. Read recursive Git trees at those exact SHAs and at the reviewed SHA. This stable policy matches agentic-check's source-version resolver; the separate unversioned `gh skill preview` check exercises gh's actual stable selection.
 
 Scan every blob named `SKILL.md`, including hidden folders and folders not yet represented in the manifest. Compare case-sensitive repo-relative paths, scoped by repo. Exact-path manifest entries stay exact; name-only entries support root folders and use the manifest plugin label to disambiguate where possible, otherwise preferring the plugins convention over legacy layouts. Remaining ambiguities require review.
 

@@ -13,7 +13,8 @@ sealed record SkillManifestEntry
         string sourceRef = "",
         string version = "",
         string recommendationAction = "install",
-        bool forceInstall = false)
+        bool forceInstall = false,
+        ToolVersion? minimumRelease = null)
     {
         SourceRepo = sourceRepo;
         InstallArg = installArg;
@@ -26,7 +27,12 @@ sealed record SkillManifestEntry
         Version = version;
         RecommendationAction = recommendationAction;
         ForceInstall = forceInstall;
+        MinimumRelease = minimumRelease;
     }
+
+    // The first release of the source repository that ships the skill. The stable channel installs from
+    // the latest release, so it offers the skill only once that release is out; preview has it already.
+    public ToolVersion? MinimumRelease { get; init; }
 
     public string SourceRepo { get; init; }
 
@@ -133,6 +139,7 @@ static class StaticSkillManifest
         ..DotnetTestSkills(),
         VincentOrleans("orleans-result-pattern"),
         VincentOrleans("orleans-multiservice-pattern"),
+        VincentOrleans("orleans-multitenant", minimumRelease: "2.4.2"),
         VincentUno("uno-agentic-support"),
         VincentUno("uno-mvvm", "presentation", "mvvm"),
         VincentUno("uno-csharpmarkup2", "markup", "csharp2"),
@@ -165,14 +172,34 @@ static class StaticSkillManifest
         DotnetAspNetCore("dotnet-webapi")
     ];
 
+    // Whether this channel, resolved to this source version, offers the entry. Only an entry with a minimum
+    // release can be left out: on the stable channel, when the latest release predates it. A default branch
+    // has it, as does a release whose tag is not a version, which leaves the install to say so.
+    internal static bool IsOffered(SkillManifestEntry skill, SourceVersionMode mode, SourceVersionInfo source)
+    {
+        if (skill.MinimumRelease is null || mode == SourceVersionMode.Preview || source.IsDefaultBranch)
+        {
+            return true;
+        }
+
+        try
+        {
+            return ToolVersion.Parse(source.Ref.TrimStart('v', 'V')).CompareTo(skill.MinimumRelease) >= 0;
+        }
+        catch (FormatException)
+        {
+            return true;
+        }
+    }
+
     static SkillManifestEntry VincentDotnet(string skill)
         => Entry(VincentRepo, skill, TechnologyNames.Dotnet, plugin: "dotnet");
 
     static SkillManifestEntry VincentDotnet(string skill, IReadOnlyList<GateRequirement> gateRequirements)
         => Entry(VincentRepo, skill, TechnologyNames.Dotnet, gateRequirements, plugin: "dotnet");
 
-    static SkillManifestEntry VincentOrleans(string skill)
-        => Entry(VincentRepo, skill, TechnologyNames.Orleans, plugin: "orleans");
+    static SkillManifestEntry VincentOrleans(string skill, string? minimumRelease = null)
+        => Entry(VincentRepo, skill, TechnologyNames.Orleans, plugin: "orleans", minimumRelease: minimumRelease is null ? null : ToolVersion.Parse(minimumRelease));
 
     static SkillManifestEntry VincentUno(string skill)
         => Entry(VincentRepo, skill, TechnologyNames.Uno, plugin: "uno-platform");
@@ -225,8 +252,9 @@ static class StaticSkillManifest
         string skill,
         string technology,
         IReadOnlyList<GateRequirement>? gateRequirements = null,
-        string plugin = "")
-        => new(sourceRepo, skill, skill, technology, gateRequirements ?? [], plugin);
+        string plugin = "",
+        ToolVersion? minimumRelease = null)
+        => new(sourceRepo, skill, skill, technology, gateRequirements ?? [], plugin, minimumRelease: minimumRelease);
 
     static IReadOnlyList<SkillManifestEntry> DotnetTestSkills(bool preview = false)
         =>

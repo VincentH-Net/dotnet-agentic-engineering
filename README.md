@@ -183,6 +183,7 @@ Skills for [Microsoft Orleans 10](https://learn.microsoft.com/en-us/dotnet/orlea
 |-------|-------------|
 | `orleans-result-pattern` | Concise, version-tolerant result pattern for Orleans 8+ grain calls — `Result` / `Result<T>` with `enum ErrorNr` + `string` errors, `[Immutable]` for zero-copy within-silo calls, implicit conversions, and RFC7807 `ValidationProblemDetails` via `TryAsValidationErrors`. |
 | `orleans-multiservice-pattern` | Modular-monolith pattern for Orleans 10 — host multiple logical services in one silo with strict `Apis → Contracts`, `Apis → Service`, `Service → Contracts` dependency rules so any logical service can later be extracted to its own physical microservice with minimal changes. |
+| `orleans-multitenant` | Multitenancy for Orleans 10 with [Orleans.Multitenant](https://github.com/VincentH-Net/Orleans.Multitenant) — per-tenant grain storage and tenant separation of grain calls and streams. Covers adding the package, silo configuration, the tenant aware API for grains and streams, stream subscriptions, cross-tenant authorization, troubleshooting, and the 4.x to 5.x upgrade. |
 
 ### uno-platform plugin
 

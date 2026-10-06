@@ -8,6 +8,10 @@ public sealed class SkillDiscoveryLiveTests(ITestOutputHelper output)
 {
     static readonly JsonSerializerOptions ReportJsonOptions = new() { WriteIndented = true };
 
+    // The stable channel as the check's resolver sees it: the latest release, or the default branch without one.
+    internal static SourceVersionInfo StableVersion(string repo, SkillSourceSnapshot stable, SkillSourceSnapshot preview)
+        => new(repo, stable.Ref, stable.CommittedAt, stable.CommitSha) { IsDefaultBranch = stable.CommitSha == preview.CommitSha && stable.Ref == preview.Ref };
+
     [SkillMaintenanceFact]
     [Trait("Category", "SkillMaintenance")]
     public async Task SourceRepositoriesHaveNoUnreviewedSkills()
@@ -24,8 +28,10 @@ public sealed class SkillDiscoveryLiveTests(ITestOutputHelper output)
             output.WriteLine($"Scanning {review.SourceRepo}");
             try
             {
-                var preview = await gh.DefaultBranchAsync(review.SourceRepo, cancellation.Token).ConfigureAwait(true);
+                var preview = await gh.PreviewAsync(review.SourceRepo, cancellation.Token).ConfigureAwait(true);
                 var stable = await gh.StableAsync(review.SourceRepo, preview, cancellation.Token).ConfigureAwait(true);
+                // The stable set as the latest release offers it: an entry a later release ships is not missing.
+                SkillManifestEntry[] stableManifest = [.. StaticSkillManifest.All.Where(skill => StaticSkillManifest.IsOffered(skill, SourceVersionMode.Stable, StableVersion(review.SourceRepo, stable, preview)))];
                 var baselineFiles = await gh.InventoryAsync(review.SourceRepo, review.CommitSha, cancellation.Token).ConfigureAwait(true);
                 var stableFiles = await gh.InventoryAsync(review.SourceRepo, stable.CommitSha, cancellation.Token).ConfigureAwait(true);
                 var previewFiles = await gh.InventoryAsync(review.SourceRepo, preview.CommitSha, cancellation.Token).ConfigureAwait(true);
@@ -43,7 +49,7 @@ public sealed class SkillDiscoveryLiveTests(ITestOutputHelper output)
                     output.WriteLine($"{review.SourceRepo}: {deferral.SkillName} deferred until {deferral.WaitingFor}: {(releases[deferral] is { } release ? deferral.Released(release) : "still waiting")}");
                 }
                 var items = SkillDiscovery.ApplyDeferrals(SkillDiscovery.Compare(review.SourceRepo, baselineFiles, stableFiles, previewFiles,
-                    StaticSkillManifest.All, StaticSkillManifest.Preview, stable.CommittedAt <= review.ReviewedAt), deferrals, deferral => releases[deferral]);
+                    stableManifest, StaticSkillManifest.Preview, stable.CommittedAt <= review.ReviewedAt), deferrals, deferral => releases[deferral]);
                 scans.Add(new(review, stable, preview, items));
                 int count = items.Count(SkillDiscovery.NeedsReview);
                 output.WriteLine($"{review.SourceRepo}: {count} item(s) require review.");

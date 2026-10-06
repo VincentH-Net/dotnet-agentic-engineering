@@ -1,7 +1,7 @@
 {
   "name": "orleans",
-  "version": "1.0.0",
-  "description": "Skills for Microsoft Orleans 10 development including the result pattern and the multiservice modular-monolith pattern",
+  "version": "1.1.0",
+  "description": "Skills for Microsoft Orleans 10 development including the result pattern, the multiservice modular-monolith pattern and multitenancy",
   "author": {
     "name": "Vincent Hoogendoorn",
     "url": "https://github.com/VincentH-Net"

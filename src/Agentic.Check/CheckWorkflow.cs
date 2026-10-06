@@ -851,7 +851,9 @@ sealed class CheckWorkflow(
             return manifest;
         }
 
-        return [.. manifest.Select(skill => versions.TryGetValue(skill.SourceRepo, out var version)
+        return [.. manifest
+            .Where(skill => !versions.TryGetValue(skill.SourceRepo, out var version) || StaticSkillManifest.IsOffered(skill, sourceVersionMode, version))
+            .Select(skill => versions.TryGetValue(skill.SourceRepo, out var version)
             ? skill with
             {
                 SourceRef = sourceVersionMode == SourceVersionMode.Preview ? version.ContentRef : string.Empty,

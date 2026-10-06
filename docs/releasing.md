@@ -69,8 +69,12 @@ only when it changed.
    The full suite fails when either is not the case.
    The literal `<Version>` in `src/Agentic/Agentic.csproj` is what Agentic.Check reads from GitHub, and
    every `-m` in directives and skills must be in its major and not above its major.minor (a test
-   enforces this). Fill the README placeholders and, if it ships the same day, the article. Commit with
-   a prompt log and push.
+   enforces this). A new skill of this repository enters the manifest's stable set with the release that
+   ships it as its minimum release, so the stable channel offers it from that release on and the suite
+   does not look for it in an older one; the preview channel has it at once. The maintenance tests read
+   this repository's preview content from the pushed branch of the checkout, which is what `main`
+   becomes at the merge. Fill the README placeholders and, if it ships the same day, the article. Commit
+   with a prompt log and push.
 2. **Run the full suite on that commit, against the candidates CI packed.** Start the `Tests`
    workflow for the branch with `gh workflow run tests.yml --ref <branch>`, then run
    `dotnet run --file tests/run-full-suite.cs -- --ci-run <run id>`. CI packs the candidates once and
@@ -97,7 +101,13 @@ only when it changed.
    ```
    In the window it opens: `dna check` must show the new Agentic.Check version and the release content
    and install `InnoWvate.Agentic` from nuget.org; then `dna prompt-log` and one agent-created commit.
-6. **Afterwards.** Publish the article. Capture a new baseline collection with the published
-   Agentic.Check for future update tests (see [tests/fixtures/README.md](../tests/fixtures/README.md)),
-   and set the next patch version of `Agentic.Check`, so its dev builds never reuse a published
-   number. The other packages keep their number until they change.
+6. **Afterwards.** Publish the article, and set the next patch version of `Agentic.Check`, so its dev
+   builds never reuse a published number. The other packages keep their number until they change.
+   Capture a new baseline collection with the published Agentic.Check (see
+   [tests/fixtures/README.md](../tests/fixtures/README.md)) only when the release changed the shape of
+   what a check writes into a repository: the markers or layout of managed blocks, the metadata of
+   installed skills, the tool manifest entries or pins, or the prompt-log format; or when a fixture
+   definition changed. A baseline is the state the update scenarios start from, and an older baseline
+   cannot hold such a state. Changed or added directive and skill text needs no baseline: updating it
+   from an older baseline is exactly what the update scenarios test, and a newer baseline would only
+   make their content-transition rows skip until the next change.

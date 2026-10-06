@@ -22,23 +22,31 @@ public sealed class ManifestGhSkillTests(ITestOutputHelper output)
         foreach (string repo in StaticSkillManifest.All.Concat(StaticSkillManifest.Preview).Select(skill => skill.SourceRepo).Distinct(StringComparer.OrdinalIgnoreCase))
         {
             _ = report.AppendLine(CultureInfo.InvariantCulture, $"## {repo}").AppendLine();
-            foreach (var skill in StaticSkillManifest.All.Where(skill => skill.SourceRepo.Equals(repo, StringComparison.OrdinalIgnoreCase)))
-            {
-                await ValidateAsync(skill, "stable", "", report, failures, cancellation.Token).ConfigureAwait(true);
-            }
-
             try
             {
-                var source = await gh.DefaultBranchAsync(repo, cancellation.Token).ConfigureAwait(true);
+                var source = await gh.PreviewAsync(repo, cancellation.Token).ConfigureAwait(true);
+                var stable = await gh.StableAsync(repo, source, cancellation.Token).ConfigureAwait(true);
+                foreach (var skill in StaticSkillManifest.All.Where(skill => skill.SourceRepo.Equals(repo, StringComparison.OrdinalIgnoreCase)))
+                {
+                    if (!StaticSkillManifest.IsOffered(skill, SourceVersionMode.Stable, SkillDiscoveryLiveTests.StableVersion(repo, stable, source)))
+                    {
+                        _ = report.AppendLine(CultureInfo.InvariantCulture, $"### stable: {skill.InstallArg}").AppendLine()
+                            .AppendLine(CultureInfo.InvariantCulture, $"SKIPPED: offered from release {skill.MinimumRelease}; the latest is `{stable.Ref}`.").AppendLine();
+                        continue;
+                    }
+
+                    await ValidateAsync(skill, "stable", "", report, failures, cancellation.Token).ConfigureAwait(true);
+                }
+
                 _ = report.AppendLine(CultureInfo.InvariantCulture, $"Preview: `{source.Ref}` at `{source.CommitSha}`").AppendLine();
                 foreach (var skill in StaticSkillManifest.Preview.Where(skill => skill.SourceRepo.Equals(repo, StringComparison.OrdinalIgnoreCase)))
                 {
                     await ValidateAsync(skill, "preview", source.CommitSha, report, failures, cancellation.Token).ConfigureAwait(true);
                 }
             }
-            catch (Exception exception) when (exception is IOException or JsonException or InvalidOperationException or KeyNotFoundException)
+            catch (Exception exception) when (exception is IOException or JsonException or InvalidOperationException or KeyNotFoundException or InvalidDataException)
             {
-                failures.Add($"{repo}: could not validate preview: {exception.Message}");
+                failures.Add($"{repo}: could not validate: {exception.Message}");
                 _ = report.AppendLine(SkillDiscovery.Escape(failures[^1])).AppendLine();
             }
         }

@@ -1,4 +1,5 @@
-﻿using System.Globalization;
+﻿using Agentic.PackageFixtures;
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using YamlDotNet.Core;
@@ -46,6 +47,26 @@ sealed class MaintenanceGh(Func<IReadOnlyList<string>, CancellationToken, Task<C
         var response = document.RootElement.Clone();
         responses.Add(endpoint, response);
         return response;
+    }
+
+    // The preview channel of this repository is its default branch, and a release branch is what that branch
+    // is about to become: validate the pushed branch of this checkout, so a skill added for a release is
+    // checked before the merge. Every other repository's preview channel is its default branch.
+    internal async Task<SkillSourceSnapshot> PreviewAsync(string repo, CancellationToken cancellationToken)
+    {
+        if (!repo.Equals(SourceOracle.OwnRepository, StringComparison.OrdinalIgnoreCase))
+        {
+            return await DefaultBranchAsync(repo, cancellationToken).ConfigureAwait(false);
+        }
+
+        RealProcess process = new();
+        string checkout = FixtureFiles.Checkout;
+        string branch = await process.SuccessAsync("git", ["symbolic-ref", "--quiet", "--short", "HEAD"], checkout).ConfigureAwait(false);
+        string sha = await process.SuccessAsync("git", ["rev-parse", "HEAD"], checkout).ConfigureAwait(false);
+        string remote = await process.SuccessAsync("git", ["ls-remote", "--exit-code", "origin", "refs/heads/" + branch], checkout).ConfigureAwait(false);
+        FixtureFiles.Require(remote.Split('\t')[0] == sha, $"SOURCE NOT READY: origin/{branch} must point to HEAD {sha} for the maintenance tests to validate it.");
+        // By SHA: a release branch may share its name with the tag the release creates.
+        return (await ResolveAsync(repo, sha, cancellationToken).ConfigureAwait(false)) with { Ref = branch };
     }
 
     internal async Task<SkillSourceSnapshot> DefaultBranchAsync(string repo, CancellationToken cancellationToken)

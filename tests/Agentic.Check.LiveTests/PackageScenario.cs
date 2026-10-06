@@ -115,6 +115,11 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
         var stack = StackDetector.Detect(workspace.Target);
         var manifest = preview ? StaticSkillManifest.Preview : StaticSkillManifest.All;
         var planned = SkillPlanner.Plan(manifest, stack);
+        foreach (string repository in planned.Select(skill => skill.SourceRepo).Append(SourceOracle.OwnRepository).Distinct(StringComparer.Ordinal))
+            await ResolveSourceAsync(repository).ConfigureAwait(false);
+        // The stable channel offers an entry only from the release that first ships it.
+        var mode = preview ? SourceVersionMode.Preview : SourceVersionMode.Stable;
+        planned = [.. planned.Where(skill => StaticSkillManifest.IsOffered(skill, mode, new SourceVersionInfo(skill.SourceRepo, sources[skill.SourceRepo].Reference, DateTimeOffset.MinValue)))];
         // Close declared dependencies against the same candidate manifest, excluding the companion action.
         var selected = planned.ToDictionary(skill => skill.Key, StringComparer.Ordinal);
         Queue<SkillDependency> dependencies = new(planned.SelectMany(skill => skill.Dependencies));
@@ -128,7 +133,13 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
                 dependencies.Enqueue(nested);
         }
         expectedSkills = [.. selected.Values];
-        foreach (string repository in expectedSkills.Select(skill => skill.SourceRepo).Append(SourceOracle.OwnRepository).Distinct(StringComparer.Ordinal))
+        foreach (string repository in expectedSkills.Select(skill => skill.SourceRepo).Distinct(StringComparer.Ordinal))
+            await ResolveSourceAsync(repository).ConfigureAwait(false);
+    }
+
+    async Task ResolveSourceAsync(string repository)
+    {
+        if (!sources.ContainsKey(repository))
             sources[repository] = await oracle.SelectedAsync(repository, preview, preview ? candidate.Commit : null).ConfigureAwait(false);
     }
 
