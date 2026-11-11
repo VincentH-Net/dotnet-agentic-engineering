@@ -18,10 +18,6 @@ interface IUserPrompts
         CancellationToken cancellationToken);
 
     Task WaitForHelpKeyAsync(string url, string purpose, CancellationToken cancellationToken);
-
-    // Asks which member of a choice applies; null when the user decides later or cannot be asked.
-    Task<string?> ChooseAsync(DirectiveChoice choice, CancellationToken cancellationToken)
-        => Task.FromResult<string?>(null);
 }
 
 sealed record RecommendationSelectionResult(
@@ -57,27 +53,6 @@ sealed class SpectreUserPrompts(IAnsiConsole console) : IUserPrompts
             duplicates,
             presentElsewhere,
             cancellationToken);
-    }
-
-    public Task<string?> ChooseAsync(DirectiveChoice choice, CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        if (!IsInteractive)
-        {
-            return Task.FromResult<string?>(null);
-        }
-
-        const string later = "Decide later: agents ask when it matters, and this question returns";
-        console.WriteLine();
-        foreach (string line in choice.Explanation)
-        {
-            console.MarkupLine($"[{SpectreReporter.InfoColor}]{Markup.Escape(line)}[/]");
-        }
-
-        SelectionPrompt<string> prompt = new() { Title = Markup.Escape(choice.Question), Converter = Markup.Escape };
-        _ = prompt.AddChoices([.. choice.Options.Select(option => option.Label), later]);
-        string answer = console.Prompt(prompt);
-        return Task.FromResult(choice.Options.FirstOrDefault(option => option.Label == answer)?.DirectiveName);
     }
 
     public async Task WaitForHelpKeyAsync(string url, string purpose, CancellationToken cancellationToken)

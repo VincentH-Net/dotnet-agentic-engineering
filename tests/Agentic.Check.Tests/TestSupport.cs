@@ -151,21 +151,6 @@ sealed class FakePrompts : IUserPrompts
 
     public IRecommendationPreviewSource? PreviewSource { get; private set; }
 
-    // The directive rows the list was shown with; null while it was not shown.
-    public IReadOnlyList<DirectivePlanItem>? RecommendedDirectives { get; private set; }
-
-    // What the user answers when asked to choose between alternative directives; null decides later.
-    public string? ChoiceAnswer { get; init; }
-
-    public List<DirectiveChoice> Choices { get; } = [];
-
-    public Task<string?> ChooseAsync(DirectiveChoice choice, CancellationToken cancellationToken)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        Choices.Add(choice);
-        return Task.FromResult(ChoiceAnswer);
-    }
-
     public Task<bool> ConfirmAsync(string prompt, bool defaultValue, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -183,7 +168,6 @@ sealed class FakePrompts : IUserPrompts
     {
         cancellationToken.ThrowIfCancellationRequested();
         PreviewSource = previewSource;
-        RecommendedDirectives = recommendedDirectives;
         RecommendedSkillActions = missingSkills;
         Duplicates = duplicates;
         PresentElsewhere = presentElsewhere;
@@ -321,14 +305,12 @@ sealed class FakeDirectiveSource : IDirectiveSource
     readonly IReadOnlyList<DirectiveSourceFile> files;
     readonly Dictionary<string, string> contents;
 
-    // groups: the choice folder of a file name, for the files that are alternatives of each other.
-    public FakeDirectiveSource(IReadOnlyDictionary<string, string>? directiveContents = null, IReadOnlyDictionary<string, string>? groups = null)
+    public FakeDirectiveSource(IReadOnlyDictionary<string, string>? directiveContents = null)
     {
         contents = directiveContents is null
             ? new Dictionary<string, string>(DefaultDirectiveContents(), StringComparer.Ordinal)
             : new Dictionary<string, string>(directiveContents, StringComparer.Ordinal);
-        files = [.. contents.Keys.Select(name => new DirectiveSourceFile(name, $"https://example.test/{name}", SourceRef: "fixture-ref",
-            Group: groups is not null && groups.TryGetValue(name, out string? group) ? group : string.Empty))];
+        files = [.. contents.Keys.Select(name => new DirectiveSourceFile(name, $"https://example.test/{name}", SourceRef: "fixture-ref"))];
     }
 
     public Task<IReadOnlyList<DirectiveSourceFile>> ListAsync(CancellationToken cancellationToken)

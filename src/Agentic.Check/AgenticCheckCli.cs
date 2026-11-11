@@ -13,7 +13,6 @@ static class AgenticCheckCli
         "--dry-run",
         "--preview",
         "--preview-source-ref",
-        "--project-phase",
         "--yes",
         "--report",
         "--verbose",
@@ -28,8 +27,7 @@ static class AgenticCheckCli
         "--agents",
         "--skills-dir",
         "--report",
-        "--preview-source-ref",
-        "--project-phase"
+        "--preview-source-ref"
     };
 
     internal static async Task<int> InvokeAsync(string[] args)
@@ -79,16 +77,6 @@ static class AgenticCheckCli
             if (!GitHubSourceVersionResolver.IsValidPreviewRef(result.GetValueOrDefault<string?>()))
                 result.AddError("--preview-source-ref requires a valid branch reference or commit SHA.");
         });
-        Option<string?> projectPhaseOption = new("--project-phase")
-        {
-            Description = "Set the project phase directive: pre-release, when nothing outside the repo depends on it yet, or production. Replaces the phase that is installed. Without it, agentic.check asks when no phase is set.",
-            Arity = ArgumentArity.ExactlyOne
-        };
-        projectPhaseOption.Validators.Add(result =>
-        {
-            if (result.GetValueOrDefault<string?>() is not ("pre-release" or "production"))
-                result.AddError("--project-phase requires pre-release or production.");
-        });
         Option<FileInfo?> reportOption = new("--report")
         {
             Description = "Write a JSON report to this path."
@@ -129,9 +117,6 @@ static class AgenticCheckCli
         - You select which to apply
         - Directives are installed / updated in AGENTS.md / CLAUDE.md, directly from the
           dotnet-agentic-engineering GitHub repo
-        - You are asked once which phase the project is in, pre-release or in production,
-          because agents rename and restructure differently by it. Switch it when the
-          project goes to production, in the list or with --project-phase
         - For Codex, rules that run dotnet outside its sandbox are installed in
           .codex/rules, so dotnet has network access without approval prompts
         - Skills are installed / updated directly from source GitHub skill repo's with 
@@ -183,7 +168,6 @@ static class AgenticCheckCli
         rootCommand.Options.Add(dryRunOption);
         rootCommand.Options.Add(previewOption);
         rootCommand.Options.Add(previewSourceRefOption);
-        rootCommand.Options.Add(projectPhaseOption);
         rootCommand.Options.Add(yesOption);
         rootCommand.Options.Add(reportOption);
         rootCommand.Options.Add(verboseOption);
@@ -225,8 +209,7 @@ static class AgenticCheckCli
                         effectiveAgents,
                         verbose,
                         preview,
-                        parseResult.GetValue(previewSourceRefOption),
-                        parseResult.GetValue(projectPhaseOption));
+                        parseResult.GetValue(previewSourceRefOption));
 
                     // One short request decides whether a tool is already the latest; a slow or absent nuget.org only costs the shortcut.
                     using HttpClient nugetClient = new() { Timeout = TimeSpan.FromSeconds(5) };

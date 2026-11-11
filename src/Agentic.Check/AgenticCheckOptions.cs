@@ -9,5 +9,4 @@ sealed record AgenticCheckOptions(
     string? Agents,
     bool Verbose,
     bool Preview = false,
-    string? PreviewSourceRef = null,
-    string? ProjectPhase = null);
+    string? PreviewSourceRef = null);

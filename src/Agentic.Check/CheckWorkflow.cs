@@ -372,34 +372,12 @@ sealed class CheckWorkflow(
             sourcePin is null ? null : $"{options.PreviewSourceRef} ({sourcePin})", codexRulesPlan?.Status, presentElsewhere);
         reporter.Info($"GitHub cache duration: {directiveCacheSettings.DurationDescription}");
 
-        // A choice made in a folder above applies here too, so it is neither asked nor offered as unset.
-        var inheritedChoices = directivePlan.Directives
-            .Where(directive => directive.Group.Length > 0
-                && duplicates.LocationsByKey.TryGetValue(RecommendationSelectionState.FormatDirectiveKey(directive.Name), out var locations)
-                && locations.Any(location => location.StartsWith("..", StringComparison.Ordinal)))
-            .Select(directive => directive.Group)
-            .ToHashSet(StringComparer.Ordinal);
-        string[] unsetChoices = [.. directivePlan.UnsetChoices.Where(group => !inheritedChoices.Contains(group))];
-        DirectivePlanItem[] phases = [.. directivePlan.Directives.Where(directive => directive.Group == DirectiveChoices.ProjectPhase)];
-        if (phases.Length > 0)
-        {
-            string values = string.Join('|', phases.Select(DirectiveChoices.ValueOf));
-            report.ProjectPhase = directivePlan.Chosen(DirectiveChoices.ProjectPhase) is { } chosenPhase ? DirectiveChoices.ValueOf(chosenPhase) : null;
-            reporter.Info(report.ProjectPhase is { } phaseValue ? $"Project phase: {phaseValue} (switch with --project-phase <{values}>)"
-                : inheritedChoices.Contains(DirectiveChoices.ProjectPhase) ? "Project phase: set in a folder above"
-                : $"Project phase: not set (choose one below, or with --project-phase <{values}>)");
-        }
-
         foreach (string warning in report.Warnings)
         {
             reporter.Warning(warning);
         }
 
-        // Once a choice is made, its other members are not offered on every run: they join the list only
-        // when there is something else to apply, and --project-phase switches at any time.
-        DirectivePlanItem[] switchRows = [.. directivePlan.SelectableDirectives
-            .Where(directive => directive.Status == DirectiveStatuses.Alternative && !unsetChoices.Contains(directive.Group))];
-        IReadOnlyList<DirectivePlanItem> recommendedDirectives = [.. directivePlan.SelectableDirectives.Except(switchRows)];
+        var recommendedDirectives = directivePlan.SelectableDirectives;
         var stableSwitchSkills = FindStableSwitchSkillActions(options.Preview, recommended, skillsDirectories);
         var metadataReinstallSkills = FindMetadataReinstallSkillActions(options.Preview, recommended, skillsWithoutMetadata);
         var movedSkills = SkillRemovalPlanner.FindMoved(installedSkills, recommended,
@@ -615,8 +593,7 @@ sealed class CheckWorkflow(
         }
 
         // Offered whenever this run has something else to apply, while the README does not link here yet.
-        // A choice that waits for an answer is not a reason to offer the badge on every run.
-        bool hasOtherActions = recommendedDirectives.Any(directive => directive.Status != DirectiveStatuses.Alternative) || recommendedSkillActions.Count > 0 || skillUpdates.Count > 0;
+        bool hasOtherActions = recommendedDirectives.Count > 0 || recommendedSkillActions.Count > 0 || skillUpdates.Count > 0;
         var readmeBadgePlan = hasOtherActions ? ReadmeBadgeInstaller.Plan(targetDirectory) : null;
         if (readmeBadgePlan is { IsCurrent: false })
         {
@@ -639,11 +616,6 @@ sealed class CheckWorkflow(
             }
         }
 
-        if (recommendedDirectives.Any(directive => directive.Status != DirectiveStatuses.Alternative) || recommendedSkillActions.Count > 0)
-        {
-            recommendedDirectives = [.. directivePlan.SelectableDirectives.Where(directive => recommendedDirectives.Contains(directive) || switchRows.Contains(directive))];
-        }
-
         if (recommendedDirectives.Count > 0 || recommendedSkillActions.Count > 0)
         {
             // Non-interactive runs start from the same specialization default as the prompt, so a folder
@@ -661,39 +633,6 @@ sealed class CheckWorkflow(
                     .ConfigureAwait(false);
             selectedDirectives = selection.SelectedDirectives;
             selectedSkills = selection.SelectedSkills;
-        }
-
-        if (options.ProjectPhase is { } requestedPhase)
-        {
-            // --project-phase sets the phase whatever the list shows, also in an unattended run.
-            var requested = phases.FirstOrDefault(directive => DirectiveChoices.ValueOf(directive).Equals(requestedPhase, StringComparison.OrdinalIgnoreCase));
-            if (requested is null)
-            {
-                string warning = $"--project-phase {requestedPhase} was ignored: the directives of this channel do not offer that project phase yet.";
-                report.Warnings.Add(warning);
-                reporter.Warning(warning);
-            }
-            else
-            {
-                selectedDirectives = [.. selectedDirectives.Where(directive => directive.Group != requested.Group)];
-                if (requested.Status != DirectiveStatuses.Current)
-                {
-                    selectedDirectives = [.. selectedDirectives, requested];
-                }
-            }
-        }
-        else if (!options.DryRun && !options.Yes && prompts.IsInteractive)
-        {
-            // A choice nobody made is asked, not defaulted: a default is a value nobody chose.
-            foreach (string group in unsetChoices.Where(group => !selectedDirectives.Any(directive => directive.Group == group)))
-            {
-                DirectivePlanItem[] members = [.. directivePlan.Directives.Where(directive => directive.Group == group)];
-                string? answer = await prompts.ChooseAsync(DirectiveChoices.Describe(group, members), cancellationToken).ConfigureAwait(false);
-                if (members.FirstOrDefault(member => member.Name == answer) is { } chosen)
-                {
-                    selectedDirectives = [.. selectedDirectives, chosen];
-                }
-            }
         }
 
         // The same selection graph closes dependencies for interactive, --yes, dry-run, and updates.
@@ -1228,7 +1167,7 @@ sealed class CheckWorkflow(
         string agentsFileName = Path.GetFileName(agentsFile);
         ReportDirectiveDryRunGroup(
             $"Would install directives into {agentsFileName}:",
-            selectedDirectives.Where(directive => directive.Status is DirectiveStatuses.Missing or DirectiveStatuses.Alternative));
+            selectedDirectives.Where(directive => directive.Status == DirectiveStatuses.Missing));
         ReportDirectiveDryRunGroup(
             $"Would update directives in {agentsFileName}:",
             selectedDirectives.Where(directive => directive.Status == DirectiveStatuses.Outdated));

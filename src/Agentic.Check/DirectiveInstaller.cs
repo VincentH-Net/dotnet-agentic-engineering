@@ -21,11 +21,9 @@ enum SourceVersionMode
     Preview
 }
 
-// Group: the folder below directives that holds the file, for a set of alternatives of which a repository
-// has at most one; empty for a directive that stands alone.
-sealed record DirectiveSourceFile(string FileName, string DownloadUrl, string Version = "", string SourceRef = "", string Group = "");
+sealed record DirectiveSourceFile(string FileName, string DownloadUrl, string Version = "", string SourceRef = "");
 
-sealed record DirectiveBlock(string Name, string Content, string Version = "", string SourceRef = "", string Group = "");
+sealed record DirectiveBlock(string Name, string Content, string Version = "", string SourceRef = "");
 
 sealed record DirectiveResult(
     bool Success,
@@ -49,42 +47,23 @@ sealed record DirectivePlanResult(
     string ClaudeContent,
     string? Error)
 {
-    // An alternative the repository did not choose is offered, not recommended.
-    public int RecommendedCount => Directives.Count(directive => directive.Status != DirectiveStatuses.Alternative);
+    public int RecommendedCount => Directives.Count;
 
     public int MissingCount => Directives.Count(directive => directive.Status == DirectiveStatuses.Missing);
 
     public int OutdatedCount => Directives.Count(directive => directive.Status == DirectiveStatuses.Outdated);
 
     public IReadOnlyList<DirectivePlanItem> SelectableDirectives
-        => [.. Directives.Where(directive => directive.Status is DirectiveStatuses.Missing or DirectiveStatuses.Outdated or DirectiveStatuses.Alternative)];
-
-    // The choices nobody made here yet: groups without an installed member.
-    public IReadOnlyList<string> UnsetChoices
-        => [.. Directives.Where(directive => directive.Group.Length > 0).GroupBy(directive => directive.Group, StringComparer.Ordinal)
-            .Where(group => group.All(directive => directive.Status == DirectiveStatuses.Alternative)).Select(group => group.Key)];
-
-    // The installed member of a choice, if any.
-    public DirectivePlanItem? Chosen(string group)
-        => Directives.FirstOrDefault(directive => directive.Group == group && directive.Status is DirectiveStatuses.Current or DirectiveStatuses.Outdated);
+        => [.. Directives.Where(directive => directive.Status is DirectiveStatuses.Missing or DirectiveStatuses.Outdated)];
 }
 
-sealed record DirectivePlanItem(string Name, string Status, string Content, string Version = "", string SourceRef = "")
-{
-    public string Group { get; init; } = string.Empty;
-
-    // For an alternative: the installed member of its group, which choosing this one removes.
-    public string? Replaces { get; init; }
-}
+sealed record DirectivePlanItem(string Name, string Status, string Content, string Version = "", string SourceRef = "");
 
 static class DirectiveStatuses
 {
     public const string Missing = "missing";
     public const string Outdated = "outdated";
     public const string Current = "current";
-
-    // A member of a choice that is not installed: the user can choose it, but it is not missing.
-    public const string Alternative = "alternative";
 }
 
 sealed partial class DirectiveInstaller(IDirectiveSource source, IReporter reporter)
@@ -134,13 +113,11 @@ sealed partial class DirectiveInstaller(IDirectiveSource source, IReporter repor
                 ? await File.ReadAllTextAsync(claudeFile, cancellationToken).ConfigureAwait(false)
                 : string.Empty;
 
-            List<DirectivePlanItem> planned = [];
+            List<DirectivePlanItem> directivePlanItems = [];
             foreach (var directive in directiveBlocks)
             {
-                planned.Add(PlanDirective(agentsContent, directive));
+                directivePlanItems.Add(PlanDirective(agentsContent, directive));
             }
-
-            var directivePlanItems = PlanChoices(planned);
 
             return new DirectivePlanResult(
                 true,
@@ -179,11 +156,11 @@ sealed partial class DirectiveInstaller(IDirectiveSource source, IReporter repor
             List<DirectiveReportItem> directiveReports = [.. plan.Directives.Select(directive => new DirectiveReportItem(directive.Name, directive.Status))];
             IReadOnlyList<DirectiveBlock> selectedBlocks = [.. plan.Directives
                 .Where(directive => selectedNames.Contains(directive.Name))
-                .Select(directive => new DirectiveBlock(directive.Name, directive.Content, Group: directive.Group))];
+                .Select(directive => new DirectiveBlock(directive.Name, directive.Content))];
             // A specialized folder whose directives all live above it needs no AGENTS.md of its own:
             // nothing selected and no file yet means no empty file, and no CLAUDE.md import of it.
             bool agentsFileWillExist = !plan.CreateAgentsFile || selectedBlocks.Count > 0;
-            string updatedAgentsContent = ApplyDirectiveBlocks(plan.AgentsContent, selectedBlocks, plan.Directives, actions, dryRun);
+            string updatedAgentsContent = ApplyDirectiveBlocks(plan.AgentsContent, selectedBlocks, actions, dryRun);
             string updatedClaudeContent = plan.ManageClaudeFile && agentsFileWillExist
                 ? EnsureClaudeImport(
                     plan.ClaudeContent,
@@ -235,7 +212,15 @@ sealed partial class DirectiveInstaller(IDirectiveSource source, IReporter repor
                 || !file.FileName.StartsWith("dotnet-", StringComparison.OrdinalIgnoreCase))
             .Where(file => stack.Technologies.Contains(TechnologyNames.Uno, StringComparer.OrdinalIgnoreCase)
                 || !file.FileName.StartsWith("uno-", StringComparison.OrdinalIgnoreCase))
-            .OrderBy(file => file.FileName, StringComparer.OrdinalIgnoreCase)];
+            .OrderBy(file => StackOrder(file.FileName))
+            .ThenBy(file => file.FileName, StringComparer.OrdinalIgnoreCase)];
+
+    // The most specific technology first, like the skills listed below the directives: Uno, then .NET,
+    // then the directives for every repository.
+    static int StackOrder(string fileName)
+        => fileName.StartsWith("uno-", StringComparison.OrdinalIgnoreCase) ? 0
+            : fileName.StartsWith("dotnet-", StringComparison.OrdinalIgnoreCase) ? 1
+            : 2;
 
     internal static string FormatDirectiveStatus(string status)
         => status switch
@@ -260,7 +245,7 @@ sealed partial class DirectiveInstaller(IDirectiveSource source, IReporter repor
             throw new DirectiveException($"Directive block from {sourceFile.DownloadUrl} is missing expected stable markers for {directiveName}.");
         }
 
-        return new DirectiveBlock(directiveName, DirectiveMarkers.Normalize(block, directiveName), sourceFile.Version, sourceFile.SourceRef, sourceFile.Group);
+        return new DirectiveBlock(directiveName, DirectiveMarkers.Normalize(block, directiveName), sourceFile.Version, sourceFile.SourceRef);
     }
 
     static DirectivePlanItem PlanDirective(string agentsContent, DirectiveBlock directive)
@@ -268,49 +253,25 @@ sealed partial class DirectiveInstaller(IDirectiveSource source, IReporter repor
         string content = NormalizeNewlines(agentsContent);
         if (DirectiveMarkers.FindBlock(content, directive.Name) is not { } range)
         {
-            return new DirectivePlanItem(directive.Name, DirectiveStatuses.Missing, directive.Content, directive.Version, directive.SourceRef) { Group = directive.Group };
+            return new DirectivePlanItem(directive.Name, DirectiveStatuses.Missing, directive.Content, directive.Version, directive.SourceRef);
         }
 
         string existingBlock = content[range];
         string status = existingBlock.Equals(directive.Content, StringComparison.Ordinal)
             ? DirectiveStatuses.Current
             : DirectiveStatuses.Outdated;
-        return new DirectivePlanItem(directive.Name, status, directive.Content, directive.Version, directive.SourceRef) { Group = directive.Group };
+        return new DirectivePlanItem(directive.Name, status, directive.Content, directive.Version, directive.SourceRef);
     }
-
-    // A repository has at most one member of a choice. A member that is not installed is an alternative, not a
-    // missing directive, and names the installed member that choosing it replaces.
-    static List<DirectivePlanItem> PlanChoices(List<DirectivePlanItem> planned)
-        => [.. planned.Select(directive => directive.Group.Length == 0 || directive.Status != DirectiveStatuses.Missing
-            ? directive
-            : directive with
-            {
-                Status = DirectiveStatuses.Alternative,
-                Replaces = planned.FirstOrDefault(other => other.Group == directive.Group && other.Status != DirectiveStatuses.Missing)?.Name
-            })];
 
     static string ApplyDirectiveBlocks(
         string agentsContent,
         IReadOnlyList<DirectiveBlock> directiveBlocks,
-        IReadOnlyList<DirectivePlanItem> planned,
         List<string> actions,
         bool dryRun)
     {
         string content = NormalizeNewlines(agentsContent);
         foreach (var directive in directiveBlocks)
         {
-            // Choosing a member of a choice replaces the member that is installed.
-            foreach (var sibling in planned.Where(other => directive.Group.Length > 0 && other.Group == directive.Group && other.Name != directive.Name))
-            {
-                if (DirectiveMarkers.FindBlock(content, sibling.Name) is { } installed)
-                {
-                    content = RemoveBlock(content, installed);
-                    actions.Add(dryRun
-                        ? $"Would remove directive {sibling.Name} from AGENTS."
-                        : $"Removed directive {sibling.Name} from AGENTS.");
-                }
-            }
-
             if (DirectiveMarkers.FindBlock(content, directive.Name) is { } range)
             {
                 string existingBlock = content[range];
@@ -462,13 +423,6 @@ sealed partial class DirectiveInstaller(IDirectiveSource source, IReporter repor
         return alternatePath ?? Path.Combine(repoRoot, preferredName);
     }
 
-    static string RemoveBlock(string content, Range block)
-    {
-        string before = content[..block.Start].TrimEnd('\n');
-        string after = content[block.End..].TrimStart('\n');
-        return before.Length == 0 ? after : after.Length == 0 ? before + "\n" : before + "\n\n" + after;
-    }
-
     static string AppendBlock(string content, string block)
     {
         if (string.IsNullOrWhiteSpace(content))
@@ -515,32 +469,15 @@ sealed class GitHubDirectiveSource(
         var items = JsonSerializer.Deserialize<IReadOnlyList<GitHubContentItem>>(content)
             ?? throw new DirectiveException($"Could not parse directives listing from {listingUrl}.");
 
-        List<DirectiveSourceFile> files = [.. Files(items, string.Empty)];
-        // A folder holds alternatives of which a repository has at most one. A check before 2.6 lists the
-        // files only and installs each of them, so it never sees a choice it would install in full.
-        foreach (var folder in items.Where(item => item.Type.Equals("dir", StringComparison.OrdinalIgnoreCase)))
-        {
-            string folderUrl = DirectiveInstallerUrl.Listing(directiveRef.ContentRef, folder.Name);
-            string folderContent = await GetStringAsync(new Uri(folderUrl), folderUrl, $"directives listing of {folder.Name}", cancellationToken).ConfigureAwait(false);
-            files.AddRange(Files(
-                JsonSerializer.Deserialize<IReadOnlyList<GitHubContentItem>>(folderContent)
-                    ?? throw new DirectiveException($"Could not parse directives listing from {folderUrl}."),
-                folder.Name));
-        }
-
-        return files;
-
-        IEnumerable<DirectiveSourceFile> Files(IReadOnlyList<GitHubContentItem> listed, string group)
-            => listed
-                .Where(item => item.Type.Equals("file", StringComparison.OrdinalIgnoreCase))
-                .Where(item => item.Name.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
-                .Where(item => !string.IsNullOrWhiteSpace(item.DownloadUrl))
-                .Select(item => new DirectiveSourceFile(
-                    item.Name,
-                    item.DownloadUrl,
-                    directiveRef.Display,
-                    directiveRef.ContentRef,
-                    group));
+        return [.. items
+            .Where(item => item.Type.Equals("file", StringComparison.OrdinalIgnoreCase))
+            .Where(item => item.Name.EndsWith(".md", StringComparison.OrdinalIgnoreCase))
+            .Where(item => !string.IsNullOrWhiteSpace(item.DownloadUrl))
+            .Select(item => new DirectiveSourceFile(
+                item.Name,
+                item.DownloadUrl,
+                directiveRef.Display,
+                directiveRef.ContentRef))];
     }
 
     public async Task<string> FetchAsync(DirectiveSourceFile sourceFile, CancellationToken cancellationToken)
@@ -945,9 +882,6 @@ static class DirectiveInstallerUrl
 
     public static string Listing(string directiveRef)
         => RepositoryApiBase + "/contents/directives?ref=" + Uri.EscapeDataString(directiveRef);
-
-    public static string Listing(string directiveRef, string folder)
-        => RepositoryApiBase + "/contents/directives/" + Uri.EscapeDataString(folder) + "?ref=" + Uri.EscapeDataString(directiveRef);
 
     public static string Branch(string branch)
         => RepositoryApiBase + "/branches/" + Uri.EscapeDataString(branch);

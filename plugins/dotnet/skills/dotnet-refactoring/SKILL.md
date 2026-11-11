@@ -30,11 +30,10 @@ When one does, change every place in the repository that names it, so the code s
 
 ### Names That Cross a Boundary
 
-Some of these names leave the repository: a serialized member that is stored or sent over the wire, a table or column name from a database mapping, a configuration key that an environment can also set, a route or another public contract. Whether anything outside already depends on such a name is not visible in the code. It depends on whether the project is in production, which the Project Phase directive in your instructions states:
+Some of these names leave the repository: a serialized member that is stored or sent over the wire, a table or column name from a database mapping, a configuration key that an environment can also set, a route or another public contract. Whether anything outside already depends on such a name is not visible in the code, so your instructions decide:
 
-- Pre-release: rename the external name too, and add no compatibility shims.
-- In production: keep the external name with the mechanism the repository already uses, for example `[JsonPropertyName("oldName")]`, or migrate the stored data and settings as part of the change. Say in your report which one you did.
-- No Project Phase directive: ask the user which of the two applies to this change, and tell them to record it with `dna check --project-phase pre-release` or `dna check --project-phase production`, so the question is not asked again. If you cannot ask, keep the external name and say so in your report.
+- With the Backward-Compatible Renames directive: keep the external name with the mechanism the repository already uses, for example `[JsonPropertyName("oldName")]`, or migrate the stored data and settings as part of the change. Say in your report which one you did.
+- Without it: rename the external name too, and add no compatibility code. List in your report each renamed name that leaves the repository.
 
 ## Change References, Not Text
 

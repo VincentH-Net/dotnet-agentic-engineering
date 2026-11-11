@@ -42,47 +42,6 @@ public sealed class DirectiveInstallerTests
             handler.Requests);
     }
 
-    // A folder below directives holds alternatives of which a repository has one. Its files carry the
-    // folder as their group; a release without such a folder costs no extra request.
-    [Fact]
-    public async Task GitHubDirectiveSourceListsAChoiceFolderAsAGroup()
-    {
-        const string api = "https://api.github.com/repos/VincentH-Net/dotnet-agentic-engineering";
-        using RecordingHttpMessageHandler handler = new();
-        handler.SetJson(
-            api + "/releases/latest",
-            """
-            { "tag_name": "v2.6.0", "published_at": "2026-11-11T12:00:00Z" }
-            """);
-        handler.SetJson(
-            api + "/contents/directives?ref=v2.6.0",
-            """
-            [
-              { "name": "foundation-prompt-log.md", "download_url": "https://raw.example.test/foundation-prompt-log.md", "type": "file" },
-              { "name": "project-phase", "download_url": null, "type": "dir" }
-            ]
-            """);
-        handler.SetJson(
-            api + "/contents/directives/project-phase?ref=v2.6.0",
-            """
-            [
-              { "name": "project-phase-pre-release.md", "download_url": "https://raw.example.test/project-phase/project-phase-pre-release.md", "type": "file" },
-              { "name": "project-phase-production.md", "download_url": "https://raw.example.test/project-phase/project-phase-production.md", "type": "file" },
-              { "name": "notes.txt", "download_url": "https://raw.example.test/project-phase/notes.txt", "type": "file" }
-            ]
-            """);
-        using HttpClient httpClient = new(handler, disposeHandler: false);
-        GitHubDirectiveSource source = new(httpClient, NoDirectiveCache(), new NullReporter());
-
-        var files = await source.ListAsync(CancellationToken.None);
-
-        Assert.Equal(
-            [("foundation-prompt-log.md", ""), ("project-phase-pre-release.md", "project-phase"), ("project-phase-production.md", "project-phase")],
-            files.Select(file => (file.FileName, file.Group)));
-        Assert.All(files, file => Assert.Equal("v2.6.0", file.SourceRef));
-        Assert.Equal(3, handler.Requests.Count);
-    }
-
     [Fact]
     public async Task GitHubDirectiveSourceFallsBackToDefaultBranchWhenNoLatestReleaseExists()
     {
@@ -336,6 +295,31 @@ public sealed class DirectiveInstallerTests
         Assert.Equal(2, plan.RecommendedCount);
         Assert.Equal(1, plan.MissingCount);
         Assert.Equal(1, plan.OutdatedCount);
+    }
+
+    // Directives are listed like the skills below them: the most specific technology first, the directives
+    // for every repository last. A new AGENTS.md gets its blocks in the same order.
+    [Fact]
+    public async Task DirectivesAreOrderedFromTheMostSpecificTechnologyToFoundation()
+    {
+        using TempDirectory tempDirectory = new();
+        _ = tempDirectory.CreateDirectory(".");
+        StackDetectionResult stack = new(
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase) { TechnologyNames.Foundation, TechnologyNames.Dotnet, TechnologyNames.Uno },
+            [],
+            []);
+        string[] listed = ["foundation-prompt-log", "dotnet-cli-run", "foundation-backward-compatible-renames", "uno-build-and-run", "dotnet-build-errors-and-warnings"];
+        string[] expected = ["uno-build-and-run", "dotnet-build-errors-and-warnings", "dotnet-cli-run", "foundation-backward-compatible-renames", "foundation-prompt-log"];
+        FakeDirectiveSource source = new(listed.ToDictionary(name => name + ".md", FakeDirectiveSource.DirectiveFile, StringComparer.Ordinal));
+        DirectiveInstaller installer = new(source, new NullReporter());
+
+        var plan = await installer.PlanAsync(tempDirectory.Path, stack, CancellationToken.None);
+        var result = await installer.ApplyAsync(plan, [.. expected], false, CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal(expected, plan.Directives.Select(directive => directive.Name));
+        string agents = await File.ReadAllTextAsync(Path.Combine(tempDirectory.Path, "AGENTS.md"), CancellationToken.None);
+        Assert.Equal(expected, expected.OrderBy(name => agents.IndexOf($"<!-- {name}:start -->", StringComparison.Ordinal)));
     }
 
     static StackDetectionResult DotnetStack()

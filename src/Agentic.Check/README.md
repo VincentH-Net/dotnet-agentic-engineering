@@ -36,8 +36,6 @@ The .NET CLI end-to-end testing skill is selected when a project interacts with 
 
 With `--preview`, the .NET breaking-changes skill is selected when a project is a published library: it tracks its public API, or it is explicitly packaged and is not a dotnet tool. A class library that only the same repo uses does not qualify. The .NET 11 Process API and System.Text.Json skills are selected, also with `--preview`, when a project targets `net11.0` or later. The .NET 10 to .NET 11 migration skill is selected when a project still targets `net10.0`.
 
-It also asks once which phase the project is in, pre-release or in production, because agents rename and restructure differently by it. Switch it when the project goes to production, in the action list or with `--project-phase production`.
-
 ## Prerequisites
 
 - .NET 10 SDK or later ([install](https://dotnet.microsoft.com/download))

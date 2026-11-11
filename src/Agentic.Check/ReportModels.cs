@@ -48,9 +48,6 @@ sealed class AgenticCheckReport
 
     public int OutdatedSkills { get; set; }
 
-    // The project phase directive installed in the target: "pre-release" or "production"; null when none is.
-    public string? ProjectPhase { get; set; }
-
     public List<SkillInstallResult> InstallResults { get; } = [];
     public List<SkillReportItem> ObsoleteSkills { get; } = [];
     public List<SkillRemovalResult> SkillRemovals { get; } = [];
