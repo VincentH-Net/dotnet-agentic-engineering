@@ -210,6 +210,8 @@ static class BaselinePreparation
         var actualGates = report.GetProperty("installGates").EnumerateArray().SelectMany(gate => gate.GetProperty("values").EnumerateObject())
             .GroupBy(gate => gate.Name, StringComparer.Ordinal).ToDictionary(group => group.Key,
                 group => group.SelectMany(gate => gate.Value.EnumerateArray()).Select(value => value.GetString()!).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray(), StringComparer.Ordinal);
+        // The framework gate follows the target framework a fixture's project happens to name, not what the fixture is about.
+        _ = actualGates.Remove("framework");
         FixtureFiles.Require(actualGates.Count == fixture.Gates.Count, $"Unexpected gate keys for {fixture.Name}");
         foreach (var (gate, values) in fixture.Gates)
             FixtureFiles.Require(actualGates.TryGetValue(gate, out string[]? actual) && actual.SequenceEqual(values.Order(StringComparer.Ordinal)), $"Wrong {gate} gate for {fixture.Name}");

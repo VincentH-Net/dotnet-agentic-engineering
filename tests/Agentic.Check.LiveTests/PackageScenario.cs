@@ -367,8 +367,10 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
         }
         foreach (var origin in origins)
         {
-            var source = sources[origin.Repository];
-            var pinnedSkill = expectedSkills.FirstOrDefault(skill => skill.PinnedRef.Length > 0 && skill.SourceRepo == origin.Repository
+            // A copy installed before its source repository was renamed keeps the old name in its stamp.
+            string repository = StaticSkillManifest.CurrentName(origin.Repository);
+            var source = sources[repository];
+            var pinnedSkill = expectedSkills.FirstOrDefault(skill => skill.PinnedRef.Length > 0 && skill.SourceRepo == repository
                 && origin.LocalPath.EndsWith("/" + skill.LocalFolder, StringComparison.Ordinal));
             if (pinnedSkill is not null)
             {
