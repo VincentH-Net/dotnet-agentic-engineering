@@ -5,7 +5,8 @@ namespace Agentic.Check.LiveTests;
 public sealed class ManifestHistoryTests(ITestOutputHelper output)
 {
     // A manifest never forgets a skill: what the previous release offered is offered now or retired, so a
-    // check can remove it from the repositories that have it.
+    // check can remove it from the repositories that have it. A renamed source repository offers its skills
+    // under its current name.
     [SkillMaintenanceFact]
     [Trait("Category", "SkillMaintenance")]
     public async Task EverySkillThePreviousReleaseOfferedIsOfferedOrRetired()
@@ -13,7 +14,7 @@ public sealed class ManifestHistoryTests(ITestOutputHelper output)
         var (version, skills) = await PublishedManifest.PreviousReleaseAsync().ConfigureAwait(true);
         output.WriteLine($"Previous release: Agentic.Check {version}, {skills.Count} manifest entries.");
         HashSet<SkillIdentity> known = [.. StaticSkillManifest.All.Concat(StaticSkillManifest.Preview).Select(StaticSkillManifest.Identity), .. StaticSkillManifest.Retired];
-        string[] forgotten = [.. skills.Select(skill => new SkillIdentity(skill.SourceRepo, skill.LocalFolder)).Distinct()
+        string[] forgotten = [.. skills.Select(skill => new SkillIdentity(StaticSkillManifest.CurrentName(skill.SourceRepo), skill.LocalFolder)).Distinct()
             .Where(identity => !known.Contains(identity)).Select(identity => $"{identity.SourceRepo} {identity.Name}").Order(StringComparer.Ordinal)];
 
         Assert.True(forgotten.Length == 0,

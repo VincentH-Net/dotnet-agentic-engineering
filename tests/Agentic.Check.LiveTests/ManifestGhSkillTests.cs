@@ -18,6 +18,7 @@ public sealed class ManifestGhSkillTests(ITestOutputHelper output)
         List<string> failures = [];
         StringBuilder report = new("# gh skill preview manifest validation\n\n");
         _ = report.AppendLine("Stable uses unversioned install arguments; preview uses the resolved default-branch commit SHA.");
+        _ = report.AppendLine("A skill the manifest pins to a release uses that release on both channels and is validated once, under stable.");
         _ = report.AppendLine("gh api metadata is cached; gh skill preview manages its own fetching.").AppendLine();
         foreach (string repo in StaticSkillManifest.All.Concat(StaticSkillManifest.Preview).Select(skill => skill.SourceRepo).Distinct(StringComparer.OrdinalIgnoreCase))
         {
@@ -35,13 +36,18 @@ public sealed class ManifestGhSkillTests(ITestOutputHelper output)
                         continue;
                     }
 
-                    await ValidateAsync(skill, "stable", "", report, failures, cancellation.Token).ConfigureAwait(true);
+                    await ValidateAsync(skill, "stable", skill.PinnedRef, report, failures, cancellation.Token).ConfigureAwait(true);
                 }
 
                 _ = report.AppendLine(CultureInfo.InvariantCulture, $"Preview: `{source.Ref}` at `{source.CommitSha}`").AppendLine();
                 foreach (var skill in StaticSkillManifest.Preview.Where(skill => skill.SourceRepo.Equals(repo, StringComparison.OrdinalIgnoreCase)))
                 {
-                    await ValidateAsync(skill, "preview", source.CommitSha, report, failures, cancellation.Token).ConfigureAwait(true);
+                    if (skill.PinnedRef.Length > 0 && StaticSkillManifest.All.Any(stable => stable.Key == skill.Key && stable.PinnedRef == skill.PinnedRef))
+                    {
+                        continue;
+                    }
+
+                    await ValidateAsync(skill, "preview", skill.PinnedRef.Length > 0 ? skill.PinnedRef : source.CommitSha, report, failures, cancellation.Token).ConfigureAwait(true);
                 }
             }
             catch (Exception exception) when (exception is IOException or JsonException or InvalidOperationException or KeyNotFoundException or InvalidDataException)

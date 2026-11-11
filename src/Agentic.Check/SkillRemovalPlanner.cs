@@ -9,7 +9,8 @@ static class SkillRemovalPlanner
     internal static IReadOnlyList<SkillManifestEntry> PlanRemovals(
         IReadOnlyList<InstalledSkill> installed,
         IReadOnlyList<SkillManifestEntry> recommended,
-        IReadOnlySet<SkillIdentity> obsolete)
+        IReadOnlySet<SkillIdentity> obsolete,
+        IReadOnlySet<SkillIdentity>? forAnotherUnoSdk = null)
     {
         var offeredByName = OfferedByName(recommended);
         Dictionary<string, SkillManifestEntry> rows = new(StringComparer.Ordinal);
@@ -20,7 +21,9 @@ static class SkillRemovalPlanner
             {
                 if (obsolete.Contains(new(sourceRepo, skill.Folder)))
                 {
-                    row = Removal(sourceRepo, skill.Folder, selected: true, $"No longer offered by {sourceRepo}.");
+                    row = Removal(sourceRepo, skill.Folder, selected: true, forAnotherUnoSdk?.Contains(new(sourceRepo, skill.Folder)) == true
+                        ? "Written for another Uno.Sdk version than this repository uses."
+                        : $"No longer offered by {sourceRepo}.");
                 }
                 else if (offeredByName.TryGetValue(skill.Folder, out var offered) && !offered.SourceRepo.Equals(sourceRepo, StringComparison.OrdinalIgnoreCase))
                 {

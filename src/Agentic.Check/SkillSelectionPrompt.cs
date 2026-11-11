@@ -47,7 +47,11 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
     readonly IReadOnlyList<RecommendationSelectionItem> items = items;
     readonly Dictionary<string, IReadOnlyList<string>> dependencyKeysByKey = BuildDependencyKeysByKey(items);
     readonly Dictionary<string, IReadOnlyList<string>> dependentKeysByKey = BuildDependentKeysByKey(items);
-    readonly HashSet<string> selectedKeys = items.Where(item => item.Skill?.SelectedByDefault != false).Select(item => item.Key).ToHashSet(StringComparer.Ordinal);
+    // An alternative of a choice is never selected on the check's own account: the user chooses.
+    readonly HashSet<string> selectedKeys = items.Where(item => item.Skill?.SelectedByDefault != false && !IsAlternative(item)).Select(item => item.Key).ToHashSet(StringComparer.Ordinal);
+    // The members of each choice among the rows, by row key: selecting one deselects the others.
+    readonly Dictionary<string, string> choiceGroupByKey = items.Where(item => item.Directive is { Group.Length: > 0 })
+        .ToDictionary(item => item.Key, item => item.Directive!.Group, StringComparer.Ordinal);
     readonly Dictionary<string, int> ordinalByKey = BuildOrdinalByKey(items);
     readonly HashSet<string> automaticallySelectedKeys = new(StringComparer.Ordinal);
     // Rows present above or below the target that specialization deselects; target-local repairs stay.
@@ -256,7 +260,7 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
                 return;
             }
 
-            foreach (var item in items)
+            foreach (var item in items.Where(item => !IsAlternative(item)))
             {
                 SelectWithDependencies(item.Key);
             }
@@ -266,6 +270,11 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
 
         foreach (var item in items.Where(item => MatchesFilter(item, Filter)))
         {
+            if (selected && IsAlternative(item))
+            {
+                continue;
+            }
+
             if (selected)
             {
                 SelectRow(item.Key);
@@ -290,7 +299,7 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
     void DisableSpecialization()
     {
         var previouslySelectedKeys = selectedKeys.ToHashSet(StringComparer.Ordinal);
-        foreach (string key in specializationKeys)
+        foreach (string key in specializationKeys.Where(key => !items.Any(item => item.Key == key && IsAlternative(item))))
         {
             SelectRow(key);
         }
@@ -319,11 +328,23 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
         }
     }
 
+    static bool IsAlternative(RecommendationSelectionItem item)
+        => item.Directive?.Status == DirectiveStatuses.Alternative;
+
     internal void SelectWithDependencies(string key)
     {
         if (!selectedKeys.Add(key))
         {
             return;
+        }
+
+        // A repository has one member of a choice: selecting one deselects the others.
+        if (choiceGroupByKey.TryGetValue(key, out string? group))
+        {
+            foreach (string other in choiceGroupByKey.Where(pair => pair.Value == group && pair.Key != key).Select(pair => pair.Key).ToArray())
+            {
+                _ = selectedKeys.Remove(other);
+            }
         }
 
         foreach (string dependencyKey in dependencyKeysByKey.GetValueOrDefault(key, []))
@@ -579,7 +600,10 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console, IRecommendation
             RecommendationSelectionKind.Directive,
             directive,
             null,
-            directive.Version)));
+            directive.Version)
+        {
+            Notes = directive.Status == DirectiveStatuses.Alternative ? DirectiveChoices.RowNotes(directive) : []
+        }));
         items.AddRange(missingSkills.Select(skill => new RecommendationSelectionItem(
             RecommendationSelectionState.FormatSkillKey(skill.SourceRepo, skill.InstallArg),
             FormatSkillListItem(skill),
@@ -595,7 +619,9 @@ sealed class RecommendationSelectionPrompt(IAnsiConsole console, IRecommendation
     }
 
     internal static string FormatDirectiveListItem(DirectivePlanItem directive)
-        => $"{directive.Name} ({FormatDirectiveAction(directive.Status)})";
+        => directive.Status == DirectiveStatuses.Alternative
+            ? $"{directive.Name} ({(directive.Replaces is { } installed ? $"replace {installed}" : "choose one")})"
+            : $"{directive.Name} ({FormatDirectiveAction(directive.Status)})";
 
     internal static string FormatDirectiveAction(string status)
         => status switch

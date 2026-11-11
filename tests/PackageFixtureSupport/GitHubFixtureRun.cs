@@ -69,7 +69,7 @@ sealed class GitHubFixtureRun : IAsyncDisposable
             ["User-Agent"] = ["agentic-fixture-source-validation"],
             ["X-GitHub-Api-Version"] = ["2022-11-28"]
         };
-        foreach (string repository in new[] { SourceOracle.OwnRepository, "dotnet/skills", "mtmattei/UnoPlatformSkills", "unoplatform/studio" })
+        foreach (string repository in new[] { SourceOracle.OwnRepository, "dotnet/skills", "noknowscode/UnoPlatformSkills", "unoplatform/studio" })
         {
             string prefix = "/repos/" + repository;
             var metadata = await GetAsync(prefix).ConfigureAwait(false);

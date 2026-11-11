@@ -34,7 +34,10 @@ public sealed class ManifestReleaseGateTests
 
         Assert.Equal(ToolVersion.Parse("2.5.0"), stable.MinimumRelease);
         Assert.Same(stable, preview);
-        Assert.All(StaticSkillManifest.All.Where(skill => skill != stable), skill => Assert.Null(skill.MinimumRelease));
+        // Each skill of this repository enters the stable set with the release that ships it.
+        var refactoring = Assert.Single(StaticSkillManifest.All, skill => skill.InstallArg == "dotnet-refactoring");
+        Assert.Equal(ToolVersion.Parse("2.6.0"), refactoring.MinimumRelease);
+        Assert.All(StaticSkillManifest.All.Where(skill => skill != stable && skill != refactoring), skill => Assert.Null(skill.MinimumRelease));
     }
 
     [Theory]

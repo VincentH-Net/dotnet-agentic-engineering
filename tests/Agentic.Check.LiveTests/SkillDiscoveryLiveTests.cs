@@ -48,8 +48,18 @@ public sealed class SkillDiscoveryLiveTests(ITestOutputHelper output)
                         : deferral.DueIn(SkillDeferrals.CheckVersion);
                     output.WriteLine($"{review.SourceRepo}: {deferral.SkillName} deferred until {deferral.WaitingFor}: {(releases[deferral] is { } release ? deferral.Released(release) : "still waiting")}");
                 }
-                var items = SkillDiscovery.ApplyDeferrals(SkillDiscovery.Compare(review.SourceRepo, baselineFiles, stableFiles, previewFiles,
-                    stableManifest, StaticSkillManifest.Preview, stable.CommittedAt <= review.ReviewedAt), deferrals, deferral => releases[deferral]);
+                List<SkillDiscoveryItem> items = [.. SkillDiscovery.ApplyDeferrals(SkillDiscovery.Compare(review.SourceRepo, baselineFiles, stableFiles, previewFiles,
+                    SkillDiscovery.Unpinned(stableManifest), SkillDiscovery.Unpinned(StaticSkillManifest.Preview), stable.CommittedAt <= review.ReviewedAt), deferrals, deferral => releases[deferral])];
+                foreach (var pinned in stableManifest.Concat(StaticSkillManifest.Preview)
+                    .Where(skill => skill.PinnedRef.Length > 0 && skill.SourceRepo.Equals(review.SourceRepo, StringComparison.OrdinalIgnoreCase))
+                    .DistinctBy(skill => skill.Key).GroupBy(skill => skill.PinnedRef, StringComparer.Ordinal))
+                {
+                    var release = await gh.ResolveAsync(review.SourceRepo, pinned.Key, cancellation.Token).ConfigureAwait(true);
+                    var releaseFiles = await gh.InventoryAsync(review.SourceRepo, release.CommitSha, cancellation.Token).ConfigureAwait(true);
+                    items.AddRange(SkillDiscovery.MissingPinned(review.SourceRepo, [.. pinned], releaseFiles, pinned.Key));
+                    output.WriteLine($"{review.SourceRepo}: {pinned.Count()} skill(s) pinned to {pinned.Key} at {release.CommitSha}");
+                }
+
                 scans.Add(new(review, stable, preview, items));
                 int count = items.Count(SkillDiscovery.NeedsReview);
                 output.WriteLine($"{review.SourceRepo}: {count} item(s) require review.");

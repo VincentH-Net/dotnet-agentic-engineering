@@ -621,6 +621,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
 
         Assert.Equal(0, result.ExitCode);
         Assert.Contains("Uno Platform", result.Screen, StringComparison.Ordinal);
+        Assert.Contains("Uno.Sdk: not found", result.Screen, StringComparison.Ordinal);
         Assert.Contains("UI update pattern: mvux, mvvm", result.Screen, StringComparison.Ordinal);
         Assert.Contains("Markup type: csharp, csharp2, xaml", result.Screen, StringComparison.Ordinal);
         Assert.Contains("Design system: material, simple", result.RecordingText, StringComparison.Ordinal);
@@ -635,7 +636,7 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
         Assert.Contains("VincentH-Net/dotnet-agentic-engineering repo:", result.Screen, StringComparison.Ordinal);
         Assert.Contains("uno-platform:", result.Screen, StringComparison.Ordinal);
         Assert.Contains("dotnet:", result.Screen, StringComparison.Ordinal);
-        Assert.Contains("mtmattei/UnoPlatformSkills repo:", result.Screen, StringComparison.Ordinal);
+        Assert.Contains("noknowscode/UnoPlatformSkills repo:", result.Screen, StringComparison.Ordinal);
         Assert.DoesNotContain("UnoPlatformSkills:", result.Screen, StringComparison.Ordinal);
         Assert.Contains("unoplatform/studio repo:", result.Screen, StringComparison.Ordinal);
         Assert.DoesNotContain("studio:", result.Screen, StringComparison.Ordinal);
@@ -1090,6 +1091,8 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
 
     static void WriteFullStackProjects(TestWorkspace workspace)
     {
+        // An Uno.Sdk before 7.0 keeps the per-topic Studio skills, which make the list long enough to scroll.
+        workspace.WriteRepoFile("global.json", """{ "msbuild-sdks": { "Uno.Sdk": "6.7.49" } }""");
         workspace.WriteRepoFile(
             "src/UnoCSharp/App.csproj",
             """
@@ -1152,8 +1155,8 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
                     Assert.True(channel >= 0 && directives > channel);
                     Assert.Contains("Preview", screen[channel..directives], StringComparison.Ordinal);
                     Assert.Contains("* no skills update check - always (re)installs", screen[channel..directives], StringComparison.Ordinal);
-                    Assert.Contains("12 missing, 1 installed", screen, StringComparison.Ordinal);
-                    Assert.DoesNotContain("12 missing, 1 up to date", screen, StringComparison.Ordinal);
+                    Assert.Contains("15 missing, 1 installed", screen, StringComparison.Ordinal);
+                    Assert.DoesNotContain("15 missing, 1 up to date", screen, StringComparison.Ordinal);
                 }
 
                 await auto.LeftAsync().ConfigureAwait(true);
@@ -1194,7 +1197,9 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
         List<string> paths = [];
         foreach (string agent in new[] { ".agents", ".claude" })
         {
-            foreach (var skill in StaticSkillManifest.All.Where(skill => skill.Technology == TechnologyNames.Dotnet && skill.GateRequirements.Count == 0))
+            // What the stable channel offers this workspace: the ungated .NET skills, and the one for a project on .NET 10.
+            foreach (var skill in StaticSkillManifest.All.Where(skill => skill.Technology == TechnologyNames.Dotnet
+                && (skill.GateRequirements.Count == 0 || skill.GateRequirements.Any(requirement => requirement is { Gate: "framework", Value: "net10" }))))
             {
                 string path = $"{agent}/skills/{skill.LocalFolder}/SKILL.md";
                 workspace.WriteRepoFile(path, installed);

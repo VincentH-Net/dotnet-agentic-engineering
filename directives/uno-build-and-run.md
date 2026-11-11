@@ -4,6 +4,7 @@ This lets you:
 
 - Have the agent register the Uno Platform MCPs at folder scope once per session, if they are missing
 - Avoid unnecessary dotnet build prior to starting an app, speeding up the agent's inner loop
+- Have the agent build the other targets after it changes platform-specific code, so a break in a target it does not run is found right away
 - Keep a separate time-stamped log file of each app run, outside source control, which the agent can analyze to solve runtime errors and warnings
 - Pass in a `AGENT_CONSOLE_LOG=<path>` startup arg to the app so it can e.g.:
   - Disable Hot Reload / Hot Design UI, which can get in the way of agents testing the app
@@ -29,6 +30,9 @@ with the current **local** time in ISO 8601 format: `app-stdout.YYYY-MM-DDTHHMMS
 You MUST query the system clock for the actual current local time - do NOT estimate or hardcode it, and do NOT use UTC.
 
 Do NOT run `dotnet build` prior to run the app - it would be redundant because `uno_app_start` already does a build.
+
+### Other Targets
+After changing code that only some targets compile (a file with a platform suffix such as `*.Android.cs` or `*.wasm.cs`, a file under `Platforms/`, code inside `#if` with a platform symbol, or platform-prefixed XAML), also run `dotnet build -f <target framework>` for each target framework in the project file that compiles the changed code and that this machine can build. This is the one case for a separate `dotnet build`. Report each affected target you could not build, with the reason.
 
 ### Verifying App Startup
 

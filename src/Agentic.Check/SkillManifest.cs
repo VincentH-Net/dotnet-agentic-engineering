@@ -34,6 +34,13 @@ sealed record SkillManifestEntry
     // the latest release, so it offers the skill only once that release is out; preview has it already.
     public ToolVersion? MinimumRelease { get; init; }
 
+    // The Uno.Sdk versions the skill is written for; null for a skill that does not depend on it.
+    public UnoSdkRange? UnoSdk { get; init; }
+
+    // A release tag of the source repository that both channels install the skill from, for a skill
+    // the latest release no longer has; empty for a skill that follows its channel.
+    public string PinnedRef { get; init; } = string.Empty;
+
     public string SourceRepo { get; init; }
 
     public string InstallArg { get; init; }
@@ -88,6 +95,17 @@ sealed record SkillManifestEntry
 
 sealed record GateRequirement(string Gate, string Value);
 
+// Uno.Sdk versions by major.minor, so a prerelease belongs to its release line: From is included, Below is not.
+sealed record UnoSdkRange((int Major, int Minor)? From = null, (int Major, int Minor)? Below = null)
+{
+    public bool Contains(ToolVersion sdk)
+        => (From is not { } from || (sdk.Major, sdk.Minor).CompareTo(from) >= 0)
+            && (Below is not { } below || (sdk.Major, sdk.Minor).CompareTo(below) < 0);
+
+    // An Uno project whose Uno.Sdk version is unknown counts as being on the latest one.
+    public bool ContainsLatest => Below is null;
+}
+
 // A skill as removal and retirement know it: by source repository and folder name, whatever its path
 // or commit, since names are unique within a repository.
 readonly record struct SkillIdentity(string SourceRepo, string Name)
@@ -120,7 +138,17 @@ static class StaticSkillManifest
     const string DotnetSkillsRepo = "dotnet/skills";
     const string VincentRepo = "VincentH-Net/dotnet-agentic-engineering";
     const string UnoStudioRepo = "unoplatform/studio";
-    const string MattRepo = "mtmattei/UnoPlatformSkills";
+    const string MattRepo = "noknowscode/UnoPlatformSkills";
+
+    // Studio versions its skills with the Uno.Sdk they are written for: its 7.0 release replaced the
+    // per-topic skills by hubs that target Uno.Sdk 7.0. A repository on an older Uno.Sdk keeps the
+    // per-topic skills, from the last release that has them.
+    const string UnoStudioPerTopicRelease = "1.1.0";
+
+    // Declared before the manifests that use them: static initializers run in source order.
+    static readonly UnoSdkRange UnoSdkBefore7 = new(Below: (7, 0));
+
+    static readonly UnoSdkRange UnoSdkFrom7 = new(From: (7, 0));
 
     // Initial review dates are inferred from each repo's last skill-set change in this file.
     // SHAs identify the latest default-branch commits at those cutoffs (GitHub committer time).
@@ -139,14 +167,14 @@ static class StaticSkillManifest
             new(2026, 6, 12, 14, 59, 14, TimeSpan.Zero)),
         new(
             UnoStudioRepo,
-            "6874bb4c471b228cc17dd97fd73ce5659569cc92",
-            new(2026, 9, 30, 20, 0, 37, TimeSpan.Zero),
-            new(2026, 10, 1, 10, 37, 26, TimeSpan.Zero)),
+            "77ae935159b5f5211aaf4be84a67a9c0bbcab74d",
+            new(2026, 11, 10, 23, 37, 31, TimeSpan.Zero),
+            new(2026, 11, 11, 12, 25, 42, TimeSpan.Zero)),
         new(
             DotnetSkillsRepo,
-            "973cffbcdbae02557cc68ad0d41b8f20d60cfa03",
-            new(2026, 10, 1, 14, 49, 17, TimeSpan.Zero),
-            new(2026, 10, 1, 15, 30, 28, TimeSpan.Zero))
+            "96c3d68dad2855e3ab5178aa1a262789d86a1466",
+            new(2026, 11, 6, 17, 6, 15, TimeSpan.Zero),
+            new(2026, 11, 11, 12, 56, 46, TimeSpan.Zero))
     ];
 
     internal static IReadOnlyList<SkillManifestEntry> All { get; } =
@@ -154,7 +182,9 @@ static class StaticSkillManifest
         VincentDotnet("cli-e2e-testing", [new("terminal", "interactive")]),
         VincentDotnet("dotnet-livecharts2"),
         VincentDotnet("dotnet-modern-csharp-editorconfig"),
+        VincentDotnet("dotnet-refactoring", minimumRelease: "2.6.0"),
         ..DotnetTestSkills(),
+        DotnetUpgradeFromNet10("migrate-dotnet10-to-dotnet11"),
         VincentOrleans("orleans-result-pattern"),
         VincentOrleans("orleans-multiservice-pattern"),
         VincentOrleans("orleans-multitenant", minimumRelease: "2.5.0"),
@@ -169,17 +199,8 @@ static class StaticSkillManifest
         VincentUno("uno-test-resize-app-window"),
         MattUno("uno-extensions-services"),
         MattUno("uno-csharp-markup", "markup", "csharp"),
-        // The latest Studio release still ships the per-topic skills; the hubs are preview only.
-        ..UnoStudioMvux(),
-        ..UnoStudioNavigation(),
-        UnoStudio("uno-testing-assertions"),
-        UnoStudio("uno-testing-ui"),
-        UnoStudio("uno-themes-material", "theme", "material"),
-        UnoStudio("uno-themes-simple", "theme", "simple"),
-        UnoStudio("uno-themes-semantic-colors-brushes", [new("theme", "material"), new("theme", "simple")]),
-        UnoStudio("uno-toolkit-material-theme", "theme", "material"),
-        UnoStudio("uno-toolkit-csharp-markup", "markup", "csharp"),
-        ..UnoStudioToolkitUngated()
+        ..UnoStudioPerTopic(),
+        ..UnoStudioHubs()
     ];
 
     // Skills some release offered that neither set offers now. A manifest never forgets a skill: a check
@@ -191,12 +212,26 @@ static class StaticSkillManifest
         new(DotnetSkillsRepo, "minimal-api-file-upload")
     ];
 
+    // Source repositories GitHub now serves under another name. A skill installed before the rename keeps the
+    // old name in its gh stamp, and GitHub redirects that name, so a check counts it as installed from the new one.
+    internal static IReadOnlyDictionary<string, string> RenamedRepositories { get; } =
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["mtmattei/UnoPlatformSkills"] = MattRepo
+        };
+
+    internal static string CurrentName(string sourceRepo)
+        => RenamedRepositories.TryGetValue(sourceRepo, out string? current) ? current : sourceRepo;
+
     internal static IReadOnlyList<SkillManifestEntry> Preview { get; } =
     [
-        ..All.Where(skill => (skill.SourceRepo != DotnetSkillsRepo || skill.Plugin != "dotnet-test") && skill.SourceRepo != UnoStudioRepo),
+        ..All.Where(skill => skill.SourceRepo != DotnetSkillsRepo || skill.Plugin != "dotnet-test"),
         ..DotnetTestSkills(preview: true),
-        ..UnoStudioHubs(),
-        DotnetAspNetCore("dotnet-webapi")
+        DotnetTest("test-value-evidence"),
+        DotnetAspNetCore("dotnet-webapi"),
+        DotnetPublishedLibrary("dotnet-breaking-changes"),
+        DotnetNet11("process-api-net11"),
+        DotnetNet11("system-text-json-net11")
     ];
 
     internal static SkillIdentity Identity(SkillManifestEntry skill)
@@ -204,12 +239,28 @@ static class StaticSkillManifest
 
     // What a channel's manifest leaves obsolete: every skill any manifest ever offered, by source repository
     // and folder name, that this manifest does not. The other channel's skills count as ever offered, so
-    // switching channels never leaves both sets installed side by side.
-    internal static IReadOnlySet<SkillIdentity> ObsoleteFor(IReadOnlyList<SkillManifestEntry> manifest)
+    // switching channels never leaves both sets installed side by side. With a detected stack, so do the
+    // skills written for another Uno.Sdk than the repository uses, so moving to a newer Uno.Sdk replaces them.
+    internal static IReadOnlySet<SkillIdentity> ObsoleteFor(IReadOnlyList<SkillManifestEntry> manifest, StackDetectionResult? stack = null)
     {
         HashSet<SkillIdentity> obsolete = [.. All.Concat(Preview).Select(Identity), .. Retired];
         obsolete.ExceptWith(manifest.Select(Identity));
+        obsolete.UnionWith(ForAnotherUnoSdk(manifest, stack));
         return obsolete;
+    }
+
+    // The manifest's skills written for an Uno.Sdk that no Uno project of the repository uses. Empty while the
+    // Uno.Sdk version of any Uno project is unknown, so a version the check cannot find removes nothing.
+    internal static IReadOnlySet<SkillIdentity> ForAnotherUnoSdk(IReadOnlyList<SkillManifestEntry> manifest, StackDetectionResult? stack)
+    {
+        HashSet<SkillIdentity> other = [];
+        ToolVersion?[] versions = [.. stack?.UnoGates.Select(report => report.SdkVersion) ?? []];
+        if (versions.Length > 0 && !versions.Contains(null))
+        {
+            other.UnionWith(manifest.Where(skill => skill.UnoSdk is { } range && !versions.Any(version => range.Contains(version!))).Select(Identity));
+        }
+
+        return other;
     }
 
     // Whether this channel, resolved to this source version, offers the entry. Only an entry with a minimum
@@ -234,6 +285,9 @@ static class StaticSkillManifest
 
     static SkillManifestEntry VincentDotnet(string skill)
         => Entry(VincentRepo, skill, TechnologyNames.Dotnet, plugin: "dotnet");
+
+    static SkillManifestEntry VincentDotnet(string skill, string minimumRelease)
+        => Entry(VincentRepo, skill, TechnologyNames.Dotnet, plugin: "dotnet", minimumRelease: ToolVersion.Parse(minimumRelease));
 
     static SkillManifestEntry VincentDotnet(string skill, IReadOnlyList<GateRequirement> gateRequirements)
         => Entry(VincentRepo, skill, TechnologyNames.Dotnet, gateRequirements, plugin: "dotnet");
@@ -281,6 +335,36 @@ static class StaticSkillManifest
             [],
             "dotnet-aspnetcore");
 
+    // For a repository that publishes a library: its callers are outside the build and the tests.
+    static SkillManifestEntry DotnetPublishedLibrary(string skill)
+        => new(
+            DotnetSkillsRepo,
+            DotnetSkillInstallArg("dotnet", skill),
+            skill,
+            TechnologyNames.Dotnet,
+            [new("library", "published")],
+            "dotnet");
+
+    // For a project that still targets .NET 10: the migration to .NET 11 is ahead of it.
+    static SkillManifestEntry DotnetUpgradeFromNet10(string skill)
+        => new(
+            DotnetSkillsRepo,
+            DotnetSkillInstallArg("dotnet-upgrade", skill),
+            skill,
+            TechnologyNames.Dotnet,
+            [new("framework", "net10")],
+            "dotnet-upgrade");
+
+    // For a project that targets .NET 11 or later, where the APIs the skill covers exist.
+    static SkillManifestEntry DotnetNet11(string skill)
+        => new(
+            DotnetSkillsRepo,
+            DotnetSkillInstallArg("dotnet11", skill),
+            skill,
+            TechnologyNames.Dotnet,
+            [new("framework", "net11")],
+            "dotnet11");
+
     static SkillDependency DotnetTestDependency(string skill)
         => new(DotnetSkillsRepo, DotnetSkillInstallArg("dotnet-test", skill));
 
@@ -319,9 +403,10 @@ static class StaticSkillManifest
         ];
 
     // Each hub folds its former per-topic skills into references/*.md, so a hub takes the union
-    // of their gates (unoplatform/studio#157). Default branch only until a release ships them.
+    // of their gates (unoplatform/studio#157).
     static IReadOnlyList<SkillManifestEntry> UnoStudioHubs()
-        =>
+    {
+        SkillManifestEntry[] hubs =
         [
             UnoStudio("uno-platform"),
             UnoStudio("uno-build-app"),
@@ -329,8 +414,31 @@ static class StaticSkillManifest
             UnoStudio("uno-navigation"),
             UnoStudio("uno-toolkit"),
             UnoStudio("uno-themes", [new("theme", "material"), new("theme", "simple")]),
-            UnoStudio("uno-testing")
+            UnoStudio("uno-testing"),
+            // New in Studio 7.0.0. The uno-platform hub routes sign-in and web API work to them.
+            UnoStudio("uno-authentication"),
+            UnoStudio("uno-kiota")
         ];
+        return [.. hubs.Select(skill => skill with { UnoSdk = UnoSdkFrom7 })];
+    }
+
+    static IReadOnlyList<SkillManifestEntry> UnoStudioPerTopic()
+    {
+        SkillManifestEntry[] perTopic =
+        [
+            ..UnoStudioMvux(),
+            ..UnoStudioNavigation(),
+            UnoStudio("uno-testing-assertions"),
+            UnoStudio("uno-testing-ui"),
+            UnoStudio("uno-themes-material", "theme", "material"),
+            UnoStudio("uno-themes-simple", "theme", "simple"),
+            UnoStudio("uno-themes-semantic-colors-brushes", [new("theme", "material"), new("theme", "simple")]),
+            UnoStudio("uno-toolkit-material-theme", "theme", "material"),
+            UnoStudio("uno-toolkit-csharp-markup", "markup", "csharp"),
+            ..UnoStudioToolkitUngated()
+        ];
+        return [.. perTopic.Select(skill => skill with { UnoSdk = UnoSdkBefore7, PinnedRef = UnoStudioPerTopicRelease, SourceRef = UnoStudioPerTopicRelease })];
+    }
 
     static IReadOnlyList<SkillManifestEntry> UnoStudioMvux()
         =>
@@ -409,6 +517,7 @@ static class SkillPlanner
         StackDetectionResult stack)
         => [.. manifest
             .Where(entry => stack.Technologies.Contains(entry.Technology, StringComparer.OrdinalIgnoreCase))
+            .Where(entry => entry.UnoSdk is not { } range || MatchesUnoSdk(range, stack))
             .Where(entry => entry.GateRequirements.Count == 0 || entry.GateRequirements.Any(requirement => HasGate(stack, requirement)))
             .DistinctBy(entry => (entry.SourceRepo, entry.InstallArg))
             .OrderBy(entry => SkillOrdering.GetSourceRepoOrder(entry.SourceRepo))
@@ -416,6 +525,13 @@ static class SkillPlanner
             .ThenBy(entry => SkillOrdering.GetPluginOrder(entry.SourceRepo, entry.Plugin))
             .ThenBy(entry => entry.Plugin, StringComparer.OrdinalIgnoreCase)
             .ThenBy(entry => entry.InstallArg, StringComparer.OrdinalIgnoreCase)];
+
+    // A range is offered when any Uno project is on an Uno.Sdk in it; unlike the other gates, it narrows
+    // an entry that also has gate requirements. A project with an unknown version is on the latest.
+    static bool MatchesUnoSdk(UnoSdkRange range, StackDetectionResult stack)
+        => stack.UnoGates.Count == 0
+            ? range.ContainsLatest
+            : stack.UnoGates.Any(report => report.SdkVersion is { } version ? range.Contains(version) : range.ContainsLatest);
 
     static bool HasGate(StackDetectionResult stack, GateRequirement requirement)
         => stack.InstallGates.Any(report => report.GetValues(requirement.Gate).Contains(requirement.Value, StringComparer.OrdinalIgnoreCase));
@@ -427,7 +543,7 @@ static class SkillOrdering
         => sourceRepo switch
         {
             "VincentH-Net/dotnet-agentic-engineering" => 0,
-            "mtmattei/UnoPlatformSkills" => 1,
+            "noknowscode/UnoPlatformSkills" => 1,
             "unoplatform/studio" => 2,
             "dotnet/skills" => 3,
             _ => 100

@@ -29,6 +29,8 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
     SortedDictionary<string, string>? filesBeforeOperation;
     string operationPhase = string.Empty;
     IReadOnlyList<SkillManifestEntry> expectedSkills = [];
+    // The release of each expected skill the manifest pins, by SourceOracle.PinnedKey.
+    readonly Dictionary<string, SourceSnapshot> pinnedSources = new(StringComparer.Ordinal);
     // A fresh scenario starts from a fixture's trigger files alone; fresh-stable sets that up from the stable channel.
     readonly bool fresh = scenario is "fresh" or FreshStable;
     bool preview = scenario is "fresh" or "migration" or "preview-preview" or "preview-declined";
@@ -138,6 +140,8 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
         expectedSkills = [.. selected.Values];
         foreach (string repository in expectedSkills.Select(skill => skill.SourceRepo).Distinct(StringComparer.Ordinal))
             await ResolveSourceAsync(repository).ConfigureAwait(false);
+        foreach (var skill in expectedSkills.Where(skill => skill.PinnedRef.Length > 0))
+            pinnedSources[SourceOracle.PinnedKey(skill.SourceRepo, skill.LocalFolder)] = await oracle.SnapshotAsync(skill.SourceRepo, skill.PinnedRef).ConfigureAwait(false);
     }
 
     async Task ResolveSourceAsync(string repository)
@@ -326,7 +330,7 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
                 {
                     retainedFiles.Add(path, hash);
                     log($"Retained pre-existing skill asset: {path} SHA256 {hash}");
-                }).ConfigureAwait(false);
+                }, pinnedSources).ConfigureAwait(false);
         }
         finally
         {
@@ -335,7 +339,12 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
         if (preview || scenario == FreshStable)
         {
             var installed = report.GetProperty("installResults").EnumerateArray().Select(item => item.GetProperty("sourceRepo").GetString() + "\n" + item.GetProperty("installArg").GetString()).Order(StringComparer.Ordinal);
-            FixtureFiles.Require(installed.SequenceEqual(expectedSkills.Select(skill => skill.Key).Order(StringComparer.Ordinal)), "The check did not execute each intended real gh installation/reinstallation.");
+            // Preview re-installs what follows the default branch. A skill pinned to a release does not change,
+            // so it is installed only where it was missing before this operation.
+            string[] agentDirectories = definition.Agents.Contains("claude-code", StringComparison.Ordinal) ? [".agents/skills", ".claude/skills"] : [".agents/skills"];
+            var intended = expectedSkills.Where(skill => skill.PinnedRef.Length == 0 || filesBeforeOperation is null
+                || agentDirectories.Any(agent => !filesBeforeOperation.ContainsKey($"{agent}/{skill.LocalFolder}/SKILL.md")));
+            FixtureFiles.Require(installed.SequenceEqual(intended.Select(skill => skill.Key).Order(StringComparer.Ordinal)), "The check did not execute each intended real gh installation/reinstallation.");
             foreach (var installation in report.GetProperty("installResults").EnumerateArray())
                 FixtureFiles.Require(installation.GetProperty("standardOutput").GetString()!.Contains("Installed ", StringComparison.Ordinal), "gh did not report an actual install/reinstall.");
         }
@@ -359,10 +368,22 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
         foreach (var origin in origins)
         {
             var source = sources[origin.Repository];
-            if (preview)
+            var pinnedSkill = expectedSkills.FirstOrDefault(skill => skill.PinnedRef.Length > 0 && skill.SourceRepo == origin.Repository
+                && origin.LocalPath.EndsWith("/" + skill.LocalFolder, StringComparison.Ordinal));
+            if (pinnedSkill is not null)
+            {
+                // A fresh install carries the manifest's pin; a copy a baseline installed from that release before it was pinned has none.
+                FixtureFiles.Require(origin.Pin == pinnedSkill.PinnedRef || (!fresh && origin.Pin is null),
+                    $"{origin.LocalPath} is not pinned to the manifest's release {pinnedSkill.PinnedRef}: {origin.Pin ?? "no pin"}");
+            }
+            else if (preview)
+            {
                 FixtureFiles.Require(origin.Pin == source.Commit, $"Preview did not pin {origin.LocalPath} to {source.Commit}");
+            }
             else
+            {
                 FixtureFiles.Require(origin.Pin is null, $"Stable switch left a pin on {origin.LocalPath}: {origin.Pin}. Production compatibility defect; do not manually unpin.");
+            }
         }
         string agents = await ReadAgentsAsync().ConfigureAwait(false);
         foreach (var (name, block) in ExpectedDirectives())
@@ -385,7 +406,7 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
         }
         foreach (string folder in removedFolders)
             FixtureFiles.Require(!Directory.Exists(Path.Combine(workspace.Target, folder)), $"Removed skill still present: {folder}");
-        var obsolete = StaticSkillManifest.ObsoleteFor(preview ? StaticSkillManifest.Preview : StaticSkillManifest.All);
+        var obsolete = StaticSkillManifest.ObsoleteFor(preview ? StaticSkillManifest.Preview : StaticSkillManifest.All, StackDetector.Detect(workspace.Target));
         foreach (var (path, text) in skillTextBefore)
         {
             string folder = SkillFolder(path);
@@ -471,7 +492,8 @@ sealed class PackageScenario(CandidateBuild candidate, string fixtureName, strin
             var origin = baseline?.Sources.FirstOrDefault(origin => origin.LocalPath == ".agents/skills/" + skill.LocalFolder);
             if (origin is null)
                 return true;
-            string source = Path.Combine(sources[skill.SourceRepo].Directory, origin.SourcePath);
+            var selected = pinnedSources.TryGetValue(SourceOracle.PinnedKey(skill.SourceRepo, skill.LocalFolder), out var pinnedSource) ? pinnedSource : sources[skill.SourceRepo];
+            string source = Path.Combine(selected.Directory, origin.SourcePath);
             if (!Directory.Exists(source) || !FixtureFiles.EqualInventory(FixtureFiles.Inventory(source), origin.SourceFiles))
                 return true;
         }

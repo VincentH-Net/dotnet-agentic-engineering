@@ -23,6 +23,91 @@ public sealed class SkillPlannerTests
         Assert.DoesNotContain(plan, skill => skill.Technology == TechnologyNames.Uno);
     }
 
+    // dotnet-breaking-changes is for code whose callers are outside the repository. dotnet/skills has it on
+    // its default branch only, so it is a preview skill.
+    [Fact]
+    public void OffersBreakingChangeGuidanceOnPreviewOnlyToARepositoryThatPublishesALibrary()
+    {
+        const string breakingChanges = "plugins/dotnet/skills/dotnet-breaking-changes";
+        HashSet<string> technologies = new(StringComparer.OrdinalIgnoreCase) { TechnologyNames.Foundation, TechnologyNames.Dotnet };
+        StackDetectionResult published = new(
+            technologies,
+            [new InstallGateReport(TechnologyNames.Dotnet, "Lib.csproj", new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase) { ["library"] = ["published"] })],
+            []);
+        StackDetectionResult plain = new(technologies, [], []);
+
+        var offered = Assert.Single(SkillPlanner.Plan(StaticSkillManifest.Preview, published), skill => skill.InstallArg == breakingChanges);
+        Assert.Equal("dotnet-breaking-changes", offered.LocalFolder);
+        Assert.Equal("dotnet/skills", offered.SourceRepo);
+        Assert.DoesNotContain(SkillPlanner.Plan(StaticSkillManifest.Preview, plain), skill => skill.InstallArg == breakingChanges);
+        Assert.DoesNotContain(SkillPlanner.Plan(StaticSkillManifest.All, published), skill => skill.InstallArg == breakingChanges);
+    }
+
+    // The .NET 11 Process APIs exist only for a project that targets net11.0 or later. dotnet/skills has the
+    // skill on its default branch only, so it is a preview skill.
+    [Fact]
+    public void OffersNet11GuidanceOnPreviewOnlyToARepositoryThatTargetsNet11()
+    {
+        const string processApi = "plugins/dotnet11/skills/process-api-net11";
+        HashSet<string> technologies = new(StringComparer.OrdinalIgnoreCase) { TechnologyNames.Foundation, TechnologyNames.Dotnet };
+        StackDetectionResult net11 = new(
+            technologies,
+            [new InstallGateReport(TechnologyNames.Dotnet, "Api.csproj", new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase) { ["framework"] = ["net11"] })],
+            []);
+        StackDetectionResult net10 = new(technologies, [], []);
+
+        var offered = Assert.Single(SkillPlanner.Plan(StaticSkillManifest.Preview, net11), skill => skill.InstallArg == processApi);
+        Assert.Equal("process-api-net11", offered.LocalFolder);
+        Assert.DoesNotContain(SkillPlanner.Plan(StaticSkillManifest.Preview, net10), skill => skill.InstallArg == processApi);
+        Assert.DoesNotContain(SkillPlanner.Plan(StaticSkillManifest.All, net11), skill => skill.InstallArg == processApi);
+    }
+
+    // The migration to .NET 11 is for a project that still targets .NET 10; dotnet/skills has it in a release.
+    [Fact]
+    public void OffersTheNet11SkillsByTheDotnetVersionAProjectTargets()
+    {
+        const string migrate = "plugins/dotnet-upgrade/skills/migrate-dotnet10-to-dotnet11";
+        const string json = "plugins/dotnet11/skills/system-text-json-net11";
+        HashSet<string> technologies = new(StringComparer.OrdinalIgnoreCase) { TechnologyNames.Foundation, TechnologyNames.Dotnet };
+        StackDetectionResult Targets(params string[] frameworks)
+            => new(technologies, [new InstallGateReport(TechnologyNames.Dotnet, "App.csproj", new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase) { ["framework"] = frameworks })], []);
+
+        foreach (var manifest in new[] { StaticSkillManifest.All, StaticSkillManifest.Preview })
+        {
+            Assert.Contains(SkillPlanner.Plan(manifest, Targets("net10")), skill => skill.InstallArg == migrate);
+            Assert.DoesNotContain(SkillPlanner.Plan(manifest, Targets("net11")), skill => skill.InstallArg == migrate);
+            Assert.DoesNotContain(SkillPlanner.Plan(manifest, new(technologies, [], [])), skill => skill.InstallArg == migrate);
+        }
+
+        Assert.Contains(SkillPlanner.Plan(StaticSkillManifest.Preview, Targets("net11")), skill => skill.InstallArg == json);
+        Assert.DoesNotContain(SkillPlanner.Plan(StaticSkillManifest.Preview, Targets("net10")), skill => skill.InstallArg == json);
+        Assert.DoesNotContain(SkillPlanner.Plan(StaticSkillManifest.All, Targets("net11")), skill => skill.InstallArg == json);
+        Assert.Contains(SkillPlanner.Plan(StaticSkillManifest.Preview, Targets("net10", "net11")), skill => skill.InstallArg == migrate);
+    }
+
+    [Fact]
+    public void OffersTheRefactoringSkillToEveryDotnetRepositoryOnBothChannels()
+    {
+        StackDetectionResult dotnet = new(new HashSet<string>(StringComparer.OrdinalIgnoreCase) { TechnologyNames.Foundation, TechnologyNames.Dotnet }, [], []);
+
+        foreach (var manifest in new[] { StaticSkillManifest.All, StaticSkillManifest.Preview })
+        {
+            var skill = Assert.Single(SkillPlanner.Plan(manifest, dotnet), skill => skill.InstallArg == "dotnet-refactoring");
+            Assert.Equal("VincentH-Net/dotnet-agentic-engineering", skill.SourceRepo);
+            Assert.Empty(skill.GateRequirements);
+        }
+    }
+
+    [Fact]
+    public void OffersTestValueEvidenceOnPreviewToEveryDotnetRepository()
+    {
+        const string testValueEvidence = "plugins/dotnet-test/skills/test-value-evidence";
+        StackDetectionResult dotnet = new(new HashSet<string>(StringComparer.OrdinalIgnoreCase) { TechnologyNames.Foundation, TechnologyNames.Dotnet }, [], []);
+
+        Assert.Contains(SkillPlanner.Plan(StaticSkillManifest.Preview, dotnet), skill => skill.InstallArg == testValueEvidence);
+        Assert.DoesNotContain(SkillPlanner.Plan(StaticSkillManifest.All, dotnet), skill => skill.InstallArg == testValueEvidence);
+    }
+
     [Fact]
     public void PlansCliE2eTestingSkillForInteractiveTerminalGate()
     {
@@ -166,8 +251,8 @@ public sealed class SkillPlannerTests
         var plan = SkillPlanner.Plan(StaticSkillManifest.All, stack);
 
         Assert.True(IndexOf(plan, "VincentH-Net/dotnet-agentic-engineering", "uno-platform") < IndexOf(plan, "VincentH-Net/dotnet-agentic-engineering", "dotnet"));
-        Assert.True(IndexOf(plan, "VincentH-Net/dotnet-agentic-engineering", "dotnet") < IndexOf(plan, "mtmattei/UnoPlatformSkills", "UnoPlatformSkills"));
-        Assert.True(IndexOf(plan, "mtmattei/UnoPlatformSkills", "UnoPlatformSkills") < IndexOf(plan, "dotnet/skills", "dotnet-test"));
+        Assert.True(IndexOf(plan, "VincentH-Net/dotnet-agentic-engineering", "dotnet") < IndexOf(plan, "noknowscode/UnoPlatformSkills", "UnoPlatformSkills"));
+        Assert.True(IndexOf(plan, "noknowscode/UnoPlatformSkills", "UnoPlatformSkills") < IndexOf(plan, "dotnet/skills", "dotnet-test"));
 
         static int IndexOf(IReadOnlyList<SkillManifestEntry> skills, string sourceRepo, string plugin)
             => Array.FindIndex(
@@ -179,7 +264,80 @@ public sealed class SkillPlannerTests
     [Fact]
     public void PlansUnoMvuxMaterialAndCsharpSkillsFromGates()
     {
-        StackDetectionResult stack = new(
+        var plan = SkillPlanner.Plan(StaticSkillManifest.All, UnoMvuxMaterialStack("6.7.49"));
+
+        Assert.Contains(plan, skill => skill.InstallArg == "uno-mvux-overview");
+        Assert.Contains(plan, skill => skill.InstallArg == "uno-toolkit-csharp-markup");
+        Assert.Contains(plan, skill => skill.InstallArg == "uno-themes-material");
+        Assert.Contains(plan, skill => skill.InstallArg == "uno-csharp-markup");
+        Assert.DoesNotContain(plan, skill => skill.InstallArg == "uno-mvvm");
+        Assert.DoesNotContain(plan, skill => skill.InstallArg == "uno-themes-simple");
+    }
+
+    // Studio writes its skills for one Uno.Sdk line: per-topic skills until its 7.0 release, hubs from then on.
+    [Theory]
+    [InlineData("6.7.49")]
+    [InlineData("6.8.0-dev.70")]
+    [InlineData("5.2.161")]
+    public void ARepositoryBeforeUnoSdk7GetsThePerTopicStudioSkillsPinnedToTheirRelease(string sdk)
+    {
+        foreach (var manifest in new[] { StaticSkillManifest.All, StaticSkillManifest.Preview })
+        {
+            var studio = SkillPlanner.Plan(manifest, UnoMvuxMaterialStack(sdk)).Where(skill => skill.SourceRepo == Studio).ToArray();
+
+            Assert.Contains(studio, skill => skill.InstallArg == "uno-mvux-overview");
+            Assert.Contains(studio, skill => skill.InstallArg == "uno-toolkit-navigationbar");
+            Assert.DoesNotContain(studio, skill => skill.InstallArg is "uno-mvux" or "uno-toolkit" or "uno-platform");
+            Assert.All(studio, skill => Assert.Equal("1.1.0", skill.PinnedRef));
+            Assert.All(studio, skill => Assert.Equal("1.1.0", skill.SourceRef));
+        }
+    }
+
+    // An Uno.Sdk version the check cannot find counts as the latest, which is what a new project has.
+    [Theory]
+    [InlineData("7.0.5")]
+    [InlineData("7.0.0-dev.77")]
+    [InlineData("8.1.2")]
+    [InlineData(null)]
+    public void ARepositoryFromUnoSdk7GetsTheStudioHubsFromItsChannel(string? sdk)
+    {
+        foreach (var manifest in new[] { StaticSkillManifest.All, StaticSkillManifest.Preview })
+        {
+            var studio = SkillPlanner.Plan(manifest, UnoMvuxMaterialStack(sdk)).Where(skill => skill.SourceRepo == Studio).ToArray();
+
+            Assert.Equal(
+                ["uno-authentication", "uno-build-app", "uno-kiota", "uno-mvux", "uno-navigation", "uno-platform", "uno-testing", "uno-themes", "uno-toolkit"],
+                studio.Select(skill => skill.InstallArg));
+            Assert.All(studio, skill => Assert.Empty(skill.PinnedRef));
+        }
+    }
+
+    [Fact]
+    public void ARepositoryWithUnoProjectsOnBothSidesOfUnoSdk7GetsBothStudioSets()
+    {
+        var older = UnoMvuxMaterialStack("6.7.49");
+        StackDetectionResult stack = new(older.Technologies, [.. older.InstallGates, new UnoGateReport("New.csproj", [], ["xaml"], ["fluent"], "7.0.5")], []);
+
+        var plan = SkillPlanner.Plan(StaticSkillManifest.All, stack);
+
+        Assert.Contains(plan, skill => skill.InstallArg == "uno-mvux-overview");
+        Assert.Contains(plan, skill => skill.InstallArg == "uno-mvux");
+    }
+
+    [Fact]
+    public void TheUnoSdkOfASkillNarrowsItsOtherGates()
+    {
+        // uno-mvux needs MVUX and Uno.Sdk 7.0 or later: neither alone is enough.
+        StackDetectionResult mvvmOn7 = new(UnoMvuxMaterialStack("7.0.5").Technologies, [new UnoGateReport("App.csproj", ["mvvm"], ["xaml"], ["material"], "7.0.5")], []);
+
+        Assert.DoesNotContain(SkillPlanner.Plan(StaticSkillManifest.All, mvvmOn7), skill => skill.InstallArg == "uno-mvux");
+        Assert.DoesNotContain(SkillPlanner.Plan(StaticSkillManifest.All, UnoMvuxMaterialStack("6.7.49")), skill => skill.InstallArg == "uno-mvux");
+    }
+
+    const string Studio = "unoplatform/studio";
+
+    static StackDetectionResult UnoMvuxMaterialStack(string? sdk)
+        => new(
             new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
                 TechnologyNames.Foundation,
@@ -191,26 +349,10 @@ public sealed class SkillPlannerTests
                     "App.csproj",
                     ["mvux"],
                     ["xaml", "csharp"],
-                    ["material"])
+                    ["material"],
+                    sdk)
             ],
             []);
-
-        var plan = SkillPlanner.Plan(StaticSkillManifest.All, stack);
-
-        Assert.Contains(plan, skill => skill.InstallArg == "uno-mvux-overview");
-        Assert.Contains(plan, skill => skill.InstallArg == "uno-toolkit-csharp-markup");
-        Assert.Contains(plan, skill => skill.InstallArg == "uno-themes-material");
-        Assert.Contains(plan, skill => skill.InstallArg == "uno-csharp-markup");
-        Assert.DoesNotContain(plan, skill => skill.InstallArg == "uno-mvvm");
-        Assert.DoesNotContain(plan, skill => skill.InstallArg == "uno-themes-simple");
-
-        // Preview replaces the per-topic Studio skills with hubs that take the union of their gates.
-        var preview = SkillPlanner.Plan(StaticSkillManifest.Preview, stack);
-        Assert.Contains(preview, skill => skill.InstallArg == "uno-mvux");
-        Assert.Contains(preview, skill => skill.InstallArg == "uno-toolkit");
-        Assert.Contains(preview, skill => skill.InstallArg == "uno-themes");
-        Assert.DoesNotContain(preview, skill => skill.InstallArg.StartsWith("uno-mvux-", StringComparison.Ordinal));
-    }
 
     [Fact]
     public void PlansUnoFluentForDefaultTheme()

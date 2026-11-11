@@ -178,6 +178,19 @@ static class SkillDiscovery
         }
     }
 
+    // A skill the manifest pins to a release is looked up in that release, whatever the channels have now.
+    internal static IReadOnlyList<SkillDiscoveryItem> MissingPinned(string repo, IReadOnlyList<SkillManifestEntry> pinned,
+        IReadOnlyList<SkillTreeFile> release, string reference)
+    {
+        List<SkillDiscoveryItem> result = [];
+        AddMissing(repo, pinned, release, release, $"pinned to {reference}", result);
+        return result;
+    }
+
+    // The entries that follow their channel: a pinned one is in neither channel's files by design.
+    internal static IReadOnlyList<SkillManifestEntry> Unpinned(IReadOnlyList<SkillManifestEntry> manifest)
+        => [.. manifest.Where(skill => skill.PinnedRef.Length == 0)];
+
     internal static bool NeedsReview(SkillDiscoveryItem item)
         => item.Kind is SkillDiscoveryKind.NewCandidate or SkillDiscoveryKind.PossibleMove or SkillDiscoveryKind.MissingUpstream;
 

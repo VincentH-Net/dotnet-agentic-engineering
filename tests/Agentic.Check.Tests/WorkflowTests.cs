@@ -841,6 +841,35 @@ public sealed class WorkflowTests
     }
 
     [Fact]
+    public async Task SkillUpdateFromARenamedRepositoryIsListedUnderItsCurrentName()
+    {
+        using TempDirectory tempDirectory = new();
+        tempDirectory.Write(".git/HEAD", "ref: refs/heads/main");
+        FakeCommandRunner commandRunner = new();
+        commandRunner.Enqueue(new CommandResult(0, "gh version 2.93.0", string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, "gh skill help", string.Empty));
+        const string dryRun = """
+              • uno-extensions-services (mtmattei/UnoPlatformSkills) 802045a4 > 9b3e7c21
+              1 update(s) available:
+            """;
+        commandRunner.Enqueue(new CommandResult(0, dryRun, string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, dryRun, string.Empty));
+        commandRunner.Enqueue(new CommandResult(0, string.Empty, "1 update(s) available:"));
+        commandRunner.Enqueue(new CommandResult(0, string.Empty, "1 update(s) available:"));
+        RecordingReporter reporter = new();
+        CheckWorkflow workflow = new(commandRunner, new FakePrompts { ConfirmResult = true }, reporter, new FakeDirectiveSource(), new FakeSourceVersionResolver());
+
+        var result = await workflow.RunAsync(
+            new AgenticCheckOptions(tempDirectory.Path, false, false, null, null, null, false),
+            CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("  noknowscode/UnoPlatformSkills repo:", reporter.BoldMessages);
+        Assert.DoesNotContain(reporter.BoldMessages, message => message.Contains("mtmattei", StringComparison.Ordinal));
+        Assert.Equal(1, reporter.OutdatedSkillCount);
+    }
+
+    [Fact]
     public async Task OutdatedSkillSummaryCountsSameSkillOnceAcrossSkillDirectories()
     {
         using TempDirectory tempDirectory = new();

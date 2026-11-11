@@ -18,6 +18,10 @@ interface IUserPrompts
         CancellationToken cancellationToken);
 
     Task WaitForHelpKeyAsync(string url, string purpose, CancellationToken cancellationToken);
+
+    // Asks which member of a choice applies; null when the user decides later or cannot be asked.
+    Task<string?> ChooseAsync(DirectiveChoice choice, CancellationToken cancellationToken)
+        => Task.FromResult<string?>(null);
 }
 
 sealed record RecommendationSelectionResult(
@@ -53,6 +57,27 @@ sealed class SpectreUserPrompts(IAnsiConsole console) : IUserPrompts
             duplicates,
             presentElsewhere,
             cancellationToken);
+    }
+
+    public Task<string?> ChooseAsync(DirectiveChoice choice, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!IsInteractive)
+        {
+            return Task.FromResult<string?>(null);
+        }
+
+        const string later = "Decide later: agents ask when it matters, and this question returns";
+        console.WriteLine();
+        foreach (string line in choice.Explanation)
+        {
+            console.MarkupLine($"[{SpectreReporter.InfoColor}]{Markup.Escape(line)}[/]");
+        }
+
+        SelectionPrompt<string> prompt = new() { Title = Markup.Escape(choice.Question), Converter = Markup.Escape };
+        _ = prompt.AddChoices([.. choice.Options.Select(option => option.Label), later]);
+        string answer = console.Prompt(prompt);
+        return Task.FromResult(choice.Options.FirstOrDefault(option => option.Label == answer)?.DirectiveName);
     }
 
     public async Task WaitForHelpKeyAsync(string url, string purpose, CancellationToken cancellationToken)
@@ -323,6 +348,7 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
         if (technologies.Contains(TechnologyNames.Uno, StringComparer.OrdinalIgnoreCase))
         {
             lines.Add("Uno Platform");
+            lines.Add($"  Uno.Sdk: {FormatUnoSdk(installGates)}");
             lines.Add($"  UI update pattern: {FormatGateValues(installGates, TechnologyNames.Uno, "presentation")}");
             lines.Add($"  Markup type: {FormatGateValues(installGates, TechnologyNames.Uno, "markup")}");
             lines.Add($"  Design system: {FormatGateValues(installGates, TechnologyNames.Uno, "theme")}");
@@ -350,6 +376,26 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
                 lines.Add("  Interactive terminal:");
                 lines.AddRange(terminalProjects.Select(project => "    " + project));
             }
+
+            string[] libraryProjects = [.. installGates
+                .Where(report => report.Technology.Equals(TechnologyNames.Dotnet, StringComparison.OrdinalIgnoreCase) && report.GetValues("library").Count > 0)
+                .Select(report => report.ProjectPath)
+                .Order(StringComparer.OrdinalIgnoreCase)];
+            if (libraryProjects.Length > 0)
+            {
+                lines.Add("  Published library:");
+                lines.AddRange(libraryProjects.Select(project => "    " + project));
+            }
+
+            string[] net11Projects = [.. installGates
+                .Where(report => report.Technology.Equals(TechnologyNames.Dotnet, StringComparison.OrdinalIgnoreCase) && report.GetValues("framework").Contains("net11", StringComparer.Ordinal))
+                .Select(report => report.ProjectPath)
+                .Order(StringComparer.OrdinalIgnoreCase)];
+            if (net11Projects.Length > 0)
+            {
+                lines.Add("  Targets .NET 11 or later:");
+                lines.AddRange(net11Projects.Select(project => "    " + project));
+            }
         }
 
         if (technologies.Contains(TechnologyNames.Foundation, StringComparer.OrdinalIgnoreCase))
@@ -358,6 +404,16 @@ sealed class SpectreReporter(IAnsiConsole console) : IReporter
         }
 
         return string.Join(Environment.NewLine, lines);
+    }
+
+    static string FormatUnoSdk(IReadOnlyList<InstallGateReport> installGates)
+    {
+        string[] versions = [.. installGates.OfType<UnoGateReport>()
+            .Select(report => report.Sdk)
+            .OfType<string>()
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)];
+        return versions.Length == 0 ? "not found" : string.Join(", ", versions);
     }
 
     static string FormatGateValues(IReadOnlyList<InstallGateReport> installGates, string technology, string gate)

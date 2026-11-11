@@ -1,4 +1,5 @@
-﻿using System.Xml.Linq;
+﻿using System.Text.Json;
+using System.Xml.Linq;
 
 namespace Agentic.Check;
 
@@ -55,26 +56,73 @@ static class StackDetector
         foreach (string projectFile in projectFiles)
         {
             var document = TryParseProject(projectFile, File.ReadAllText(projectFile), warnings);
-            if (document is null || !IsInteractiveTerminalProject(document, universe, Path.GetDirectoryName(projectFile) ?? "."))
+            if (document is null)
             {
                 continue;
             }
 
-            reports.Add(new InstallGateReport(
-                TechnologyNames.Dotnet,
-                ToRelativePath(repoRoot, projectFile),
-                new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
-                {
-                    ["terminal"] = ["interactive"]
-                }));
+            string projectDirectory = Path.GetDirectoryName(projectFile) ?? ".";
+            Dictionary<string, IReadOnlyList<string>> values = new(StringComparer.OrdinalIgnoreCase);
+            if (IsInteractiveTerminalProject(document, universe, projectDirectory))
+            {
+                values["terminal"] = ["interactive"];
+            }
+
+            // A Directory.Build file that does not parse is reported once, by the scan that owns its technology.
+            XDocument?[] documents = [document, .. AncestorBuildFiles(projectFile, repoRoot, [])];
+            if (IsPublishedLibraryProject(document, documents, universe, projectDirectory))
+            {
+                values["library"] = ["published"];
+            }
+
+            string[] frameworks = [.. TargetFrameworkGates(documents)];
+            if (frameworks.Length > 0)
+            {
+                values["framework"] = frameworks;
+            }
+
+            if (values.Count > 0)
+            {
+                reports.Add(new InstallGateReport(TechnologyNames.Dotnet, ToRelativePath(repoRoot, projectFile), values));
+            }
         }
 
         return reports;
     }
 
+    // The library gate serves dotnet-breaking-changes, which is for code whose callers live outside the
+    // repository. A class library alone is no evidence of that: most are used only by the projects next
+    // to them, where the build and the tests catch a break. A project counts when it tracks its public
+    // API, or when it is explicitly packaged and is not a tool, whose users call commands, not an API.
+    static readonly string[] PublicApiPackages = ["Microsoft.CodeAnalysis.PublicApiAnalyzers", "Microsoft.DotNet.ApiCompat", "Microsoft.DotNet.ApiCompat.Task"];
+
+    static readonly string[] PublicApiFiles = ["PublicAPI.Shipped.txt", "PublicAPI.Unshipped.txt"];
+
+    static bool IsPublishedLibraryProject(XDocument document, XDocument?[] documents, FileUniverse universe, string projectDirectory)
+    {
+        if (documents.Any(candidate => candidate is not null && HasProperty(candidate, "EnablePackageValidation", "true"))
+            || PublicApiPackages.Any(package => HasPackageReference(documents, package))
+            || universe.Enumerate(projectDirectory, "*.txt").Any(file => PublicApiFiles.Contains(Path.GetFileName(file), StringComparer.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        // The project's own setting wins over a Directory.Build file, as it does in MSBuild.
+        if (HasTrueProperty(document, "PackAsTool") || HasProperty(document, "IsPackable", "false"))
+        {
+            return false;
+        }
+
+        return documents.Any(candidate => candidate is not null
+            && (HasProperty(candidate, "IsPackable", "true")
+                || HasProperty(candidate, "GeneratePackageOnBuild", "true")
+                || candidate.Descendants().Any(element => element.Name.LocalName.Equals("PackageId", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(element.Value))));
+    }
+
     static List<InstallGateReport> DetectUnoGates(IReadOnlyList<string> projectFiles, string repoRoot, List<string> warnings)
     {
         List<InstallGateReport> reports = [];
+        string globalJsonRoot = GlobalJsonRoot(repoRoot);
         foreach (string projectFile in projectFiles)
         {
             string content = File.ReadAllText(projectFile);
@@ -134,11 +182,18 @@ static class StackDetector
                 _ = theme.Add("fluent");
             }
 
+            string? sdk = UnoSdkVersion(document, projectFile, globalJsonRoot);
+            if (sdk is null)
+            {
+                warnings.Add($"Could not find the Uno.Sdk version of {ToRelativePath(repoRoot, projectFile)}: it is not on the project's Sdk and no global.json above it names Uno.Sdk. Skills for the latest Uno.Sdk are offered.");
+            }
+
             reports.Add(new UnoGateReport(
                 ToRelativePath(repoRoot, projectFile),
                 [.. presentation.Order(StringComparer.OrdinalIgnoreCase)],
                 [.. markup.Order(StringComparer.OrdinalIgnoreCase)],
-                [.. theme.Order(StringComparer.OrdinalIgnoreCase)]));
+                [.. theme.Order(StringComparer.OrdinalIgnoreCase)],
+                sdk));
         }
 
         return reports;
@@ -158,6 +213,109 @@ static class StackDetector
                 .Select(element => element.Attribute("Name")?.Value)
                 .OfType<string>()
                 .Any(sdk => sdk.Equals("Uno.Sdk", StringComparison.OrdinalIgnoreCase));
+    }
+
+    const string UnoSdkName = "Uno.Sdk";
+
+    // The Uno.Sdk version a project builds with: the one on its Sdk reference, else the one in the nearest
+    // global.json that names Uno.Sdk. Null when neither holds a literal version.
+    static string? UnoSdkVersion(XDocument? document, string projectFile, string globalJsonRoot)
+    {
+        string? version = document?.Root?.Attribute("Sdk")?.Value
+            .Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(part => part.StartsWith(UnoSdkName + "/", StringComparison.OrdinalIgnoreCase))
+            .Select(part => part[(UnoSdkName.Length + 1)..])
+            .FirstOrDefault()
+            ?? document?.Descendants()
+                .Where(element => element.Name.LocalName.Equals("Sdk", StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(element.Attribute("Name")?.Value, UnoSdkName, StringComparison.OrdinalIgnoreCase))
+                .Select(element => element.Attribute("Version")?.Value)
+                .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+        if (IsLiteralVersion(version))
+        {
+            return version!.Trim();
+        }
+
+        for (var directory = new DirectoryInfo(Path.GetDirectoryName(Path.GetFullPath(projectFile))!); directory is not null; directory = directory.Parent)
+        {
+            if (GlobalJsonUnoSdkVersion(Path.Combine(directory.FullName, "global.json")) is { } pinned)
+            {
+                return pinned;
+            }
+
+            if (string.Equals(Path.TrimEndingDirectorySeparator(directory.FullName), globalJsonRoot, StringComparison.Ordinal))
+            {
+                break;
+            }
+        }
+
+        return null;
+    }
+
+    static string? GlobalJsonUnoSdkVersion(string path)
+    {
+        if (!File.Exists(path))
+        {
+            return null;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(path), new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true });
+            if (document.RootElement.ValueKind != JsonValueKind.Object || !document.RootElement.TryGetProperty("msbuild-sdks", out var sdks) || sdks.ValueKind != JsonValueKind.Object)
+            {
+                return null;
+            }
+
+            foreach (var sdk in sdks.EnumerateObject())
+            {
+                if (sdk.Name.Equals(UnoSdkName, StringComparison.OrdinalIgnoreCase) && sdk.Value.ValueKind == JsonValueKind.String && IsLiteralVersion(sdk.Value.GetString()))
+                {
+                    return sdk.Value.GetString()!.Trim();
+                }
+            }
+
+            return null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    static bool IsLiteralVersion(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        try
+        {
+            _ = ToolVersion.Parse(value.Trim());
+            return true;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
+
+    // MSBuild reads global.json from the folders above a project, which can lie above the target folder:
+    // the search stops at the repository root when the target is inside one, else at the target.
+    static string GlobalJsonRoot(string repoRoot)
+    {
+        string target = Path.TrimEndingDirectorySeparator(Path.GetFullPath(repoRoot));
+        for (var directory = new DirectoryInfo(target); directory is not null; directory = directory.Parent)
+        {
+            string git = Path.Combine(directory.FullName, ".git");
+            if (Directory.Exists(git) || File.Exists(git))
+            {
+                return Path.TrimEndingDirectorySeparator(directory.FullName);
+            }
+        }
+
+        return target;
     }
 
     static void AddMultiValueWarnings(IReadOnlyList<UnoGateReport> reports, List<string> warnings)
@@ -266,10 +424,55 @@ static class StackDetector
             || PackageReferences(document).Any(package => TerminalPackages.Contains(package, StringComparer.OrdinalIgnoreCase))
             || universe.Enumerate(projectDirectory, "*.cs").Any(file => ConsoleInputSignals.Any(signal => FileContains(file, signal)));
 
+    // The framework gate serves the skills that depend on the .NET version a project targets: "net10" for a
+    // project that still targets net10.0, which has the migration to .NET 11 ahead of it, and "net11" for one
+    // that targets net11.0 or later, where the .NET 11 APIs exist. The platform suffix does not matter. A
+    // project's own target frameworks win over a Directory.Build file's, as they do in MSBuild; one set
+    // through a property is not followed.
+    static IEnumerable<string> TargetFrameworkGates(XDocument?[] documents)
+    {
+        int[] majors = [.. (documents
+            .Select(candidate => candidate?.Descendants()
+                .Where(element => element.Name.LocalName.Equals("TargetFramework", StringComparison.OrdinalIgnoreCase)
+                    || element.Name.LocalName.Equals("TargetFrameworks", StringComparison.OrdinalIgnoreCase))
+                .SelectMany(element => element.Value.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                .ToArray() ?? [])
+            .FirstOrDefault(monikers => monikers.Length > 0) ?? [])
+            .Select(NetMajor)
+            .OfType<int>()];
+        if (majors.Contains(10))
+        {
+            yield return "net10";
+        }
+
+        if (majors.Any(major => major >= 11))
+        {
+            yield return "net11";
+        }
+    }
+
+    // 11 for net11.0, net11.0-windows10.0.19041; null for net48, netstandard2.0 or netcoreapp3.1.
+    static int? NetMajor(string moniker)
+    {
+        if (!moniker.StartsWith("net", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        string version = moniker[3..].Split('-')[0];
+        int dot = version.IndexOf('.', StringComparison.Ordinal);
+        return dot > 0 && int.TryParse(version[..dot], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out int major)
+            ? major
+            : null;
+    }
+
     static bool HasTrueProperty(XDocument document, string name)
+        => HasProperty(document, name, "true");
+
+    static bool HasProperty(XDocument document, string name, string value)
         => document.Descendants()
             .Where(element => element.Name.LocalName.Equals(name, StringComparison.OrdinalIgnoreCase))
-            .Any(element => element.Value.Trim().Equals("true", StringComparison.OrdinalIgnoreCase));
+            .Any(element => element.Value.Trim().Equals(value, StringComparison.OrdinalIgnoreCase));
 
     static IEnumerable<XDocument?> AncestorBuildFiles(string projectFile, string repoRoot, List<string> warnings)
     {
@@ -429,11 +632,14 @@ record InstallGateReport(
         => Values.TryGetValue(gate, out var values) ? values : [];
 }
 
+// Sdk is the project's Uno.Sdk version, null when the check could not find it. It is not one of the gate
+// values: a skill names the Uno.Sdk versions it is written for as a range, next to its gates.
 sealed record UnoGateReport(
     string ProjectPath,
     IReadOnlyList<string> Presentation,
     IReadOnlyList<string> Markup,
-    IReadOnlyList<string> Theme) : InstallGateReport(
+    IReadOnlyList<string> Theme,
+    string? Sdk = null) : InstallGateReport(
         TechnologyNames.Uno,
         ProjectPath,
         new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
@@ -441,7 +647,10 @@ sealed record UnoGateReport(
             ["presentation"] = Presentation,
             ["markup"] = Markup,
             ["theme"] = Theme
-        });
+        })
+{
+    public ToolVersion? SdkVersion => Sdk is null ? null : ToolVersion.Parse(Sdk);
+}
 
 static class TechnologyNames
 {

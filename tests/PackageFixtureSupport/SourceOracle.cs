@@ -86,9 +86,11 @@ sealed class SourceOracle(RealProcess process, string workingDirectory) : IDispo
         return await SnapshotAsync(repository, reference).ConfigureAwait(false);
     }
 
+    // pinnedSources: the release the manifest pins a skill to, by PinnedKey; such a skill is verified against
+    // that release whatever source its repository was resolved to.
     internal async Task<IReadOnlyList<SkillOrigin>> VerifySkillsAsync(string target, IReadOnlyDictionary<string, SourceSnapshot>? selected = null,
         IReadOnlySet<string>? allowedFolders = null, IReadOnlyDictionary<string, string>? previousFiles = null,
-        Action<string, string>? reportRetainedFile = null)
+        Action<string, string>? reportRetainedFile = null, IReadOnlyDictionary<string, SourceSnapshot>? pinnedSources = null)
     {
         List<SkillOrigin> origins = [];
         foreach (string agent in new[] { ".agents/skills", ".claude/skills" })
@@ -111,7 +113,9 @@ sealed class SourceOracle(RealProcess process, string workingDirectory) : IDispo
                 string tree = Value("github-tree-sha");
                 string sourcePath = Value("github-path");
                 string? pin = metadata.Children.TryGetValue(new YamlScalarNode("github-pinned"), out var pinned) ? ((YamlScalarNode)pinned).Value : null;
-                var snapshot = selected is not null && selected.TryGetValue(repository, out var expected)
+                var snapshot = pinnedSources is not null && pinnedSources.TryGetValue(PinnedKey(repository, Path.GetFileName(folder)), out var pinnedSource)
+                    ? pinnedSource
+                    : selected is not null && selected.TryGetValue(repository, out var expected)
                     ? expected : await SnapshotAsync(repository, reference).ConfigureAwait(false);
                 string expectedTree = snapshot.Tree.GetProperty("tree").EnumerateArray()
                     .Single(item => item.GetProperty("path").GetString() == sourcePath && item.GetProperty("type").GetString() == "tree")
@@ -146,6 +150,9 @@ sealed class SourceOracle(RealProcess process, string workingDirectory) : IDispo
         }
         return origins;
     }
+
+    internal static string PinnedKey(string repository, string folder)
+        => repository + "\n" + folder;
 
     internal static SortedDictionary<string, string> VerifyAssetInventory(string localPath,
         IReadOnlyDictionary<string, string> sourceFiles, IReadOnlyDictionary<string, string> installedFiles,

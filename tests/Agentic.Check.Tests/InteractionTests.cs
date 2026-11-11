@@ -288,7 +288,8 @@ public sealed class InteractionTests
             "App.csproj",
             ["mvux"],
             ["csharp2", "xaml"],
-            ["material"]);
+            ["material"],
+            "6.7.49");
         InstallGateReport dotnetGate = new(
             TechnologyNames.Dotnet,
             "Tool.csproj",
@@ -296,12 +297,27 @@ public sealed class InteractionTests
             {
                 ["terminal"] = ["interactive"]
             });
+        InstallGateReport libraryGate = new(
+            TechnologyNames.Dotnet,
+            "Lib.csproj",
+            new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["library"] = ["published"]
+            });
+        InstallGateReport net11Gate = new(
+            TechnologyNames.Dotnet,
+            "Api.csproj",
+            new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["framework"] = ["net11"]
+            });
 
         Assert.Equal(
             string.Join(
                 Environment.NewLine,
                 [
                     "Uno Platform",
+                    "  Uno.Sdk: 6.7.49",
                     "  UI update pattern: mvux",
                     "  Markup type: csharp2, xaml",
                     "  Design system: material",
@@ -310,9 +326,13 @@ public sealed class InteractionTests
                     ".NET",
                     "  Interactive terminal:",
                     "    Tool.csproj",
+                    "  Published library:",
+                    "    Lib.csproj",
+                    "  Targets .NET 11 or later:",
+                    "    Api.csproj",
                     "Agentic Foundation"
                 ]),
-            SpectreReporter.FormatStack(technologies, [unoGate, dotnetGate]));
+            SpectreReporter.FormatStack(technologies, [unoGate, dotnetGate, libraryGate, net11Gate]));
     }
 
     [Fact]

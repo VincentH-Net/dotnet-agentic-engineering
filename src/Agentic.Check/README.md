@@ -17,7 +17,7 @@ best-in-class GitHub skills repo's:
 
 - [dotnet/skills](https://github.com/dotnet/skills)
 - [unoplatform/studio](https://github.com/unoplatform/studio)
-- [mtmattei/UnoPlatformSkills](https://github.com/mtmattei/UnoPlatformSkills)
+- [noknowscode/UnoPlatformSkills](https://github.com/noknowscode/UnoPlatformSkills)
 - [VincentH-Net/dotnet-agentic-engineering](https://github.com/VincentH-Net/dotnet-agentic-engineering)
 
 The composition minimizes context usage and avoids contradictions and ambiguities,
@@ -30,8 +30,13 @@ Uno Platform skills are selected depending on detected:
 - MVVM or MVUX update pattern
 - Pure XAML markup or XAML combined with either Uno C# Markup or C# Markup 2
 - Fluent / Material / Simple / Cupertino design system
+- Uno.Sdk version: the current Uno Platform Studio skills from Uno.Sdk 7.0 on, the Studio skills written for it on an earlier Uno.Sdk
 
 The .NET CLI end-to-end testing skill is selected when a project interacts with a terminal: it is packaged as a dotnet tool, references a command-line or terminal UI package such as System.CommandLine, Spectre.Console or Hex1b, or reads console input. A console app that only writes output does not qualify.
+
+With `--preview`, the .NET breaking-changes skill is selected when a project is a published library: it tracks its public API, or it is explicitly packaged and is not a dotnet tool. A class library that only the same repo uses does not qualify. The .NET 11 Process API and System.Text.Json skills are selected, also with `--preview`, when a project targets `net11.0` or later. The .NET 10 to .NET 11 migration skill is selected when a project still targets `net10.0`.
+
+It also asks once which phase the project is in, pre-release or in production, because agents rename and restructure differently by it. Switch it when the project goes to production, in the action list or with `--project-phase production`.
 
 ## Prerequisites
 

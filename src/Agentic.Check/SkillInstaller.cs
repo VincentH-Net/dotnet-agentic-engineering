@@ -57,9 +57,11 @@ sealed class SkillInstaller(
     internal static bool RequiresStableSwitch(SkillManifestEntry skill, string skillsDirectory)
     {
         string skillFile = Path.Combine(skillsDirectory, skill.LocalFolder, "SKILL.md");
-        if (!string.IsNullOrWhiteSpace(ReadFrontMatterValue(skillFile, "github-pinned:")))
+        string? pinned = ReadFrontMatterValue(skillFile, "github-pinned:");
+        if (!string.IsNullOrWhiteSpace(pinned))
         {
-            return true;
+            // A pin is a preview leftover, unless the manifest itself pins the skill to that release.
+            return !pinned.Equals(skill.PinnedRef, StringComparison.Ordinal);
         }
 
         string? gitHubRef = ReadGitHubRef(skillFile);
@@ -455,7 +457,8 @@ sealed class SkillInstaller(
                 arguments.AddRange(["--pin", skill.SourceRef]);
             }
 
-            if (skill.ForceInstall || !string.IsNullOrWhiteSpace(skill.SourceRef))
+            // A preview ref moves, so its install replaces the copy; a release the manifest pins does not.
+            if (skill.ForceInstall || (!string.IsNullOrWhiteSpace(skill.SourceRef) && skill.PinnedRef.Length == 0))
             {
                 arguments.Add("--force");
             }

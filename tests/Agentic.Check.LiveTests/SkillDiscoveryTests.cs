@@ -27,6 +27,24 @@ public sealed class SkillDiscoveryTests
     }
 
     [Fact]
+    public void ASkillPinnedToAReleaseIsLookedUpInThatReleaseAndNotInTheChannels()
+    {
+        var hub = File("skills/hub/SKILL.md");
+        var topic = File("skills/topic/SKILL.md");
+        SkillManifestEntry[] manifest = [Entry("hub"), Entry("topic") with { PinnedRef = "1.1.0" }, Entry("gone") with { PinnedRef = "1.1.0" }];
+
+        // The latest release and the default branch have the hub only: a pinned entry is not missing there.
+        var items = SkillDiscovery.Compare(Repo, [hub], [hub], [hub], SkillDiscovery.Unpinned(manifest), SkillDiscovery.Unpinned(manifest));
+        Assert.Equal(0, items.Count(SkillDiscovery.NeedsReview));
+
+        var missing = Assert.Single(SkillDiscovery.MissingPinned(Repo, [.. manifest.Where(skill => skill.PinnedRef.Length > 0)], [topic], "1.1.0"));
+        Assert.Equal(SkillDiscoveryKind.MissingUpstream, missing.Kind);
+        Assert.Equal("gone", missing.Skill.Name);
+        Assert.Equal("pinned to 1.1.0", missing.Availability);
+        Assert.True(SkillDiscovery.NeedsReview(missing));
+    }
+
+    [Fact]
     public void DeferredCandidatesStayOutOfReviewUntilTheirTriggerIsReleased()
     {
         var flat = File("skills/flex/SKILL.md") with { Name = "uno-flex" };

@@ -29,6 +29,8 @@ public sealed class PackageFixtureSupportTests
         Assert.Equal(definition.Technologies.Order(StringComparer.Ordinal), detected.Technologies.Order(StringComparer.Ordinal));
         var actual = detected.InstallGates.SelectMany(report => report.Values).GroupBy(pair => pair.Key, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => group.SelectMany(pair => pair.Value).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray(), StringComparer.Ordinal);
+        // The framework gate follows the target framework a trigger happens to name, not what a fixture is about.
+        _ = actual.Remove("framework");
         Assert.Equal(definition.Gates.Keys.Order(StringComparer.Ordinal), actual.Keys.Order(StringComparer.Ordinal));
         foreach (var (key, values) in definition.Gates)
             Assert.Equal(values.Order(StringComparer.Ordinal), actual[key]);

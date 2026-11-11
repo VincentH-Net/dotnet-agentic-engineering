@@ -27,7 +27,7 @@ static class InstalledSkills
         return installed;
     }
 
-    // gh stamps the repository as a URL; the manifest names it owner/repo.
+    // gh stamps the repository as a URL; the manifest names it owner/repo, by its current name.
     internal static string? SourceRepoOf(string? stamped)
     {
         if (string.IsNullOrWhiteSpace(stamped))
@@ -43,6 +43,6 @@ static class InstalledSkills
 
         const string host = "github.com/";
         int index = value.IndexOf(host, StringComparison.OrdinalIgnoreCase);
-        return index >= 0 ? value[(index + host.Length)..] : value;
+        return StaticSkillManifest.CurrentName(index >= 0 ? value[(index + host.Length)..] : value);
     }
 }

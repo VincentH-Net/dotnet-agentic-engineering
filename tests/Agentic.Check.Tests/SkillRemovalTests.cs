@@ -20,16 +20,64 @@ public sealed class SkillRemovalTests
         var preview = StaticSkillManifest.ObsoleteFor(StaticSkillManifest.Preview);
         var stable = StaticSkillManifest.ObsoleteFor(StaticSkillManifest.All);
 
-        // The per-topic Studio skills are stable only; the hubs are preview only; the retired skill is in neither.
-        Assert.Contains(new SkillIdentity(Studio, SkillName), preview);
-        Assert.DoesNotContain(new SkillIdentity(Studio, "uno-mvux"), preview);
-        Assert.Contains(new SkillIdentity(Studio, "uno-mvux"), stable);
-        Assert.DoesNotContain(new SkillIdentity(Studio, SkillName), stable);
+        // dotnet-test-frameworks is stable only; its successor is preview only; the retired skill is in neither.
+        Assert.Contains(new SkillIdentity("dotnet/skills", "dotnet-test-frameworks"), preview);
+        Assert.DoesNotContain(new SkillIdentity("dotnet/skills", "test-analysis-extensions"), preview);
+        Assert.Contains(new SkillIdentity("dotnet/skills", "test-analysis-extensions"), stable);
+        Assert.DoesNotContain(new SkillIdentity("dotnet/skills", "dotnet-test-frameworks"), stable);
+        // Both channels offer both Studio sets; which one a repository gets depends on its Uno.Sdk.
+        Assert.DoesNotContain(new SkillIdentity(Studio, SkillName), preview);
+        Assert.DoesNotContain(new SkillIdentity(Studio, "uno-mvux"), stable);
         Assert.Contains(new SkillIdentity("dotnet/skills", "minimal-api-file-upload"), preview);
         Assert.Contains(new SkillIdentity("dotnet/skills", "minimal-api-file-upload"), stable);
         Assert.DoesNotContain(new SkillIdentity(Repository, "dotnet-livecharts2"), preview);
         Assert.DoesNotContain(new SkillIdentity(Repository, "dotnet-livecharts2"), stable);
     }
+
+    [Theory]
+    [InlineData("6.7.49", "uno-mvux", SkillName)]
+    [InlineData("7.0.5", SkillName, "uno-mvux")]
+    public void TheStudioSkillsForAnotherUnoSdkAreObsoleteSoMovingToANewerOneReplacesThem(string sdk, string obsolete, string kept)
+    {
+        foreach (var manifest in new[] { StaticSkillManifest.All, StaticSkillManifest.Preview })
+        {
+            var forSdk = StaticSkillManifest.ObsoleteFor(manifest, UnoStack(sdk));
+
+            Assert.Contains(new SkillIdentity(Studio, obsolete), forSdk);
+            Assert.DoesNotContain(new SkillIdentity(Studio, kept), forSdk);
+            Assert.Contains(new SkillIdentity(Studio, obsolete), StaticSkillManifest.ForAnotherUnoSdk(manifest, UnoStack(sdk)));
+        }
+    }
+
+    [Fact]
+    public void NoStudioSkillIsObsoleteWhileAnUnoSdkVersionIsUnknownOrBothSetsAreInUse()
+    {
+        Assert.Empty(StaticSkillManifest.ForAnotherUnoSdk(StaticSkillManifest.All, UnoStack([null])));
+        Assert.Empty(StaticSkillManifest.ForAnotherUnoSdk(StaticSkillManifest.All, UnoStack("6.7.49", null)));
+        Assert.Empty(StaticSkillManifest.ForAnotherUnoSdk(StaticSkillManifest.All, UnoStack("6.7.49", "7.0.5")));
+        Assert.Empty(StaticSkillManifest.ForAnotherUnoSdk(StaticSkillManifest.All, UnoStack()));
+        Assert.Empty(StaticSkillManifest.ForAnotherUnoSdk(StaticSkillManifest.All, null));
+    }
+
+    [Fact]
+    public void ARemovalForAnotherUnoSdkSaysSo()
+    {
+        InstalledSkill[] installed = [new("a", "uno-mvux", Studio, "skills/uno-mvux"), new("a", SkillName, Studio, "skills/" + SkillName)];
+        var stack = UnoStack("6.7.49");
+
+        var rows = SkillRemovalPlanner.PlanRemovals(installed, [], StaticSkillManifest.ObsoleteFor(StaticSkillManifest.All, stack), StaticSkillManifest.ForAnotherUnoSdk(StaticSkillManifest.All, stack));
+
+        var row = Assert.Single(rows);
+        Assert.Equal("uno-mvux", row.LocalFolder);
+        Assert.True(row.SelectedByDefault);
+        Assert.Equal(["Written for another Uno.Sdk version than this repository uses."], row.Notes);
+    }
+
+    static StackDetectionResult UnoStack(params string?[] sdks)
+        => new(
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase) { TechnologyNames.Uno },
+            [.. sdks.Select((sdk, index) => new UnoGateReport($"App{index}.csproj", [], ["xaml"], ["fluent"], sdk))],
+            []);
 
     [Fact]
     public void RetiredSkillsAreInNeitherSetAndIdentityIgnoresCase()
@@ -66,6 +114,25 @@ public sealed class SkillRemovalTests
         Assert.Equal("skills/" + SkillName, stamped.SourcePath);
         var unstamped = Assert.Single(installed, skill => skill.Folder == "hand-copied");
         Assert.Null(unstamped.SourceRepo);
+    }
+
+    [Fact]
+    public void ASkillInstalledBeforeItsRepositoryWasRenamedCountsAsFromTheCurrentName()
+    {
+        const string renamed = "mtmattei/UnoPlatformSkills";
+        const string skill = "uno-extensions-services";
+        string current = StaticSkillManifest.RenamedRepositories[renamed];
+        using TempDirectory temp = new();
+        temp.Write($".agents/skills/{skill}/SKILL.md", Stamped(renamed, skill));
+
+        var installed = InstalledSkills.Scan([Path.Combine(temp.Path, ".agents", "skills")]);
+        var offered = Assert.Single(StaticSkillManifest.All, entry => entry.LocalFolder == skill);
+
+        Assert.Equal(current, offered.SourceRepo);
+        Assert.Equal(current, Assert.Single(installed).SourceRepo);
+        Assert.Empty(SkillRemovalPlanner.PlanRemovals(installed, StaticSkillManifest.All, StaticSkillManifest.ObsoleteFor(StaticSkillManifest.All)));
+        Assert.Equal([offered], SkillRemovalPlanner.WithReplacements([offered], [offered], installed));
+        Assert.Empty(SkillRemovalPlanner.FindMoved(installed, [offered], _ => skill));
     }
 
     [Fact]
@@ -188,6 +255,32 @@ public sealed class SkillRemovalTests
         Assert.Equal([$"{Repository}@v1.2.3"], resolver.SkillPathRequests);
         Assert.Contains($"Would install {Repository} dotnet-livecharts2 into {Path.Combine(temp.Path, ".agents", "skills")}.", result.Report.Actions);
         Assert.DoesNotContain(result.Report.Actions, action => action.Contains("dotnet-modern-csharp-editorconfig", StringComparison.Ordinal));
+        Assert.Empty(reporter.Warnings);
+    }
+
+    // Moving a repository to Uno.Sdk 7 swaps the per-topic Studio skills for the hubs; a hub in a repository
+    // that is still on an older Uno.Sdk goes the other way.
+    [Theory]
+    [InlineData("7.0.5", SkillName, "uno-navigation")]
+    [InlineData("6.7.49", "uno-navigation", SkillName)]
+    public async Task ARepositoryIsOfferedTheStudioSkillsForItsUnoSdkAndTheRemovalOfTheOthers(string sdk, string installed, string offered)
+    {
+        using TempDirectory temp = new();
+        temp.Write("global.json", $$"""{ "msbuild-sdks": { "Uno.Sdk": "{{sdk}}" } }""");
+        temp.Write("App.csproj", "<Project Sdk=\"Uno.Sdk\" />");
+        temp.Write($".agents/skills/{installed}/SKILL.md", Stamped(Studio, "skills/" + installed));
+        FakeCommandRunner runner = new();
+        QueueChecks(runner, directories: 1);
+        RecordingReporter reporter = new();
+        CheckWorkflow workflow = new(runner, new FakePrompts { SelectedDirectiveNames = [], SelectedSkillInstallArgs = [] }, reporter, new FakeDirectiveSource(), new FakeSourceVersionResolver());
+
+        var result = await workflow.RunAsync(new(temp.Path, true, false, null, null, "codex", false), CancellationToken.None);
+
+        Assert.Equal(0, result.ExitCode);
+        var removal = Assert.Single(result.Report.ObsoleteSkills);
+        Assert.Equal(installed, removal.LocalFolder);
+        Assert.Contains(result.Report.RecommendedSkills, skill => skill.LocalFolder == offered);
+        Assert.DoesNotContain(result.Report.RecommendedSkills, skill => skill.LocalFolder == installed);
         Assert.Empty(reporter.Warnings);
     }
 

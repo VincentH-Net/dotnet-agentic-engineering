@@ -136,7 +136,7 @@ public sealed class SkillSelectionStateTests
     [Fact]
     public void SinglePluginHeaderThatRepeatsRepoNameIsHidden()
     {
-        Assert.False(SkillGroupHeaderPolicy.ShouldShowPluginHeaders("mtmattei/UnoPlatformSkills", ["UnoPlatformSkills"]));
+        Assert.False(SkillGroupHeaderPolicy.ShouldShowPluginHeaders("noknowscode/UnoPlatformSkills", ["UnoPlatformSkills"]));
         Assert.False(SkillGroupHeaderPolicy.ShouldShowPluginHeaders("unoplatform/studio", ["studio"]));
     }
 

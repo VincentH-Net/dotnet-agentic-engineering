@@ -27,7 +27,7 @@ The skills available for composition are carefully tested and are selected from 
 
 - [dotnet/skills](https://github.com/dotnet/skills)
 - [unoplatform/studio](https://github.com/unoplatform/studio)
-- [mtmattei/UnoPlatformSkills](https://github.com/mtmattei/UnoPlatformSkills)
+- [noknowscode/UnoPlatformSkills](https://github.com/noknowscode/UnoPlatformSkills)
 - [VincentH-Net/dotnet-agentic-engineering](https://github.com/VincentH-Net/dotnet-agentic-engineering)
 
 This repo saves .NET software engineers a significant, ongoing effort:
@@ -74,11 +74,18 @@ For Uno Platform, the offered skills are further refined depending on detected:
 - MVVM or MVUX update pattern
 - Pure XAML markup or XAML combined with either Uno C# Markup or C# Markup 2
 - Fluent / Material / Simple / Cupertino design system
+- Uno.Sdk version: from 7.0 on you get the current [Uno Platform Studio](https://github.com/unoplatform/studio) skills, which are written for Uno.Sdk 7; on an earlier Uno.Sdk you get the Studio skills written for it
+
+When you move a repo to Uno.Sdk 7, the next `dna check` offers to replace the earlier Studio skills with the current ones.
 
 For .NET, the `cli-e2e-testing` skill is offered only when a project interacts with a terminal: it is packaged as a dotnet tool, references a command-line or terminal UI package such as System.CommandLine, Spectre.Console or Hex1b, or reads console input. A console app that only writes output does not qualify.
 
+With `--preview`, the `dotnet-breaking-changes` skill is offered only when a project is a published library, whose callers are outside the repo: it tracks its public API (`PublicAPI.Shipped.txt`, package validation or ApiCompat), or it sets `PackageId`, `IsPackable` or `GeneratePackageOnBuild` and is not a dotnet tool. A class library that only the same repo uses does not qualify. The `process-api-net11` and `system-text-json-net11` skills are offered, also with `--preview`, only when a project targets `net11.0` or later. The `migrate-dotnet10-to-dotnet11` skill is offered only when a project still targets `net10.0`.
 
-By default skills come from the latest stable release in each source repo; `--preview` switches that to each source repo's default branch. Target agents default to the ones found on your machine; `--agents` overrides that and decides the skills directories, such as `.claude/skills` and `.agents/skills`. For more options such as `--dry-run` and `--preview`, run:
+
+`dna check` also asks once which phase the project is in: pre-release, when nothing outside the repo depends on it yet, or in production. Agents rename and restructure by it. Switch it when the project goes to production, in the action list or with `dna check --project-phase production`.
+
+By default skills come from the latest stable release in each source repo; `--preview` switches that to each source repo's default branch. The Studio skills for an Uno.Sdk before 7.0 come from the last Studio release that has them, on either channel. Target agents default to the ones found on your machine; `--agents` overrides that and decides the skills directories, such as `.claude/skills` and `.agents/skills`. For more options such as `--dry-run` and `--preview`, run:
 
 ```bash
 dnx agentic.check -- -h
@@ -157,9 +164,10 @@ This repo offers the following directives (markdown snippets to include in your 
 |----------|-------------|
 | [`foundation-documentation-sources`](./directives/foundation-documentation-sources.md) | Prioritizes first-party vendor MCPs for external documentation, e.g. using Microsoft Learn before Context7 for Microsoft technologies. |
 | [`foundation-prompt-log`](./directives/foundation-prompt-log.md) | Records sanitized user prompts and agent question-and-answer pairs in code commit messages so intent is preserved and can be replayed later. Uses the `dotnet agentic` tool. |
+| [`project-phase-pre-release`](./directives/project-phase/project-phase-pre-release.md) or [`project-phase-production`](./directives/project-phase/project-phase-production.md) | States whether anything outside the repo depends on the project yet. Pre-release: agents rename consistently everywhere and add no compatibility shims. In production: agents keep stored data, deployed settings and other clients working. A repo has one of the two; `dna check` asks which and replaces it when you switch. |
 | [`dotnet-cli-run`](./directives/dotnet-cli-run.md) | Prevents long agent timeout delays from running `dotnet` without network access. For Codex, `dna check` also offers rules that run `dotnet` outside the sandbox without approval prompts. |
 | [`dotnet-build-errors-and-warnings`](./directives/dotnet-build-errors-and-warnings.md) | Configures .NET build warnings and errors and a modern C# .editorconfig, then directs agents to fix build errors and warnings or document rare justified suppressions. |
-| [`uno-build-and-run`](./directives/uno-build-and-run.md) | Registers the Uno Platform MCPs at folder scope when they are missing, and standardizes Uno app launch for agents by skipping redundant pre-builds, writing per-run stdout logs via `AGENT_CONSOLE_LOG`, and verifying or stopping the app with the Uno runtime tools. |
+| [`uno-build-and-run`](./directives/uno-build-and-run.md) | Registers the Uno Platform MCPs at folder scope when they are missing, and standardizes Uno app launch for agents by skipping redundant pre-builds, writing per-run stdout logs via `AGENT_CONSOLE_LOG`, and verifying or stopping the app with the Uno runtime tools. After a change to platform-specific code, the agent also builds the other targets that compile it. |
 
 ## Skills catalog
 
@@ -174,6 +182,7 @@ Skills for .NET development.
 | `cli-e2e-testing` | CLI end-to-end testing guide for real terminal flows with Hex1b automation, keyboard input, observable terminal output, and asciinema recordings. |
 | `dotnet-livecharts2` | LiveCharts2 development guide — installation, XAML source generator integration, theme config, gotchas, and sample index with exact repo file paths. Covers all platforms (WinUI, Uno, Avalonia, MAUI, WPF, Blazor, WinForms, Eto). |
 | `dotnet-modern-csharp-editorconfig` | Drop-in opinionated `.editorconfig` for modern C# (C# 14 / .NET 10, also works with C# 10–13) — formatting, naming, style, and preview analyzer severities. Covers required `.csproj` flags and the .NET 8 vs .NET 9+ build-respect-editorconfig distinction. |
+| `dotnet-refactoring` | What a green build does not check when C# code is refactored — names read at runtime, edits to text that only looks like a reference, behavior drift while deduplicating, generated and partial code, and targets the default build skips. Follows the project phase directive for names that leave the repo. |
 
 ### orleans plugin
 

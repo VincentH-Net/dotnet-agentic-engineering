@@ -73,7 +73,17 @@ public sealed class TemplateDetectionTests(ITestOutputHelper output)
                 var gates = detected.InstallGates.SelectMany(gate => gate.Values).GroupBy(pair => pair.Key, StringComparer.Ordinal)
                     .ToDictionary(group => group.Key, group => group.SelectMany(pair => pair.Value).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray(), StringComparer.Ordinal);
                 string gateText = string.Join("; ", gates.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => $"{pair.Key}={string.Join(',', pair.Value)}"));
-                bool matches = technologies.SequenceEqual(expectation.Technologies.Order(StringComparer.Ordinal))
+                // The Uno.Sdk version decides which Studio skills a project gets, so a new project must have one the check finds.
+                if (detected.UnoGates.Count > 0)
+                {
+                    gateText += $"; Uno.Sdk={string.Join(',', detected.UnoGates.Select(gate => gate.Sdk ?? "not found").Distinct(StringComparer.Ordinal))}";
+                }
+
+                // A template targets the framework of the SDK that creates it, so the framework gate depends on
+                // the machine, not on the template: it is reported above and left out of the comparison.
+                _ = gates.Remove("framework");
+                bool matches = detected.UnoGates.All(gate => gate.Sdk is not null)
+                    && technologies.SequenceEqual(expectation.Technologies.Order(StringComparer.Ordinal))
                     && gates.Keys.Order(StringComparer.Ordinal).SequenceEqual(expectation.Gates.Keys.Order(StringComparer.Ordinal))
                     && expectation.Gates.All(pair => gates[pair.Key].SequenceEqual(pair.Value.Order(StringComparer.Ordinal)));
                 if (!matches)

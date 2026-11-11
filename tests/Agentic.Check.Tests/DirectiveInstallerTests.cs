@@ -42,6 +42,47 @@ public sealed class DirectiveInstallerTests
             handler.Requests);
     }
 
+    // A folder below directives holds alternatives of which a repository has one. Its files carry the
+    // folder as their group; a release without such a folder costs no extra request.
+    [Fact]
+    public async Task GitHubDirectiveSourceListsAChoiceFolderAsAGroup()
+    {
+        const string api = "https://api.github.com/repos/VincentH-Net/dotnet-agentic-engineering";
+        using RecordingHttpMessageHandler handler = new();
+        handler.SetJson(
+            api + "/releases/latest",
+            """
+            { "tag_name": "v2.6.0", "published_at": "2026-11-11T12:00:00Z" }
+            """);
+        handler.SetJson(
+            api + "/contents/directives?ref=v2.6.0",
+            """
+            [
+              { "name": "foundation-prompt-log.md", "download_url": "https://raw.example.test/foundation-prompt-log.md", "type": "file" },
+              { "name": "project-phase", "download_url": null, "type": "dir" }
+            ]
+            """);
+        handler.SetJson(
+            api + "/contents/directives/project-phase?ref=v2.6.0",
+            """
+            [
+              { "name": "project-phase-pre-release.md", "download_url": "https://raw.example.test/project-phase/project-phase-pre-release.md", "type": "file" },
+              { "name": "project-phase-production.md", "download_url": "https://raw.example.test/project-phase/project-phase-production.md", "type": "file" },
+              { "name": "notes.txt", "download_url": "https://raw.example.test/project-phase/notes.txt", "type": "file" }
+            ]
+            """);
+        using HttpClient httpClient = new(handler, disposeHandler: false);
+        GitHubDirectiveSource source = new(httpClient, NoDirectiveCache(), new NullReporter());
+
+        var files = await source.ListAsync(CancellationToken.None);
+
+        Assert.Equal(
+            [("foundation-prompt-log.md", ""), ("project-phase-pre-release.md", "project-phase"), ("project-phase-production.md", "project-phase")],
+            files.Select(file => (file.FileName, file.Group)));
+        Assert.All(files, file => Assert.Equal("v2.6.0", file.SourceRef));
+        Assert.Equal(3, handler.Requests.Count);
+    }
+
     [Fact]
     public async Task GitHubDirectiveSourceFallsBackToDefaultBranchWhenNoLatestReleaseExists()
     {

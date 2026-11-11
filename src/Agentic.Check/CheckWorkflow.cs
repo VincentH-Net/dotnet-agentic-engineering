@@ -372,25 +372,57 @@ sealed class CheckWorkflow(
             sourcePin is null ? null : $"{options.PreviewSourceRef} ({sourcePin})", codexRulesPlan?.Status, presentElsewhere);
         reporter.Info($"GitHub cache duration: {directiveCacheSettings.DurationDescription}");
 
+        // A choice made in a folder above applies here too, so it is neither asked nor offered as unset.
+        var inheritedChoices = directivePlan.Directives
+            .Where(directive => directive.Group.Length > 0
+                && duplicates.LocationsByKey.TryGetValue(RecommendationSelectionState.FormatDirectiveKey(directive.Name), out var locations)
+                && locations.Any(location => location.StartsWith("..", StringComparison.Ordinal)))
+            .Select(directive => directive.Group)
+            .ToHashSet(StringComparer.Ordinal);
+        string[] unsetChoices = [.. directivePlan.UnsetChoices.Where(group => !inheritedChoices.Contains(group))];
+        DirectivePlanItem[] phases = [.. directivePlan.Directives.Where(directive => directive.Group == DirectiveChoices.ProjectPhase)];
+        if (phases.Length > 0)
+        {
+            string values = string.Join('|', phases.Select(DirectiveChoices.ValueOf));
+            report.ProjectPhase = directivePlan.Chosen(DirectiveChoices.ProjectPhase) is { } chosenPhase ? DirectiveChoices.ValueOf(chosenPhase) : null;
+            reporter.Info(report.ProjectPhase is { } phaseValue ? $"Project phase: {phaseValue} (switch with --project-phase <{values}>)"
+                : inheritedChoices.Contains(DirectiveChoices.ProjectPhase) ? "Project phase: set in a folder above"
+                : $"Project phase: not set (choose one below, or with --project-phase <{values}>)");
+        }
+
         foreach (string warning in report.Warnings)
         {
             reporter.Warning(warning);
         }
 
-        var recommendedDirectives = directivePlan.SelectableDirectives;
+        // Once a choice is made, its other members are not offered on every run: they join the list only
+        // when there is something else to apply, and --project-phase switches at any time.
+        DirectivePlanItem[] switchRows = [.. directivePlan.SelectableDirectives
+            .Where(directive => directive.Status == DirectiveStatuses.Alternative && !unsetChoices.Contains(directive.Group))];
+        IReadOnlyList<DirectivePlanItem> recommendedDirectives = [.. directivePlan.SelectableDirectives.Except(switchRows)];
         var stableSwitchSkills = FindStableSwitchSkillActions(options.Preview, recommended, skillsDirectories);
         var metadataReinstallSkills = FindMetadataReinstallSkillActions(options.Preview, recommended, skillsWithoutMetadata);
         var movedSkills = SkillRemovalPlanner.FindMoved(installedSkills, recommended,
             await ExpectedSkillPathsAsync(installedSkills, recommended, resolver, directiveCacheSettings, cancellationToken).ConfigureAwait(false));
+        // Preview re-installs what it offers on every run to follow the default branch. A skill pinned to a
+        // release does not change, so it is installed only when missing or when its copy is from elsewhere.
+        var repinSkills = options.Preview
+            ? SkillInstaller.FindRequiringStableSwitch([.. recommended.Where(skill => skill.PinnedRef.Length > 0)], skillsDirectories)
+            : [];
         var recommendedSkillActions = options.Preview
-            ? [.. recommended.Select(skill => skill with
-            {
-                RecommendationAction = missing.Contains(skill) ? "install" : movedSkills.Contains(skill) ? SkillInstaller.MovedReinstallAction : "re-install"
-            })]
+            ? [.. recommended
+                .Where(skill => skill.PinnedRef.Length == 0 || missing.Contains(skill) || repinSkills.Contains(skill))
+                .Select(skill => skill with
+                {
+                    RecommendationAction = missing.Contains(skill) ? "install" : movedSkills.Contains(skill) ? SkillInstaller.MovedReinstallAction : "re-install",
+                    ForceInstall = skill.ForceInstall || repinSkills.Contains(skill)
+                })]
             : BuildSkillActions(recommended, missing, stableSwitchSkills, metadataReinstallSkills, movedSkills);
-        // An injected manifest carries no history, so nothing is obsolete unless the test says so.
-        var obsolete = obsoleteSkills ?? (skillManifest is null ? StaticSkillManifest.ObsoleteFor(options.Preview ? StaticSkillManifest.Preview : StaticSkillManifest.All) : new HashSet<SkillIdentity>());
-        var removals = SkillRemovalPlanner.PlanRemovals(installedSkills, recommended, obsolete);
+        // An injected manifest carries no history, so only the skills for another Uno.Sdk are obsolete unless the test says so.
+        var channelManifest = skillManifest ?? (options.Preview ? StaticSkillManifest.Preview : StaticSkillManifest.All);
+        var forAnotherUnoSdk = StaticSkillManifest.ForAnotherUnoSdk(channelManifest, stack);
+        var obsolete = obsoleteSkills ?? (skillManifest is null ? StaticSkillManifest.ObsoleteFor(channelManifest, stack) : forAnotherUnoSdk);
+        var removals = SkillRemovalPlanner.PlanRemovals(installedSkills, recommended, obsolete, forAnotherUnoSdk);
         report.ObsoleteSkills.AddRange(removals.Select(SkillReportItem.FromManifestEntry));
         recommendedSkillActions = [.. SkillRemovalPlanner.WithReplacements(recommendedSkillActions, recommended, installedSkills), .. removals];
         ToolVersion? repairRequirement = null;
@@ -583,7 +615,8 @@ sealed class CheckWorkflow(
         }
 
         // Offered whenever this run has something else to apply, while the README does not link here yet.
-        bool hasOtherActions = recommendedDirectives.Count > 0 || recommendedSkillActions.Count > 0 || skillUpdates.Count > 0;
+        // A choice that waits for an answer is not a reason to offer the badge on every run.
+        bool hasOtherActions = recommendedDirectives.Any(directive => directive.Status != DirectiveStatuses.Alternative) || recommendedSkillActions.Count > 0 || skillUpdates.Count > 0;
         var readmeBadgePlan = hasOtherActions ? ReadmeBadgeInstaller.Plan(targetDirectory) : null;
         if (readmeBadgePlan is { IsCurrent: false })
         {
@@ -606,6 +639,11 @@ sealed class CheckWorkflow(
             }
         }
 
+        if (recommendedDirectives.Any(directive => directive.Status != DirectiveStatuses.Alternative) || recommendedSkillActions.Count > 0)
+        {
+            recommendedDirectives = [.. directivePlan.SelectableDirectives.Where(directive => recommendedDirectives.Contains(directive) || switchRows.Contains(directive))];
+        }
+
         if (recommendedDirectives.Count > 0 || recommendedSkillActions.Count > 0)
         {
             // Non-interactive runs start from the same specialization default as the prompt, so a folder
@@ -623,6 +661,39 @@ sealed class CheckWorkflow(
                     .ConfigureAwait(false);
             selectedDirectives = selection.SelectedDirectives;
             selectedSkills = selection.SelectedSkills;
+        }
+
+        if (options.ProjectPhase is { } requestedPhase)
+        {
+            // --project-phase sets the phase whatever the list shows, also in an unattended run.
+            var requested = phases.FirstOrDefault(directive => DirectiveChoices.ValueOf(directive).Equals(requestedPhase, StringComparison.OrdinalIgnoreCase));
+            if (requested is null)
+            {
+                string warning = $"--project-phase {requestedPhase} was ignored: the directives of this channel do not offer that project phase yet.";
+                report.Warnings.Add(warning);
+                reporter.Warning(warning);
+            }
+            else
+            {
+                selectedDirectives = [.. selectedDirectives.Where(directive => directive.Group != requested.Group)];
+                if (requested.Status != DirectiveStatuses.Current)
+                {
+                    selectedDirectives = [.. selectedDirectives, requested];
+                }
+            }
+        }
+        else if (!options.DryRun && !options.Yes && prompts.IsInteractive)
+        {
+            // A choice nobody made is asked, not defaulted: a default is a value nobody chose.
+            foreach (string group in unsetChoices.Where(group => !selectedDirectives.Any(directive => directive.Group == group)))
+            {
+                DirectivePlanItem[] members = [.. directivePlan.Directives.Where(directive => directive.Group == group)];
+                string? answer = await prompts.ChooseAsync(DirectiveChoices.Describe(group, members), cancellationToken).ConfigureAwait(false);
+                if (members.FirstOrDefault(member => member.Name == answer) is { } chosen)
+                {
+                    selectedDirectives = [.. selectedDirectives, chosen];
+                }
+            }
         }
 
         // The same selection graph closes dependencies for interactive, --yes, dry-run, and updates.
@@ -919,7 +990,15 @@ sealed class CheckWorkflow(
 
         return [.. manifest
             .Where(skill => !versions.TryGetValue(skill.SourceRepo, out var version) || StaticSkillManifest.IsOffered(skill, sourceVersionMode, version))
-            .Select(skill => versions.TryGetValue(skill.SourceRepo, out var version)
+            .Select(skill => skill.PinnedRef.Length > 0
+            // Pinned to a release whatever the channel resolved its repository to.
+            ? skill with
+            {
+                SourceRef = skill.PinnedRef,
+                Version = skill.PinnedRef,
+                ResolvedSource = new SourceVersionInfo(skill.SourceRepo, skill.PinnedRef, DateTimeOffset.MinValue)
+            }
+            : versions.TryGetValue(skill.SourceRepo, out var version)
             ? skill with
             {
                 SourceRef = sourceVersionMode == SourceVersionMode.Preview ? version.ContentRef : string.Empty,
@@ -1149,7 +1228,7 @@ sealed class CheckWorkflow(
         string agentsFileName = Path.GetFileName(agentsFile);
         ReportDirectiveDryRunGroup(
             $"Would install directives into {agentsFileName}:",
-            selectedDirectives.Where(directive => directive.Status == DirectiveStatuses.Missing));
+            selectedDirectives.Where(directive => directive.Status is DirectiveStatuses.Missing or DirectiveStatuses.Alternative));
         ReportDirectiveDryRunGroup(
             $"Would update directives in {agentsFileName}:",
             selectedDirectives.Where(directive => directive.Status == DirectiveStatuses.Outdated));
@@ -1584,7 +1663,7 @@ sealed class CheckWorkflow(
             return [];
         }
 
-        string[] lines = [.. OutputLines(updateReport).Where(line => !IsNoticeLine(line))];
+        string[] lines = [.. OutputLines(updateReport).Where(line => !IsNoticeLine(line) && !IsPinnedSkipLine(line))];
         if (lines.Length == 0)
         {
             return [];
@@ -1629,6 +1708,10 @@ sealed class CheckWorkflow(
 
     static bool IsNoticeLine(string line)
         => line.StartsWith('!');
+
+    // gh lists each skill it skips for being pinned ("<name> is pinned to <ref> (skipped)"): not an update.
+    static bool IsPinnedSkipLine(string line)
+        => line.Contains(" is pinned to ", StringComparison.Ordinal) && line.TrimEnd().EndsWith("(skipped)", StringComparison.Ordinal);
 
     internal static IReadOnlyList<string> ExtractNotices(CommandReport report)
         => !report.Success
@@ -1698,7 +1781,7 @@ sealed class CheckWorkflow(
         int sourceStartIndex = metadataIndex + 2;
         int sourceEndIndex = normalized.IndexOf(')', sourceStartIndex);
         string sourceRepo = sourceEndIndex > sourceStartIndex
-            ? normalized[sourceStartIndex..sourceEndIndex].Trim()
+            ? StaticSkillManifest.CurrentName(normalized[sourceStartIndex..sourceEndIndex].Trim())
             : "unknown source";
         return string.IsNullOrWhiteSpace(name)
             ? null
