@@ -19,7 +19,10 @@ terminal's environment changes: `DOTNET_CLI_HOME`, `NUGET_PACKAGES`, `AGENTIC_CH
 PATH, `AGENTIC_CHECK_PREVIEW_SOURCE_REF` and `AGENTIC_CHECK_NUGET_INDEX`. Your normal global tools, caches, GitHub login and
 shell profiles are untouched. In that shell `dna check`, `dna prompt-log`, `dnx agentic.check` and
 agent-started `dotnet agentic` commands all resolve the local packages, because the repository's
-`NuGet.Config` lists only the local feed.
+`NuGet.Config` maps those three package IDs to the local feed, even where nuget.org has the same
+version. Every other package comes from nuget.org, so a test repository such as an Uno app still
+restores, and `dnx` resolves other tools, such as `uno.devserver`, from nuget.org instead of an old
+copy in the NuGet cache.
 
 Directives and skills have no local-file source in Agentic.Check; it reads them from GitHub. The
 script therefore requires HEAD to be pushed and `directives/` and `plugins/` to be clean, and pins

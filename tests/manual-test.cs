@@ -190,12 +190,25 @@ try
         }
     }
 
+    const string nugetOrg = "https://api.nuget.org/v3/index.json";
     string nugetConfig = Path.Combine(target!, "NuGet.Config");
-    string packageSource = published ? "https://api.nuget.org/v3/index.json" : feed;
+    string packageSource = published ? nugetOrg : feed;
     if (existing)
-        Say($"\nRefreshing {nugetConfig} to {(published ? "nuget.org" : "the new feed")}; the repository's files and history are untouched.");
-    new XDocument(new XElement("configuration",
-        new XElement("packageSources", new XElement("clear"), new XElement("add", new XAttribute("key", published ? "nuget.org" : "local-builds"), new XAttribute("value", packageSource))),
+        Say($"\nRefreshing {nugetConfig} to {(published ? "nuget.org" : "the new feed and nuget.org")}; the repository's files and history are untouched.");
+    XElement packageSources = new("packageSources", new XElement("clear"));
+    XElement? packageSourceMapping = null;
+    if (!published)
+    {
+        // The three tools come only from the local feed, even where nuget.org has the same version, which the
+        // inner dev loop reuses. Every other package comes from nuget.org, so the test repository still restores
+        // and dnx resolves other tools, such as an Uno app's uno.devserver, there instead of from the NuGet cache.
+        packageSources.Add(PackageSource("local-builds", feed));
+        packageSourceMapping = new("packageSourceMapping",
+            new XElement("packageSource", new XAttribute("key", "local-builds"), packages.Select(package => new XElement("package", new XAttribute("pattern", package.id)))),
+            new XElement("packageSource", new XAttribute("key", "nuget.org"), new XElement("package", new XAttribute("pattern", "*"))));
+    }
+    packageSources.Add(PackageSource("nuget.org", nugetOrg));
+    new XDocument(new XElement("configuration", packageSources, packageSourceMapping,
         new XElement("fallbackPackageFolders", new XElement("clear")))).Save(nugetConfig);
 
     string toolsDirectory = Path.Combine(cliHome, ".dotnet", "tools");
@@ -298,8 +311,8 @@ try
             : "use the local builds from `feed/` and the pinned content. Your normal global tools, caches, GitHub login and",
         published
             ? "Your normal global tools, caches, GitHub login and shell profiles are unchanged."
-            : "shell profiles are unchanged. `NuGet.Config` in the test repository lists only the local feed; add nuget.org",
-        published ? string.Empty : "there if you need to restore other packages in that repository.",
+            : "shell profiles are unchanged. `NuGet.Config` in the test repository maps these three packages to `feed/`",
+        published ? string.Empty : "and every other package to nuget.org, so the repository still restores.",
         string.Empty,
         $"Reuse this repository: `dotnet run --file tests/manual-test.cs{(published ? " --published" : string.Empty)} --target " + Quote(target!) + "`.",
         string.Empty
@@ -360,6 +373,9 @@ string Git(params string[] arguments)
 // Console text of this repository-only script is not localized (the documented CA1303 exclusion);
 // the parameter name keeps the literal-string analyzer from treating it as localizable UI text.
 static void Say(string line) => Console.WriteLine(line);
+
+static XElement PackageSource(string key, string value)
+    => new("add", new XAttribute("key", key), new XAttribute("value", value));
 
 IReadOnlyList<string> CompletedFixtures(string id)
 {
