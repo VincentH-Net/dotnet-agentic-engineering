@@ -110,7 +110,7 @@ dna check
 
 #### Specialize folders
 
-You can specialize folders within your repo with subsets of directives and skills local to that context, e.g. frontend or backend folders. This reduces your agent context size as compared to installing all directives and skills in the repo root. For details on this:
+You can specialize folders within your repo with subsets of directives and skills local to that context, e.g. frontend or backend folders. This reduces your agent context size as compared to installing all directives and skills in the repo root. A directive and the skill it tells agents to use are installed in the same folder. For details on this:
 ```bash
 dna check -h
 ```

@@ -12,7 +12,7 @@
     {
       "name": "dotnet",
       "source": "./plugins/dotnet",
-      "description": "Skills for .NET development including agent directives, charting with LiveCharts2 and a modern C# 14 editorconfig baseline"
+      "description": "Skills for .NET development including CLI end-to-end testing, charting with LiveCharts2, a modern C# 14 editorconfig baseline and C# refactoring"
     },
     {
       "name": "orleans",

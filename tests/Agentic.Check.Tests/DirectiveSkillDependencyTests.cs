@@ -108,8 +108,9 @@ public sealed class DirectiveSkillDependencyTests
         Assert.Equal([Directive], closed.SelectedDirectives);
     }
 
-    // The same as for a skill that depends on that skill: the row left out because a copy exists above or
-    // below takes the rows that depend on it out of the default selection.
+    // A directive and the skill it names belong in the same folder, whatever a harness reads from the folders
+    // above or below. So the skill that is left out because a copy exists there takes the directive with it,
+    // as it takes a skill that depends on it.
     [Fact]
     public void ASkillPresentElsewhereTakesItsDirectiveOutOfTheDefaultSelection()
     {
@@ -120,6 +121,55 @@ public sealed class DirectiveSkillDependencyTests
 
         Assert.Empty(selection.SelectedDirectives);
         Assert.Empty(selection.SelectedSkills);
+    }
+
+    // Tab OFF installs here what exists above or below, so the rows that left with it come back with it;
+    // the next ON takes both out again. A row the user deselected stays out.
+    [Fact]
+    public void SpecializationOffBringsTheDirectiveBackWithItsSkill()
+    {
+        var needed = Skill("needed");
+        var other = Skill("other");
+        DirectivePlanItem unrelated = new("dotnet-unrelated", DirectiveStatuses.Missing, "Body.");
+        RecommendationSelectionState state = new(RecommendationSelectionPrompt.BuildItems([Directive, unrelated], [needed, other]));
+        state.ApplySpecializationScanResult(new(new Dictionary<string, IReadOnlyList<string>> { [Key(needed)] = ["../.agents/skills/needed/SKILL.md"] }));
+        Assert.Equal([unrelated], state.SelectedDirectives);
+        state.DeselectWithDependents(RecommendationSelectionState.FormatDirectiveKey(unrelated.Name));
+
+        state.ToggleCachedSpecialization();
+
+        Assert.Equal([Directive], state.SelectedDirectives);
+        Assert.Equal([needed, other], state.SelectedSkills);
+        // Deselecting another row must not drop the directive that came back.
+        state.DeselectWithDependents(Key(other));
+        Assert.Equal([Directive], state.SelectedDirectives);
+
+        state.ToggleCachedSpecialization();
+
+        Assert.Empty(state.SelectedDirectives);
+        Assert.Empty(state.SelectedSkills);
+    }
+
+    // The same between skills: a skill selected from the start never brings along the replacement of a
+    // skill with the same name from another repository, or its removal. Selecting the replacement still does.
+    [Fact]
+    public void ASkillSelectedFromTheStartDoesNotBringAnUnselectedReplacementOrItsRemoval()
+    {
+        InstalledSkill[] installed = [new("/repo/.agents/skills", "needed", "someone/else", "skills/needed")];
+        var needed = Skill("needed");
+        SkillManifestEntry dependent = new("fixture", "dependent", "dependent", TechnologyNames.Dotnet, [], dependencies: [new("fixture", "needed")]);
+        SkillManifestEntry[] recommended = [needed, dependent];
+        SkillManifestEntry[] rows = [
+            .. SkillRemovalPlanner.WithReplacements([dependent], recommended, installed),
+            .. SkillRemovalPlanner.PlanRemovals(installed, recommended, new HashSet<SkillIdentity>())];
+        Assert.Equal(3, rows.Length);
+
+        var defaults = RecommendationSelectionPrompt.DefaultSelection([], rows, new(new Dictionary<string, IReadOnlyList<string>>()));
+        var closed = CheckWorkflow.CloseDependencies([], defaults.SelectedSkills, rows);
+
+        Assert.Equal(["dependent"], closed.SelectedSkills.Select(skill => skill.LocalFolder));
+        var replaced = CheckWorkflow.CloseDependencies([], [.. rows.Where(row => row.LocalFolder == "needed" && !SkillRemovalPlanner.IsRemoval(row))], rows);
+        Assert.Equal(["install", SkillInstaller.RemoveAction], replaced.SelectedSkills.Select(skill => skill.RecommendationAction));
     }
 
     // As between skills: the directive is written before skills install and stays when its skill fails;

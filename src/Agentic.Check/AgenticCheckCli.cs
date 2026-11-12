@@ -161,6 +161,10 @@ static class AgenticCheckCli
            above) and Claude Code (composes above, as well as below when working on
            files below its working dir).
 
+        A directive and the skill it tells agents to use are installed in the same folder:
+        when the skill is deselected because it is installed above or below, so is the
+        directive, and selecting the directive selects the skill for this folder too.
+
         Docs: {DnaLauncherContract.DocsUrl}
         """);
         rootCommand.Arguments.Add(targetDirectoryArgument);

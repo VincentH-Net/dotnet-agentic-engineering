@@ -1009,6 +1009,68 @@ public sealed class AgenticCheckEndToEndTests(ITestOutputHelper testOutput)
         AssertRecordingWasWritten(workspace);
     }
 
+    // A directive names the skill it tells agents to use, so the two rows move together in both directions,
+    // and confirming applies exactly that pair.
+    [Fact]
+    [Trait("Category", "EndToEnd")]
+    public async Task InteractiveDirectiveAndTheSkillItNamesAreSelectedTogether()
+    {
+        if (IsUnsupportedPlatform())
+        {
+            return;
+        }
+
+        const string directive = "dotnet-build-errors-and-warnings (install)";
+        const string skill = "dotnet-modern-csharp-editorconfig (install)";
+        using var workspace = await TestWorkspace.CreateAsync(nameof(InteractiveDirectiveAndTheSkillItNamesAreSelectedTogether)).ConfigureAwait(true);
+        var result = await RunInteractiveCommandAsync(
+            workspace,
+            $"--agents codex {Quote(workspace.RepoPath)}",
+            async auto =>
+            {
+                await auto.WaitUntilTextAsync("Recommend ", timeout: TimeSpan.FromSeconds(45)).ConfigureAwait(true);
+                await auto.WaitUntilTextAsync($"[x] {skill}", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
+                await auto.LeftAsync().ConfigureAwait(true);
+                await auto.WaitUntilTextAsync($"[ ] {skill}", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
+                await auto.WaitUntilTextAsync($"[ ] {directive}", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
+
+                // Selecting the directive brings its skill along.
+                await ToggleFilteredRowAsync(auto, "dotnet-build-errors", $"[x] {directive}").ConfigureAwait(true);
+                await auto.WaitUntilTextAsync($"[x] {skill}", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
+
+                // Deselecting the skill takes the directive away.
+                await ToggleFilteredRowAsync(auto, "csharp-editorconfig", $"[ ] {skill}").ConfigureAwait(true);
+                await auto.WaitUntilTextAsync($"[ ] {directive}", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
+
+                await ToggleFilteredRowAsync(auto, "dotnet-build-errors", $"[x] {directive}").ConfigureAwait(true);
+                await auto.WaitUntilTextAsync($"[x] {skill}", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
+                await auto.EnterAsync().ConfigureAwait(true);
+            }).ConfigureAwait(true);
+
+        Assert.Equal(0, result.ExitCode);
+        string[] installs = [.. (await workspace.ReadGhLogAsync().ConfigureAwait(true))
+            .Split('\n')
+            .Where(line => line.StartsWith("skill install", StringComparison.Ordinal))];
+        string install = Assert.Single(installs);
+        Assert.StartsWith("skill install VincentH-Net/dotnet-agentic-engineering dotnet-modern-csharp-editorconfig --dir", install, StringComparison.Ordinal);
+        Assert.True(File.Exists(Path.Combine(workspace.RepoPath, ".agents", "skills", "dotnet-modern-csharp-editorconfig", "SKILL.md")));
+        string agents = await workspace.ReadRepoFileAsync("AGENTS.md").ConfigureAwait(true);
+        Assert.Contains("<!-- dotnet-build-errors-and-warnings:start -->", agents, StringComparison.Ordinal);
+        Assert.DoesNotContain("<!-- dotnet-cli-run:start -->", agents, StringComparison.Ordinal);
+        AssertRecordingWasWritten(workspace);
+    }
+
+    // Types a filter that matches one row, toggles that row, and clears the filter so the whole list is back.
+    static async Task ToggleFilteredRowAsync(Hex1bTerminalAutomator auto, string filter, string expectedRow)
+    {
+        await auto.TypeAsync(filter).ConfigureAwait(true);
+        await auto.WaitUntilTextAsync($"Filter: {filter}", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
+        await auto.SpaceAsync().ConfigureAwait(true);
+        await auto.WaitUntilTextAsync(expectedRow, timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
+        await auto.EscapeAsync().ConfigureAwait(true);
+        await auto.WaitUntilTextAsync("Enter confirm", timeout: TimeSpan.FromSeconds(10)).ConfigureAwait(true);
+    }
+
     [Fact]
     [Trait("Category", "EndToEnd")]
     public async Task InteractiveSkillUpdatePromptUpdatesUniqueSkillsAcrossDirectories()

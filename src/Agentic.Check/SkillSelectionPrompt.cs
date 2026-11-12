@@ -52,6 +52,9 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
     readonly HashSet<string> automaticallySelectedKeys = new(StringComparer.Ordinal);
     // Rows present above or below the target that specialization deselects; target-local repairs stay.
     readonly HashSet<string> specializationKeys = new(StringComparer.Ordinal);
+    // Rows that left the selection only because a row they depend on is one of those. A directive and the
+    // skill it names belong in the same folder, so they leave together and come back together.
+    readonly HashSet<string> specializationDependentKeys = new(StringComparer.Ordinal);
 
     public IReadOnlyList<RecommendationSelectionItem> FilteredItems { get; private set; } = items;
 
@@ -279,11 +282,15 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
 
     void EnableSpecialization()
     {
+        var previouslySelectedKeys = selectedKeys.ToHashSet(StringComparer.Ordinal);
         foreach (string key in specializationKeys)
         {
             DeselectWithDependents(key);
         }
 
+        specializationDependentKeys.UnionWith(previouslySelectedKeys
+            .Except(selectedKeys)
+            .Where(key => !specializationKeys.Contains(key) && DependsOnSpecializationRow(key)));
         IsSpecialized = true;
     }
 
@@ -298,7 +305,37 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
         // Dependencies these rows pulled in are remembered like automatic tools, so the next ON drops
         // them again unless something else still needs them, and a round trip leaves other rows as they were.
         automaticallySelectedKeys.UnionWith(selectedKeys.Except(previouslySelectedKeys).Except(specializationKeys));
+        // The rows ON took along come back as the space bar would select them, so they are not automatic.
+        foreach (string key in specializationDependentKeys)
+        {
+            SelectRow(key);
+        }
+
+        specializationDependentKeys.Clear();
         IsSpecialized = false;
+    }
+
+    bool DependsOnSpecializationRow(string key)
+    {
+        HashSet<string> seen = new(StringComparer.Ordinal) { key };
+        Stack<string> pending = new([key]);
+        while (pending.TryPop(out string? current))
+        {
+            foreach (string dependencyKey in dependencyKeysByKey.GetValueOrDefault(current, []))
+            {
+                if (specializationKeys.Contains(dependencyKey))
+                {
+                    return true;
+                }
+
+                if (seen.Add(dependencyKey))
+                {
+                    pending.Push(dependencyKey);
+                }
+            }
+        }
+
+        return false;
     }
 
     static bool IsTargetLocalRepair(RecommendationSelectionItem item)
@@ -438,13 +475,19 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
 
     static Dictionary<string, IReadOnlyList<string>> BuildDependencyKeysByKey(IReadOnlyList<RecommendationSelectionItem> items)
     {
+        // The rows the check leaves unselected: the replacement of a skill with the same name from another
+        // repository, and a removal that waits for the user.
+        var unselectedKeys = items.Where(item => item.Skill?.SelectedByDefault == false).Select(item => item.Key).ToHashSet(StringComparer.Ordinal);
         var selectableKeys = items.Select(item => item.Key).ToHashSet(StringComparer.Ordinal);
         Dictionary<string, IReadOnlyList<string>> dependencyKeysByKey = new(StringComparer.Ordinal);
         foreach (var item in items)
         {
+            // Only such a row brings another one along, as a replacement brings its removal. A row that is
+            // selected from the start never does, or confirming the list would apply what it showed unselected.
+            bool bringsUnselected = unselectedKeys.Contains(item.Key);
             string[] dependencyKeys = [.. (item.Skill?.Dependencies ?? CompanionDependency.ForDirective(item.Directive?.Name, item.Directive?.Content))
                 .Select(dependency => FormatSkillKey(dependency.SourceRepo, dependency.InstallArg))
-                .Where(selectableKeys.Contains)
+                .Where(key => selectableKeys.Contains(key) && (bringsUnselected || !unselectedKeys.Contains(key)))
                 .Concat(NamedSkillKeys(item.Directive, items))
                 .Distinct(StringComparer.Ordinal)];
             dependencyKeysByKey[item.Key] = dependencyKeys;
