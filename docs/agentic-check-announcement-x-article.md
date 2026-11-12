@@ -27,7 +27,7 @@ dna check
 `dna check` runs the latest `agentic.check`, which detects a .NET web API and lists what fits it:
 
 - **Directives**: short, tested instructions in `AGENTS.md` / `CLAUDE.md`, such as how to run `dotnet` without agent timeouts, how to fix build warnings, which documentation source to consult first, and the prompt log.
-- **Skills**, installed with `gh skill` from tested sources: [dotnet/skills](https://github.com/dotnet/skills), [unoplatform/studio](https://github.com/unoplatform/studio), [mtmattei/UnoPlatformSkills](https://github.com/mtmattei/UnoPlatformSkills) and [VincentH-Net/dotnet-agentic-engineering](https://github.com/VincentH-Net/dotnet-agentic-engineering).
+- **Skills**, installed with `gh skill` from tested sources: [dotnet/skills](https://github.com/dotnet/skills), [unoplatform/studio](https://github.com/unoplatform/studio), [noknowscode/UnoPlatformSkills](https://github.com/noknowscode/UnoPlatformSkills) and [VincentH-Net/dotnet-agentic-engineering](https://github.com/VincentH-Net/dotnet-agentic-engineering).
 - **Tools** that directives and skills depend on, installed with `dotnet tool` and pinned in the target folder.
 
 Directives and skills compose like your stack: Orleans adds to .NET, which adds to Foundation. `agentic.check` currently detects .NET, ASP.NET Core, Microsoft Orleans and Uno Platform. For Uno Platform it also detects MVVM or MVUX, XAML or C# Markup, and the design system. You select what to apply. The goal is to give the agent exactly what this repo needs, and nothing that conflicts with it.

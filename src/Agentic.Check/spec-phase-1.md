@@ -11,7 +11,7 @@ agentic-check is a companion tool to the dotnet-agentic-engineering repo in the 
 This first phase spec is to implement skills install and skills update for foundation, dotnet and uno technologies; agentic-check must use `gh skill` to ensure that the latest version of specific skills from below github repo's are installed as repo-local skills:
 1. dotnet     = https://github.com/dotnet/skills
 2. Uno Studio = https://github.com/unoplatform/studio
-3. Matt       = https://github.com/mtmattei/UnoPlatformSkills
+3. Matt       = https://github.com/noknowscode/UnoPlatformSkills
 4. Vincent    = https://github.com/VincentH-Net/dotnet-agentic-engineering
 
 Align the names of command line parameters to well known .NET cli tools such as `dotnet`, `aspire` and check/doctor tools like `uno-check`.

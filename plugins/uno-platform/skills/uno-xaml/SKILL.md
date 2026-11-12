@@ -3,11 +3,11 @@ name: uno-xaml
 description: "Uno Platform XAML correctness and performance guidance for XAML markup profiles: deferred loading with x:Load, virtualized item-template mechanics, text trimming and layout resilience, UI-bound lifecycle cleanup, UI-thread safety at the Page/control boundary, input scopes, keyboard accelerators, focus, and drag/drop caveats. Use when the selected markup type is XAML or when existing XAML needs performance, lifecycle, input, text overflow, or template fixes. Do NOT use for MVVM property/command patterns, Uno Navigation, Fluent or Material theming, visual design/layout composition, Uno C# Markup, or C# Markup 2; combine with the selected update-model, design-system, navigation, and markup skills instead."
 metadata:
   author: https://github.com/VincentH-Net
-  version: "1.1"
+  version: "1.1.1"
   framework: uno-platform
   category: xaml
   sources:
-    - https://github.com/mtmattei/UnoPlatformSkills/tree/main/winui-xaml
+    - https://github.com/noknowscode/UnoPlatformSkills/tree/main/winui-xaml
     - Microsoft Learn WinUI XAML guidance
     - Uno Platform compatibility caveats
 ---
