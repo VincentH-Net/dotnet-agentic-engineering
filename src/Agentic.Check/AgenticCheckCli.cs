@@ -121,6 +121,7 @@ static class AgenticCheckCli
           .codex/rules, so dotnet has network access without approval prompts
         - Skills are installed / updated directly from source GitHub skill repo's with 
           'gh skill', and a skill a newer release no longer offers is removed again
+        - A directive that tells agents to use a skill is selected together with that skill
         - Tools that directives and skills depend on are installed / updated with 'dotnet tool',
           pinned once per repository in the repo root's .config/dotnet-tools.json
 

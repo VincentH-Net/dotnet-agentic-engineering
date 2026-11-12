@@ -33,7 +33,7 @@ When one does, change every place in the repository that names it, so the code s
 Some of these names leave the repository: a serialized member that is stored or sent over the wire, a table or column name from a database mapping, a configuration key that an environment can also set, a route or another public contract. Whether anything outside already depends on such a name is not visible in the code, so your instructions decide:
 
 - With the Backward-Compatible Renames directive: keep the external name with the mechanism the repository already uses, for example `[JsonPropertyName("oldName")]`, or migrate the stored data and settings as part of the change. Say in your report which one you did.
-- Without it: rename the external name too, and add no compatibility code. List in your report each renamed name that leaves the repository.
+- Without it, or when the request sets it aside by name: rename the external name too, and add no compatibility code. List in your report each renamed name that leaves the repository.
 
 ## Change References, Not Text
 

@@ -97,6 +97,8 @@ you to run `gh auth login`or wait, and then rerun; completed changes are kept. W
 
 `agentic.check` offers to install or update `dotnet agentic` in your repo when a selected directive or skill depends on it.
 
+A directive that tells agents to use a skill is selected together with that skill: selecting the directive selects the skill, and deselecting the skill deselects the directive.
+
 It also offers to install the global `dna`shorthand command for `agentic.check` and `dotnet agentic` (the repo setup tool and the repo-local tool that directives and skills call). After this, you can also install or update repo's with:
 
 ```bash
@@ -161,10 +163,10 @@ This repo offers the following directives (markdown snippets to include in your 
 |----------|-------------|
 | [`foundation-documentation-sources`](./directives/foundation-documentation-sources.md) | Prioritizes first-party vendor MCPs for external documentation, e.g. using Microsoft Learn before Context7 for Microsoft technologies. |
 | [`foundation-prompt-log`](./directives/foundation-prompt-log.md) | Records sanitized user prompts and agent question-and-answer pairs in code commit messages so intent is preserved and can be replayed later. Uses the `dotnet agentic` tool. |
-| [`foundation-backward-compatible-renames`](./directives/foundation-backward-compatible-renames.md) | Keeps stored data, deployed settings and other clients working when agents rename or restructure: a name that leaves the repo keeps working, or what uses it is migrated. Deselect it in `dna check` while nothing outside the repo depends on the project yet. |
 | [`dotnet-cli-run`](./directives/dotnet-cli-run.md) | Prevents long agent timeout delays from running `dotnet` without network access. For Codex, `dna check` also offers rules that run `dotnet` outside the sandbox without approval prompts. |
-| [`dotnet-build-errors-and-warnings`](./directives/dotnet-build-errors-and-warnings.md) | Configures .NET build warnings and errors and a modern C# .editorconfig, then directs agents to fix build errors and warnings or document rare justified suppressions. |
-| [`uno-build-and-run`](./directives/uno-build-and-run.md) | Registers the Uno Platform MCPs at folder scope when they are missing, and standardizes Uno app launch for agents by skipping redundant pre-builds, writing per-run stdout logs via `AGENT_CONSOLE_LOG`, and verifying or stopping the app with the Uno runtime tools. After a change to platform-specific code, the agent also builds the other targets that compile it. |
+| [`dotnet-build-errors-and-warnings`](./directives/dotnet-build-errors-and-warnings.md) | Configures .NET build warnings and errors and a modern C# .editorconfig, then directs agents to fix build errors and warnings or document rare justified suppressions. Uses the `dotnet-modern-csharp-editorconfig` skill. |
+| [`dotnet-backward-compatible-renames`](./directives/dotnet-backward-compatible-renames.md) | Keeps stored data, deployed settings and other clients working when agents rename or restructure: a name that leaves the repo keeps working, or what uses it is migrated. Name the directive in a request to allow a breaking rename for that change. Deselect it in `dna check` while nothing outside the repo depends on the project yet. Uses the `dotnet-refactoring` skill. |
+| [`uno-build-and-run`](./directives/uno-build-and-run.md) | Registers the Uno Platform MCPs at folder scope when they are missing, and standardizes Uno app launch for agents by skipping redundant pre-builds, writing per-run stdout logs via `AGENT_CONSOLE_LOG`, and verifying or stopping the app with the Uno runtime tools. After a change to platform-specific code, the agent also builds the other targets that compile it. Uses the `uno-agentic-support` skill. |
 
 ## Skills catalog
 
@@ -179,7 +181,7 @@ Skills for .NET development.
 | `cli-e2e-testing` | CLI end-to-end testing guide for real terminal flows with Hex1b automation, keyboard input, observable terminal output, and asciinema recordings. |
 | `dotnet-livecharts2` | LiveCharts2 development guide — installation, XAML source generator integration, theme config, gotchas, and sample index with exact repo file paths. Covers all platforms (WinUI, Uno, Avalonia, MAUI, WPF, Blazor, WinForms, Eto). |
 | `dotnet-modern-csharp-editorconfig` | Drop-in opinionated `.editorconfig` for modern C# (C# 14 / .NET 10, also works with C# 10–13) — formatting, naming, style, and preview analyzer severities. Covers required `.csproj` flags and the .NET 8 vs .NET 9+ build-respect-editorconfig distinction. |
-| `dotnet-refactoring` | What a green build does not check when C# code is refactored — names read at runtime, edits to text that only looks like a reference, behavior drift while deduplicating, generated and partial code, and targets the default build skips. Follows the `foundation-backward-compatible-renames` directive for names that leave the repo. |
+| `dotnet-refactoring` | What a green build does not check when C# code is refactored — names read at runtime, edits to text that only looks like a reference, behavior drift while deduplicating, generated and partial code, and targets the default build skips. Follows the `dotnet-backward-compatible-renames` directive for names that leave the repo. |
 
 ### orleans plugin
 

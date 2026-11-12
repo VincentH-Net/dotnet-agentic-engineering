@@ -10,12 +10,14 @@ This lets you:
   - Disable Hot Reload / Hot Design UI, which can get in the way of agents testing the app
   - Enable debug logging to specified file as early as possible during app start, so the agents can see and address any runtime warnings and errors
 
+This directive uses the `uno-agentic-support` skill; `dna check` selects the two together.
+
 Use `dna check` to install or update directives for your technology, or manually copy below markdown in your `AGENTS.MD`:
 
 ~~~md
 <!-- uno-build-and-run:start -->
 ## Build and Run
-This directive overrides any skill's build, start, verify and stop steps, including `uno-testing`; apply `uno-agentic-support` without asking first.
+This directive overrides any skill's build, start, verify and stop steps, including `uno-testing`; apply the `uno-agentic-support` skill without asking first.
 
 ### Uno Platform MCPs
 Once per session, BEFORE the first Uno task, check that the tools `uno_platform_docs_search` and `uno_app_start` (or `uno_discover_tools`) are listed. If NOT, register these MCP servers at folder/project scope, then tell the user to run `dnx -y uno.devserver login` outside the session and restart:

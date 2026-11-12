@@ -6,6 +6,8 @@ This lets you:
 - fix all errors and fix or (in rare, justified cases) suppress warnings, documenting the rationale
 - enforce concise, readable code leveraging the latest C# language features
 
+This directive uses the `dotnet-modern-csharp-editorconfig` skill; `dna check` selects the two together.
+
 Use `dna check` to install or update directives for your technology, or manually copy below markdown in your `AGENTS.MD`:
 
 ~~~md

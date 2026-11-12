@@ -308,8 +308,8 @@ public sealed class DirectiveInstallerTests
             new HashSet<string>(StringComparer.OrdinalIgnoreCase) { TechnologyNames.Foundation, TechnologyNames.Dotnet, TechnologyNames.Uno },
             [],
             []);
-        string[] listed = ["foundation-prompt-log", "dotnet-cli-run", "foundation-backward-compatible-renames", "uno-build-and-run", "dotnet-build-errors-and-warnings"];
-        string[] expected = ["uno-build-and-run", "dotnet-build-errors-and-warnings", "dotnet-cli-run", "foundation-backward-compatible-renames", "foundation-prompt-log"];
+        string[] listed = ["foundation-prompt-log", "dotnet-cli-run", "foundation-documentation-sources", "uno-build-and-run", "dotnet-build-errors-and-warnings", "dotnet-backward-compatible-renames"];
+        string[] expected = ["uno-build-and-run", "dotnet-backward-compatible-renames", "dotnet-build-errors-and-warnings", "dotnet-cli-run", "foundation-documentation-sources", "foundation-prompt-log"];
         FakeDirectiveSource source = new(listed.ToDictionary(name => name + ".md", FakeDirectiveSource.DirectiveFile, StringComparer.Ordinal));
         DirectiveInstaller installer = new(source, new NullReporter());
 

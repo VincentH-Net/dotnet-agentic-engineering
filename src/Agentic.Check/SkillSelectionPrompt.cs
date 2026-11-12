@@ -445,11 +445,25 @@ sealed class RecommendationSelectionState(IReadOnlyList<RecommendationSelectionI
             string[] dependencyKeys = [.. (item.Skill?.Dependencies ?? CompanionDependency.ForDirective(item.Directive?.Name, item.Directive?.Content))
                 .Select(dependency => FormatSkillKey(dependency.SourceRepo, dependency.InstallArg))
                 .Where(selectableKeys.Contains)
+                .Concat(NamedSkillKeys(item.Directive, items))
                 .Distinct(StringComparer.Ordinal)];
             dependencyKeysByKey[item.Key] = dependencyKeys;
         }
 
         return dependencyKeysByKey;
+    }
+
+    // The rows that install a skill the directive tells the agent to use. A row the check leaves unselected,
+    // such as the replacement of a skill with the same name from another repository, is never brought along.
+    static IEnumerable<string> NamedSkillKeys(DirectivePlanItem? directive, IReadOnlyList<RecommendationSelectionItem> items)
+    {
+        var named = DirectiveSkillDependency.NamedIn(directive?.Content);
+        return named.Count == 0
+            ? []
+            : items
+                .Where(item => item is { Kind: RecommendationSelectionKind.Skill, Skill: { SelectedByDefault: true } skill }
+                    && !SkillRemovalPlanner.IsRemoval(skill) && named.Contains(skill.LocalFolder))
+                .Select(item => item.Key);
     }
 
     static Dictionary<string, IReadOnlyList<string>> BuildDependentKeysByKey(IReadOnlyList<RecommendationSelectionItem> items)
