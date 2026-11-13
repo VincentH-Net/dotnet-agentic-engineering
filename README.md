@@ -20,8 +20,7 @@ Install `dna` once per machine, then one command does everything:
 > [!NOTE]
 > `dna`: [dotnet-agentic-engineering](https://github.com/VincentH-Net/dotnet-agentic-engineering) in one command
 
-<!-- TODO screenshot: replace with a 2.3 capture of `dna check` showing the action list with directives, skills, and the InnoWvate.Agentic and dna tool actions. -->
-![Terminal window on macOS running dnx agentic.check in the Api3 project folder, showing large cyan and green agentic-check ASCII art. The terminal text reads ~/Projects/Api3, dnx agentic.check, .NET Agentic Engineering Check 0.3.1, Optimizes your repo for agentic engineering with .NET - based technologies. The surrounding environment is a dark terminal window with standard macOS window controls. The tone is technical, polished, and reassuring.](docs/images/agentic-check.png)
+This 66-second video shows the check on a new Uno Platform 7 app on .NET 11:
 
 The skills available for composition are carefully tested and are selected from best-in-class GitHub skills repo's:
 
