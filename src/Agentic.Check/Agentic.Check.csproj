@@ -2,12 +2,14 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
+    <!-- Start on a machine that has only a newer .NET runtime, such as .NET 11 without .NET 10. -->
+    <RollForward>Major</RollForward>
     <ImplicitUsings>enable</ImplicitUsings>
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>agentic-check</ToolCommandName>
     <PackageId>Agentic.Check</PackageId>
     <Title>Agentic Check</Title>
-    <Version>2.6.0</Version>
+    <Version>2.6.1</Version>
     <Authors>Vincent Hoogendoorn</Authors>
     <Company>InnoWvate.NET</Company>
     <Copyright>Copyright © 2026 Vincent Hoogendoorn / InnoWvate.NET</Copyright>

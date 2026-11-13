@@ -2,6 +2,8 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
+    <!-- Start on a machine that has only a newer .NET runtime, such as .NET 11 without .NET 10. -->
+    <RollForward>Major</RollForward>
     <ImplicitUsings>enable</ImplicitUsings>
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>agentic</ToolCommandName>
@@ -10,7 +12,7 @@
     <!-- Agentic.Check reads this literal version from this GitHub path to install a compatible tool.
          Keep it explicit here (no imports/expressions); update consumer -m values when major/minor changes.
          If this file moves, update Agentic.Check's source path; contract tests verify both. -->
-    <Version>2.4.0</Version>
+    <Version>2.4.1</Version>
     <Authors>Vincent Hoogendoorn</Authors>
     <Company>InnoWvate.NET</Company>
     <Copyright>Copyright © 2026 Vincent Hoogendoorn / InnoWvate.NET</Copyright>

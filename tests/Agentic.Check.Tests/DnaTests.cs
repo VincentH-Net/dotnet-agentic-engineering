@@ -220,13 +220,14 @@ sealed class DnaRunner(ToolRunner? companion = null) : ICommandRunner
 {
     internal string? Version { get; set; }
     internal List<IReadOnlyList<string>> Writes { get; } = [];
-    readonly ToolRunner companion = companion ?? new();
+    // Every command that is not about the global dna goes to this runner.
+    internal ToolRunner Commands { get; } = companion ?? new();
 
     public Task<CommandResult> RunAsync(string fileName, IReadOnlyList<string> arguments, string workingDirectory,
         CancellationToken cancellationToken, IReadOnlyDictionary<string, string?>? environment = null)
     {
         if (fileName != "dotnet" || !arguments.Contains("--global"))
-            return companion.RunAsync(fileName, arguments, workingDirectory, cancellationToken, environment);
+            return Commands.RunAsync(fileName, arguments, workingDirectory, cancellationToken, environment);
         if (arguments[1] == "list")
         {
             object[] data = Version is null ? [] : [new { packageId = DnaInstaller.PackageId, version = Version, commands = new[] { "dna" } }];

@@ -41,6 +41,19 @@ sealed class DnaInstaller(ICommandRunner runner, string? searchPath = null, stri
         }
     }
 
+    // Whether a version is older than the latest published one. A version that cannot be read is not judged.
+    internal static bool IsOlderThan(string version, ToolVersion latest)
+    {
+        try
+        {
+            return ToolVersion.Parse(version).CompareTo(latest) < 0;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
+
     internal static SkillManifestEntry Action(DnaInstallation installation)
         => new(string.Empty, PackageId, "`dna` shorthand for `dotnet agentic`", string.Empty, [],
             dependencies: [CompanionDependency.Identity], recommendationAction: installation.Action,

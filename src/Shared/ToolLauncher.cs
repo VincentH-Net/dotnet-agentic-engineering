@@ -45,8 +45,15 @@ static class ToolLauncher
             return 130;
         }
 
-        return await RunAsync(["tool", "exec", "Agentic.Check", "--", .. arguments], directory, error, cancellationToken).ConfigureAwait(false);
+        return await RunAsync(CheckArguments(arguments), directory, error, cancellationToken).ConfigureAwait(false);
     }
+
+    // The .NET 11 SDK starts a version of a tool that it downloaded before, unless its feeds answer within
+    // 100 ms, so a new release of Agentic.Check would not be picked up. --no-http-cache makes it ask the
+    // feeds for the latest version, as the .NET 10 SDK always does; a version that is already downloaded
+    // is not downloaded again.
+    internal static string[] CheckArguments(string[] arguments)
+        => ["tool", "exec", "Agentic.Check", "--no-http-cache", "--", .. arguments];
 
     internal static async Task<int> RunAsync(string[] arguments, string directory, TextWriter error, CancellationToken cancellationToken = default)
     {

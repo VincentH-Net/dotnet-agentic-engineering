@@ -20,7 +20,7 @@ public sealed class DnaPackageTests
         var installed = await installer.EnsureAsync(absent, workspace.Target, false, true, new NoPrompts(), CancellationToken.None).ConfigureAwait(true);
         Assert.True(installed.Success, installed.Error);
         Assert.Equal("install", installed.Action);
-        Assert.Equal("1.0.0", installed.ResolvedVersion);
+        Assert.Equal("1.0.1", installed.ResolvedVersion);
         Assert.True(File.Exists(installer.CommandPath));
 
         // Help works before the tool is pinned: the built-in page names check and points at the rest.

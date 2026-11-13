@@ -134,6 +134,46 @@ sealed class CheckWorkflow(
             }
         }
 
+        string checkCommand = launcher is null ? DnaLauncherContract.StandaloneCheckLauncher : DnaLauncherContract.CheckLauncher;
+
+        // Only the latest Agentic.Check is tested with the content it reads: every version reads the directives
+        // and skills of the latest release, while its list of skills and their sources is compiled in. So an
+        // older one does no work, in any kind of run. It can be running without anyone having asked for it: the
+        // .NET 11 SDK starts a version of a tool that it downloaded before unless its feeds answer within 100 ms.
+        var latestCheck = await LatestListedAsync(ToolHeader.PackageId).ConfigureAwait(false);
+        bool outdatedCheck = latestCheck is not null && DnaInstaller.IsOlderThan(ToolHeader.Version, latestCheck);
+
+        if (launcher is not null)
+        {
+            // The action list never offers the dna update in a run that dna started, because the running dna
+            // cannot be replaced. So the run says it. A person at the terminal updates dna before anything else
+            // happens; a run without one goes on with a warning, unless that dna started an older check.
+            var latestDna = await LatestListedAsync(DnaInstaller.PackageId).ConfigureAwait(false);
+            if (latestDna is not null && DnaInstaller.IsOlderThan(launcher.Version, latestDna))
+            {
+                string outdated = $"The dna shorthand {WithoutBuildMetadata(launcher.Version)} is older than the latest {latestDna}. Run `dotnet tool update --global {DnaInstaller.PackageId}`";
+                if (outdatedCheck || (!options.DryRun && !options.Yes && prompts.IsInteractive))
+                {
+                    string error = outdated + ", then run `dna check` again.";
+                    report.Prerequisites[^1] = report.Prerequisites[^1] with { Success = false, StandardError = error };
+                    reporter.Error(error);
+                    await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
+                    return new CheckRunResult(2, report);
+                }
+
+                report.Warnings.Add(outdated + ".");
+            }
+        }
+
+        if (outdatedCheck)
+        {
+            string error = $"Agentic.Check {ToolHeader.Version} is older than the latest {latestCheck}, and only the latest version works with the latest directives and skills. Run `dnx agentic.check --no-http-cache`.";
+            report.Prerequisites.Add(new(ToolHeader.PackageId, false, ToolHeader.Version, latestCheck!.ToString(), string.Empty, error));
+            reporter.Error(error);
+            await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
+            return new CheckRunResult(2, report);
+        }
+
         var prerequisites = await new PrerequisiteChecker(commandRunner)
             .CheckAsync(report.TargetDirectory, cancellationToken)
             .ConfigureAwait(false);
@@ -587,6 +627,12 @@ sealed class CheckWorkflow(
                 ? null
                 : NuGetVersionSource.Latest(await versionSource.VersionsAsync(packageId, cancellationToken).ConfigureAwait(false), major, includePrerelease);
 
+        // The latest stable version that an install or update without a version number selects.
+        async Task<ToolVersion?> LatestListedAsync(string packageId)
+            => versionSource is null
+                ? null
+                : NuGetVersionSource.Latest(await versionSource.ListedVersionsAsync(packageId, cancellationToken).ConfigureAwait(false), null, false);
+
         if (codexRulesPlan is { IsCurrent: false })
         {
             recommendedSkillActions = [.. recommendedSkillActions, CodexRulesInstaller.Action(codexRulesPlan)];
@@ -618,6 +664,15 @@ sealed class CheckWorkflow(
 
         if (recommendedDirectives.Count > 0 || recommendedSkillActions.Count > 0)
         {
+            // The action list needs a person at a terminal. An agent or a pipeline passes an option that says
+            // what it wants instead; without one the run stops here, before it applies anything.
+            if (!options.DryRun && !options.Yes && !prompts.IsInteractive)
+            {
+                reporter.Error($"{recommendedDirectives.Count + recommendedSkillActions.Count} action(s) are recommended, but this run has no terminal to select them in. Run `{checkCommand} --yes` to apply them all, or `{checkCommand} --dry-run` to list them.");
+                await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
+                return new CheckRunResult(2, report);
+            }
+
             // Non-interactive runs start from the same specialization default as the prompt, so a folder
             // below an installed root never gets a second copy of what it already inherits.
             var selection = options.DryRun || options.Yes
@@ -860,12 +915,17 @@ sealed class CheckWorkflow(
 
         if (!options.Preview)
         {
-            await RunSkillUpdateAsync(githubRunner, options, skillsDirectories, targetDirectory, report, skillUpdates, manifest, async updateSkills =>
+            bool asked = await RunSkillUpdateAsync(githubRunner, options, skillsDirectories, targetDirectory, report, skillUpdates, manifest, checkCommand, async updateSkills =>
             {
                 var closure = CloseDependencies([], updateSkills, [.. manifest, CompanionDependency.Action()]);
                 return !closure.SelectedSkills.Any(skill => skill.IsCompanion)
                     || await EnsureCompanionAsync(closure.SelectedSkills.First(skill => skill.Dependencies.Contains(CompanionDependency.Identity)).ResolvedSourceRef, null, false).ConfigureAwait(false);
             }, cancellationToken).ConfigureAwait(false);
+            if (!asked)
+            {
+                await WriteReportAsync(options.ReportPath, report, cancellationToken).ConfigureAwait(false);
+                return new CheckRunResult(2, report);
+            }
         }
 
         int exitCode = report.SkillRemovals.Any(result => !result.Success) || report.Companion?.Success == false || report.Dna?.Success == false || report.CodexRules?.Success == false || report.ReadmeBadge?.Success == false || report.SkillUpdates.Any(result => !result.Success) || report.InstallResults.Any(result => !result.Success) || report.SkillCopyResults.Any(result => !result.Success) ? 1 : 0;
@@ -1019,7 +1079,8 @@ sealed class CheckWorkflow(
         }
     }
 
-    async Task RunSkillUpdateAsync(
+    // False when the updates need a confirmation and the run has no terminal to ask in.
+    async Task<bool> RunSkillUpdateAsync(
         ICommandRunner githubRunner,
         AgenticCheckOptions options,
         IReadOnlyList<string> skillsDirectories,
@@ -1027,21 +1088,28 @@ sealed class CheckWorkflow(
         AgenticCheckReport report,
         IReadOnlyList<SkillUpdateCandidate> skillUpdates,
         IReadOnlyList<SkillManifestEntry> manifest,
+        string checkCommand,
         Func<IReadOnlyList<SkillManifestEntry>, Task<bool>> ensurePrerequisites,
         CancellationToken cancellationToken)
     {
         if (report.SkillUpdateDryRuns.All(result => !result.Success))
         {
-            return;
+            return true;
         }
 
         if (skillUpdates.Count == 0)
         {
             report.Actions.Add("No target-local skill updates found.");
-            return;
+            return true;
         }
 
         ReportSkillUpdates(skillUpdates, recommendedSkills: manifest);
+
+        if (!options.Yes && !prompts.IsInteractive)
+        {
+            reporter.Error($"{skillUpdates.Count} skill update(s) are available, but this run has no terminal to confirm them in. Run `{checkCommand} --yes` to apply them, or `{checkCommand} --dry-run` to list them.");
+            return false;
+        }
 
         bool update = options.Yes || await prompts.ConfirmAsync("Update these skill(s)?", false, cancellationToken)
             .ConfigureAwait(false);
@@ -1049,7 +1117,7 @@ sealed class CheckWorkflow(
         if (!update)
         {
             report.Actions.Add("Skipped target-local skill updates.");
-            return;
+            return true;
         }
 
         List<(string SkillsDirectory, CommandReport Report)> failures = [];
@@ -1114,6 +1182,8 @@ sealed class CheckWorkflow(
                 reporter.Success(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Updated {updatedCount} skill(s) successfully."));
             }
         }
+
+        return true;
     }
 
     // gh names each skill it updated on its own line; without such lines a run that only
@@ -1247,6 +1317,9 @@ sealed class CheckWorkflow(
             return null;
         }
     }
+
+    static string WithoutBuildMetadata(string version)
+        => version.Split('+')[0];
 
     static bool IsAtLeast(string installed, ToolVersion latest)
     {

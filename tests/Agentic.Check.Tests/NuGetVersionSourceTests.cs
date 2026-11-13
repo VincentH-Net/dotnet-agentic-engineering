@@ -1,4 +1,6 @@
+using System.IO.Compression;
 using System.Net;
+using System.Text;
 
 namespace Agentic.Check.Tests;
 
@@ -79,6 +81,86 @@ public sealed class NuGetVersionSourceTests
         using HttpClient client = new(handler, disposeHandler: false);
 
         Assert.Null(await new NuGetVersionSource(client).VersionsAsync("InnoWvate.Agentic", CancellationToken.None));
+    }
+
+    // nuget.org keeps an unlisted version downloadable but never selects it for an install or update without
+    // a version number. Its registration documents say which versions are listed, and are stored compressed.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ListedVersionsLeaveOutTheUnlistedOnes(bool compressed)
+    {
+        const string registration = """
+            {"items":[{"items":[
+              {"catalogEntry":{"version":"1.0.0","listed":true}},
+              {"catalogEntry":{"version":"1.0.1","listed":false}},
+              {"catalogEntry":{"version":"1.0.2+build.7"}},
+              {"catalogEntry":{"version":"not-a-version","listed":true}}]}]}
+            """;
+        using StubHandler handler = new(request => new(HttpStatusCode.OK) { Content = compressed ? Compressed(registration) : new StringContent(registration) });
+        using HttpClient client = new(handler, disposeHandler: false);
+
+        var versions = await new NuGetVersionSource(client).ListedVersionsAsync("InnoWvate.Dna", CancellationToken.None);
+
+        Assert.Equal(["1.0.0", "1.0.2+build.7"], versions!.Select(version => version.ToString()));
+        Assert.Equal("https://api.nuget.org/v3/registration5-gz-semver2/innowvate.dna/index.json", handler.Requested?.ToString());
+    }
+
+    // A package with many versions keeps each page of its registration in a document of its own.
+    [Fact]
+    public async Task ListedVersionsFollowThePagesOfALongHistory()
+    {
+        const string page = "https://api.nuget.org/v3/registration5-gz-semver2/innowvate.dna/page/1.0.0/1.0.1.json";
+        using StubHandler handler = new(request => new(HttpStatusCode.OK)
+        {
+            Content = new StringContent(request.RequestUri!.ToString() == page
+                ? """{"items":[{"catalogEntry":{"version":"1.0.0","listed":true}},{"catalogEntry":{"version":"1.0.1","listed":true}}]}"""
+                : """{"items":[{"@id":"PAGE"},{"items":[{"catalogEntry":{"version":"1.1.0","listed":true}}]}]}""".Replace("PAGE", page, StringComparison.Ordinal))
+        });
+        using HttpClient client = new(handler, disposeHandler: false);
+
+        var versions = await new NuGetVersionSource(client).ListedVersionsAsync("InnoWvate.Dna", CancellationToken.None);
+
+        Assert.Equal(["1.0.0", "1.0.1", "1.1.0"], versions!.Select(version => version.ToString()));
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.NotFound, "")]
+    [InlineData(HttpStatusCode.OK, "not json")]
+    [InlineData(HttpStatusCode.OK, "{}")]
+    public async Task ListedVersionsAreUnknownWhenTheRegistrationCannotBeRead(HttpStatusCode status, string content)
+    {
+        using StubHandler handler = new(request => new(status) { Content = new StringContent(content) });
+        using HttpClient client = new(handler, disposeHandler: false);
+
+        Assert.Null(await new NuGetVersionSource(client).ListedVersionsAsync("InnoWvate.Dna", CancellationToken.None));
+    }
+
+    // A folder of packages that stands in for nuget.org has no unlisted versions.
+    [Fact]
+    public async Task ListedVersionsOfADirectoryIndexAreItsVersions()
+    {
+        using TempDirectory temp = new();
+        foreach (string package in new[] { "InnoWvate.Dna.1.0.0.nupkg", "InnoWvate.Dna.1.0.1.nupkg" })
+            temp.Write(package, string.Empty);
+        using HttpClient client = new();
+
+        var versions = await new NuGetVersionSource(client, temp.Path).ListedVersionsAsync("InnoWvate.Dna", CancellationToken.None);
+
+        Assert.Equal(["1.0.0", "1.0.1"], versions!.Select(version => version.ToString()).Order(StringComparer.Ordinal));
+    }
+
+    static ByteArrayContent Compressed(string text)
+    {
+        using MemoryStream buffer = new();
+        using (GZipStream gzip = new(buffer, CompressionMode.Compress, leaveOpen: true))
+        {
+            gzip.Write(Encoding.UTF8.GetBytes(text));
+        }
+
+        ByteArrayContent content = new(buffer.ToArray());
+        content.Headers.ContentEncoding.Add("gzip");
+        return content;
     }
 
     sealed class StubHandler(Func<HttpRequestMessage, HttpResponseMessage> respond) : HttpMessageHandler

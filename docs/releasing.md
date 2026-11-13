@@ -61,6 +61,25 @@ only when it changed.
   unpublished. Publishing before the fast-forward (steps 3 and 4) guarantees this for a release; do
   not merge a branch that raised the companion's minor or major into `main` any earlier. A patch that
   is ahead of nuget.org is harmless, because only the major.minor is required.
+- **Only the latest `Agentic.Check` runs.** Every version reads the directives and skills of the latest
+  release, or of `main` with `--preview`, while its list of skills and their sources is compiled in.
+  So only the newest version is tested with that content, and an older one is not supported, also not
+  when it is asked for by number. A check that finds a newer stable version listed on nuget.org stops
+  before any work, in every kind of run, and names the command that gets it. Publishing before the
+  tag (steps 3 and 4) keeps this safe: the version it points to works with the content of the
+  previous release and of the new one. A test shell or a mirror sets `AGENTIC_CHECK_NUGET_INDEX` to
+  say where the latest version is looked up.
+- **A run that `dna` started announces a newer `dna`; it cannot install it.** The running `dna`
+  cannot be replaced, so that run never offers its update. It stops with the update command when a
+  person is at the terminal, and warns and continues with `--yes`, `--dry-run` or without a
+  terminal. When that `dna` started an older check, the run stops with the `dna` update command in
+  every case.
+- **To take a release back, undo both halves.** Unlist `Agentic.Check` on nuget.org: the check and
+  the SDK only count listed versions, so the previous version runs again. And take the GitHub
+  release out of "latest", by deleting it or marking it a pre-release, so that the previous version
+  reads the content it was tested with. A machine that runs the unlisted version from its cache
+  through plain `dnx` on the .NET 11 SDK keeps it until a newer version is published, so publish a
+  fixed version soon after.
 
 ## Steps
 

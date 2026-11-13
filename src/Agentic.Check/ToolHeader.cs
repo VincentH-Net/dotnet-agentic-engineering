@@ -47,7 +47,10 @@ static class ToolHeader
             + Styled($"underline {CheckColor}", "Check")
             + Subdued($" {Version}");
 
-    static string Version
+    internal const string PackageId = "Agentic.Check";
+
+    // The version of the running tool without its build metadata.
+    internal static string Version
     {
         get
         {

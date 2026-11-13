@@ -135,6 +135,9 @@ sealed class MappedCommandRunner : ICommandRunner
 
 sealed class FakePrompts : IUserPrompts
 {
+    // Whether a person can answer at a terminal; an agent or a pipeline has none.
+    public bool IsInteractive { get; init; } = true;
+
     public bool ConfirmResult { get; init; } = true;
 
     public List<string> ConfirmPrompts { get; } = [];
