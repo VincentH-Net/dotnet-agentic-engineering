@@ -24,6 +24,8 @@ This 66-second video shows the check on a new Uno Platform 7 app on .NET 11:
 
 https://github.com/user-attachments/assets/e2b27903-7cfa-48a1-87b6-9d489a4288d5
 
+This 73-second video shows what an agent then does in such a repo with one prompt, "Run the app":
+
 The skills available for composition are carefully tested and are selected from best-in-class GitHub skills repo's:
 
 - [dotnet/skills](https://github.com/dotnet/skills)
